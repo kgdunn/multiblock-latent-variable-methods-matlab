@@ -12,10 +12,10 @@
 classdef block
     % Class attributes
     properties
-        data_raw = false;       % Raw data for the block: never touched, unless excluded
+        raw_data = false;       % Raw data for the block: only used for batch blocks
         data = false;           % Working data: will be processed by the software
-        data_pred = [];         % Predicted values of the data: only used in PLS models
-        data_pred_pp = [];      % Predicted values of the data, pre-processed: only used in PLS models
+        %data_pred = [];         % Predicted values of the data: only used in PLS models
+        %data_pred_pp = [];      % Predicted values of the data, pre-processed: only used in PLS models
         
         has_missing = false;
         is_preprocessed = false;
@@ -34,25 +34,16 @@ classdef block
         lim = struct;       % Statstical limits for the model entries
         
         % Batch data specific
-        J = 0;              % Number of batch time steps 
+%        
         nTags = 0;          % Number of batch tags
         
         % Block parameters
         A = 0;       % Number of components
         N = 0;       % Number of observations
         K = 0;       % Number of variables (columns)
+        J = 0;       % Number of batch time steps (non-zero for batch blocks)
         
-        % Block model parameters
-        P = [];      % Block loadings, P.  For PLS this is also C
-        T = [];      % Block scores, T.  For PLS this is also U
-        T_j = [];    % Instantaneous scores (batch models)
-        error_j = [];% Instantaneous errors (batch models)
-        S = [];      % Std deviation of the scores
-        W = [];      % Block weights (used for PLS only)
-        R = [];      % Block weights (W-star matrix, for PLS only) 
-        C = [];      % Block loadings (for PLS Y-blocks only)
-        U = [];      % Block scores (for PLS Y-blocks only) 
-        beta = [];   % Beta-regression coeffients (for PLS X-blocks only)
+        
     end
     
     methods
@@ -70,10 +61,6 @@ classdef block
                 self = given_data;
                 return
             end            
-            
-            % Prediction of the data, using A components
-            % Not available on X-space blocks
-            self.data_pred = false;
             
             [self.N, self.K] = size(given_data);
             self.mmap = false;            
@@ -96,9 +83,9 @@ classdef block
             
             % Third argument: block type
             try
-                self.block_type = lower(varargin{3});
+               self.block_type = lower(varargin{3});
             catch ME
-                self.block_type = 'ordinary';
+               self.block_type = 'ordinary';
             end
             valid_types = {'ordinary', 'batch'};
             found = false;
@@ -150,13 +137,13 @@ classdef block
                 % tags at time 2, and so on, up till time step J.
                 % So we write that X = K*J (K tags, at J time steps).
                 
-                self.data_raw = cell(nBatches,1);
+                self.raw_data = cell(nBatches,1);
                 self.data = zeros(nBatches, self.J * self.nTags);
                 for n = 1:nBatches
                     startRow = (n-1) * self.J+1;
                     endRow = startRow - 1 + self.J;
-                    self.data_raw{n} = given_data(startRow:endRow,:);
-                    temp = self.data_raw{n}';
+                    self.raw_data{n} = given_data(startRow:endRow,:);
+                    temp = self.raw_data{n}';
                     self.data(n, :) = temp(:)';
                 end
                 self.N = nBatches;                
@@ -164,127 +151,15 @@ classdef block
             else
                 self.J = 0;
                 self.data = given_data;
-                self.data_raw = given_data;
+                self.raw_data = given_data;
             end
             
 
-            self.A = 0;
-        
             % Create storage for other associated matrices
-            self = self.initialize_storage(self.A);
+            %self = self.initialize_storage(self.A);
         end
         
-        function self = initialize_storage(self, A)
-            % Initializes storage matrices with the correct dimensions.
-            % If ``A`` is given, and ``A`` > ``self.A`` then it will expand
-            % the storage matrices to accommodate the larger number of
-            % components.
-            if A <= self.A
-                A = self.A;
-            end
-            
-            self.P = zeroexp([self.K, A], self.P);  % loadings; .C for PLS
-            self.T = zeroexp([self.N, A], self.T);  % block scores, .U for PLS
-            self.S = zeroexp([1, A], self.S);       % score scaling factors
-            self.W = zeroexp([self.K, A], self.W);  % PLS weights
-            self.R = zeroexp([self.K, A], self.R);  % PLS weights
-            self.C = zeroexp([self.K, A], self.C);  % PLS Y-space loadings
-            self.U = zeroexp([self.N, A], self.U);  % PLS Y-space scores
 
-            % Block preprocessing options: resets them
-            if numel(self.PP) == 0
-                self.PP = struct('mean_center', [], 'scaling', []);
-                %self.PP.mean_center = zeros(1, self.K);
-                %self.PP.scaling = zeros(1, self.K);
-            end
-
-            % Calculated values for this block
-            % --------------------------------
-            % Overall SPE value for the complete observation, per component
-            if isempty(fieldnames(self.stats))
-                self.stats.SPE = [];
-                self.stats.SPE_j = [];
-                
-                self.stats.start_SS_col = [];
-                self.stats.deflated_SS_col = [];                
-                self.stats.R2k_a = [];
-                self.stats.R2k_cum = [];
-                self.stats.R2_a = [];
-                self.stats.R2 = [];
-                self.stats.VIP_a = [];
-                self.stats.VIP = [];
-                
-                self.stats.T2 = [];
-                self.stats.T2_j = [];
-                
-                self.stats.model_power = [];
-            end
-            if isempty(fieldnames(self.lim))
-                % Ordinary model portion
-                self.lim.t = [];
-                self.lim.T2 = [];
-                self.lim.SPE = [];
-                
-                % Instantaneous (batch) model portion
-                self.lim.t_j = [];                
-                self.lim.SPE_j = []; 
-                self.lim.T2_j = []; %not used: we monitoring based on final T2 value
-            end
-
-            self.stats.SPE = zeroexp([self.N, A], self.stats.SPE);
-            % Instantaneous SPE limit using all A components (batch models)
-            self.stats.SPE_j = zeroexp([self.N, self.J], self.stats.SPE_j, true);
-                        
-
-            % R^2 per variable, per component; cumulative R2 per variable
-            % Baseline value for all R2 calculations: before any components are
-            % extracted, but after the data have been preprocessed.
-            self.stats.start_SS_col = zeroexp([1, self.K], self.stats.start_SS_col);
-            % Used in cross-validation calculations: ssq of each column,
-            % per component, after deflation with the a-th component.
-            self.stats.deflated_SS_col = zeroexp([self.K, A], self.stats.deflated_SS_col);
-            self.stats.R2k_a = zeroexp([self.K, A], self.stats.R2k_a);
-            self.stats.R2k_cum = zeroexp([self.K, A], self.stats.R2k_cum);
-            % R^2 per block, per component; cumulate R2 for the block
-            self.stats.R2_a = zeroexp([A, 1], self.stats.R2_a);
-            self.stats.R2 = zeroexp([A, 1], self.stats.R2);
-
-            % VIP value (only calculated for X-blocks); only last column is useful
-            self.stats.VIP_a = zeroexp([self.K, A], self.stats.VIP_a);
-            self.stats.VIP = zeroexp([self.K, 1], self.stats.VIP);
-
-            % Overall T2 value for each observation
-            self.stats.T2 = zeroexp([self.N, 1], self.stats.T2);
-            % Instantaneous T2 limit using all A components (batch models)
-            self.stats.T2_j = zeroexp([self.N, self.J], self.stats.T2_j);
-
-            % Modelling power = 1 - (RSD_k)/(RSD_0k)
-            % RSD_k = residual standard deviation of variable k after A PC's
-            % RSD_0k = same, but before any latent variables are extracted
-            % RSD_0k = 1.0 if the data have been autoscaled.
-            self.stats.model_power = zeroexp([1, self.K], self.stats.model_power);
-
-            % Actual limits for the block: to be calculated later on
-            % ---------------------------
-            % Limits for the (possibly time-varying) scores
-            %siglevels = {'95.0', '99.0'};
-            self.lim.t = zeroexp([1, A], self.lim.t);
-            self.lim.t_j = zeroexp([self.J, A], self.lim.t_j, true); 
-
-            % Hotelling's T2 limits using A components (column)
-            % (this is actually the instantaneous T2 limit,
-            % but we don't call it that, because at time=J the T2 limit is the
-            % same as the overall T2 limit - not so for SPE!).
-            self.lim.T2 = zeroexp([1, A], self.lim.T2);            
-            
-            % SPE limits for the block and instaneous (i.e. time-varying) limits
-            % Overall SPE limit using for ``a`` components (column)
-            self.lim.SPE = zeroexp([1, A], self.lim.SPE);
-            
-            % SPE instantaneous limits using all A components
-            self.lim.SPE_j = zeroexp([self.J, 1], self.lim.SPE_j);
-            
-        end % ``initialize_storage``
 
         function self = preprocess(self, varargin)
             % Calculates the preprocessing vectors for a block
@@ -465,21 +340,21 @@ classdef block
                 other.nTags = self.nTags;
                 other.J = self.J;
                 other.tagnames = self.tagnames;
-                other.data_raw = cell(numel(which), 1);
+                other.raw_data = cell(numel(which), 1);
                 for n = 1:numel(which)
-                    other.data_raw{n} = self.data_raw{which(n)};
+                    other.raw_data{n} = self.raw_data{which(n)};
                 end
                 
-                self_data_raw = self.data_raw;
+                self_raw_data = self.raw_data;
                 self_data = subsref(self.data, s_ordinary_remain);
                 self = block(self_data, self.name);
                 self.block_type = 'batch';
                 self.J = other.J;
                 self.nTags = other.nTags;
                 self.tagnames = other.tagnames;
-                self.data_raw = cell(numel(remain), 1);
+                self.raw_data = cell(numel(remain), 1);
                 for n = 1:numel(remain)
-                    self.data_raw{n} = self_data_raw{remain(n)};
+                    self.raw_data{n} = self_raw_data{remain(n)};
                 end
             end
         end
@@ -620,7 +495,7 @@ function plot_raw(self, nrow, ncol)
         for k = 1:self.nTags
             axes(hA(k))
             for n = 1:self.N
-                plot(self.data_raw{n}(:,k),'k'),hold on
+                plot(self.raw_data{n}(:,k),'k'),hold on
             end
             set(hA(k),'FontSize',14)
             axis tight
@@ -709,9 +584,9 @@ function plot_highlight_batch(self, nrow, ncol, which_batch)
         for k = 1:self.nTags
             axes(hA(k))
             for n = 1:self.N
-                plot(self.data_raw{n}(:,k), 'Color', [0.2, 0.2 0.2]),hold on
+                plot(self.raw_data{n}(:,k), 'Color', [0.2, 0.2 0.2]),hold on
             end
-            plot(self.data_raw{which_batch}(:,k), 'r', 'Linewidth', 1.5)
+            plot(self.raw_data{which_batch}(:,k), 'r', 'Linewidth', 1.5)
             set(hA(k),'FontSize',14)
             axis tight
             grid('on')
@@ -737,13 +612,13 @@ function plot_one_batch(self,  which_batch, which_tags)
         maxrow = zeros(1, self.nTags)*-Inf;
         minrow = zeros(1, self.nTags)*Inf;
         for n = 1:self.N            
-            maxrow = max(maxrow, max(self.data_raw{n}));
-            minrow = min(minrow, min(self.data_raw{n}));
+            maxrow = max(maxrow, max(self.raw_data{n}));
+            minrow = min(minrow, min(self.raw_data{n}));
         end
             
         
         for k = which_tags
-            plot((self.data_raw{which_batch}(:,k)-minrow(k))/maxrow(k),'k', ...
+            plot((self.raw_data{which_batch}(:,k)-minrow(k))/maxrow(k),'k', ...
                   'LineWidth',2)
             hold on
             set(hA,'FontSize',14)
