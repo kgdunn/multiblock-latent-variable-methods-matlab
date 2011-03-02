@@ -66,14 +66,14 @@ classdef mblvm < handle
             out = numel(self.blocks);
         end
             
-        function out = iter_terminate(lv_prev, lv_current, itern, tolerance, model, conditions)
+        function out = iter_terminate(self, lv_prev, lv_current, itern, tolerance, conditions)
             % The latent variable algorithm is terminated when any one of these
             % conditions is True
             %  #. scores converge: the norm between two successive iterations
             %  #. a max number of iterations is reached
             score_tol = norm(lv_prev - lv_current);                       
             conditions.converged = score_tol < tolerance;
-            conditions.max_iter = itern > model.opt.max_iter;            
+            conditions.max_iter = itern > self.opt.max_iter;            
             
             if conditions.converged || conditions.max_iter
                 out = true;  % algorithm has converged

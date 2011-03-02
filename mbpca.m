@@ -19,7 +19,6 @@ classdef mbpca < mblvm
             block_id = 1;
 
             start_time = cputime;
-            tolerance = self.opt.tolerance;            
             dblock = self.blocks{block_id};
             which_components = max(self.A+1, 1) : A;            
             for a = which_components
@@ -31,12 +30,12 @@ classdef mbpca < mblvm
                 end
                 % Baseline for all R^2 calculations
                 start_SS_col = dblock.stats.start_SS_col;
-                if all(initial_ssq < tolerance)
+                if all(initial_ssq < self.opt.tolerance)
                         warning('lvm:fit_PCA', 'There is no variance left in the data')
                 end
                 
                 % Do the work elsewhere
-                [t_a, p_a, itern] = mbpca.single_block_PCA(dblock, self);
+                [t_a, p_a, itern] = mbpca.single_block_PCA(dblock, self, a);
                 
                 
                 if self.opt.show_progress
@@ -101,9 +100,11 @@ classdef mbpca < mblvm
     
     % These methods don't require a class instance
     methods(Static)
-        function single_block_PCA(dblock, self)
-            % Extracts a PCA component on a single block of data, ``data``
+        function [t_a, p_a, itern] = single_block_PCA(dblock, self, a)
+            % Extracts a PCA component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
+            % The ``a`` entry is merely used to show which component is being 
+            % extracted in the progress bar.
             % 
             %
             % 1.   Wold, Esbensen and Geladi, 1987, Principal Component Analysis,
@@ -111,7 +112,8 @@ classdef mbpca < mblvm
             %      http://dx.doi.org/10.1016/0169-7439(87)80084-9
             % 2.   Missing data: http://dx.doi.org/10.1016/B978-044452701-1.00125-3
             
-            
+            tolerance = self.opt.tolerance;
+            N = size(dblock.data, 1);
             if self.opt.show_progress
                 h = awaitbar(0, sprintf('Calculating component %d on block %s', a, dblock.name));
             end
@@ -119,7 +121,7 @@ classdef mbpca < mblvm
             t_a_guess = rand(N,1)*2-1;
             t_a = t_a_guess + 1.0;
             itern = 0;            
-            while not(self.iter_terminate(t_a_guess, t_a, itern, tolerance, self))
+            while not(self.iter_terminate(t_a_guess, t_a, itern, tolerance))
                 % 0: Richardson's acceleration, or any numerical acceleration
                 %    method for PCA where there is slow convergence?
 
