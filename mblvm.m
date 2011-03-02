@@ -19,7 +19,7 @@ classdef mblvm < handle
     
     % Subclasses may choose to redefine these methods
     methods
-        function self = mblvm(varargin)
+        function self = mblvm(varargin)            
             
             % Process model options, if provided
             % -----------------------
@@ -112,12 +112,12 @@ classdef mblvm < handle
                 given_A = 0;
             end
 
-            self.A = max([self.opt.min_lv, 0, given_A]);            
-            self.stats.timing = zeroexp([self.A, 1], self.stats.timing);
-            self.stats.itern = zeroexp([self.A, 1], self.stats.itern);
+            requested_A = max([self.opt.min_lv, 0, given_A]);            
+            self.stats.timing = zeroexp([requested_A, 1], self.stats.timing);
+            self.stats.itern = zeroexp([requested_A, 1], self.stats.itern);
             
-            self = preprocess_blocks(self, self.A);  % superclass method
-            self = calc_model(self, self.A);
+            self = preprocess_blocks(self, requested_A);  % superclass method
+            self = calc_model(self, requested_A);         % must be subclassed
             self = calc_statistics(self); 
             self = calc_limits(self);    
             

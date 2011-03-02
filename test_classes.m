@@ -1,5 +1,5 @@
- % Copyright (c) 2010-2011 ConnectMV, Inc. All rights reserved.
-% -------------------------------------------------------------
+X_raw = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
+PCA_model_1 = lvm({'X', X_raw}, 1);
 
 % Load the raw data
 dupont = load('../code/datasets/DuPont.mat');

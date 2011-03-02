@@ -14,150 +14,10 @@ classdef lvm
     
     methods
         
-        function self = build(self, varargin)
-            % Will build the latent variable model, using cross validation
-            % options.  Will preprocess the data if it has not been
-            % preprocessed already.
-            
-            if self.opt.randomize_test.use
-                terminate_adding = false;                
-                A = 0;
-                while not(terminate_adding)
-                    A = A + 1;                    
-                    self.opt.randomize_test.use = false;
-                    self.opt.randomize_test.use_internal = true;
-                    self = build(self, A);
-                    self.opt.randomize_test.use = true;
-                    self.opt.randomize_test.use_internal = false;
-                    
-
-                    if strcmpi(self.model_type, 'pca')
-                        [self, terminate_adding] = PCA_randomization_assess(self);
-                    elseif strcmpi(self.model_type, 'npls')
-                        [self, terminate_adding] = PLS_randomization_assess(self);
-                    end
-                    
-                    if terminate_adding                        
-                        self.stats.risk.rate = zeros(1, self.A);
-                        for a = 1:self.A
-                            stats = self.opt.randomize_test.risk_statistics{a};
-                            self.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
-                        end
-                        self.stats.risk.strength = self.opt.randomize_test.test_statistic(1:self.A);
-                        self.A = self.opt.randomize_test.last_worthwhile_A;
-                    end
-                end % randomization testing
-
-                
-%             elseif self.opt.cross_val.use
-%                 G = self.opt.cross_val.groups;                
-%                 cvModels = cell(G, 1);  
-%                 check_models = cell(G, 1);   % data left out for cross-validation
-%                 cv_pred = cell(G, 1);        % predictions from left-out group
-%                 
-%                 % This part may change, depending on *how* the user would 
-%                 % like to perform cross validation.  LOO, stratified, or
-%                 % sequential.
-%                 N = self.blocks{1}.N;
-%                 cv_list = zeros(N, 1);
-%                 cv_list(1) = self.opt.cross_val.start_at;
-%                 for n = 2:N
-%                     cv_list(n) = cv_list(n-1) + 1;
-%                     if cv_list(n) > G
-%                         cv_list(n) = 1;
-%                     end
-%                 end
-%                 
-%                 % Now break the dataset up into G groups across all blocks. 
-%                 for g = 1:G
-%                     build_blocks = cell(self.B, 1);
-%                     check_blocks = cell(self.B, 1);
-%                     for b = 1:self.B
-%                         build_blocks{b} = self.blocks{b}.data(cv_list~=g, :);
-%                         check_blocks{b} = self.blocks{b}.data(cv_list==g, :);
-%                     end
-%                     % Duplicate the user-required options, but modify some
-%                     % to build the model for the "g"-th dataset. 
-%                     cvOpt = self.opt;
-%                     cvOpt.cross_val.use = false;
-%                     cvOpt.cross_val.subgroup = g;
-%                     cvOpt.build_now = false;
-%                     cvModels{g} = lvm(self.model_type, build_blocks, cvOpt);
-%                     check_models{g} = check_blocks;
-%                 end
-%                 
-%                 
-%                 
-%                 % To speed up cross-validation: use the loadings vector
-%                 % from the 1st group as an initial guess for the other
-%                 % groups.
-%                 
-%                 terminate_cv = false;                
-%                 A = 0;
-%                 while not(terminate_cv)
-%                     A = A + 1;
-%                     for g = 1:G
-%                         cvModels{g} = cvModels{g}.build(A);                         
-%                         cv_pred{g} = cvModels{g}.apply(check_models{g}, A);                                            
-%                     end
-%                     self.opt.cross_val = setfield(self.opt.cross_val, 'use', false);
-%                     %self.opt.cross_val.use = false;  % Weirdly, this leads
-%                     % to errors, whereas the above is OK.
-%                     self = self.build(self, A);
-%                     self.opt.cross_val = setfield(self.opt.cross_val, 'use', true);
-%                     
-%                     % Check stats on each sub-model  
-%                     % R2 = zeros(G, A);
-%                     % for g = 1:G
-%                     %     R2(g,:) = cv_pred{g}.blocks{1}.stats.R2_a;                     
-%                     % end
-% 
-%                     % For PCA models
-%                     if strcmpi(self.model_type, 'pca')
-%                         [self, terminate_cv] = PCA_cross_validation(self, cv_pred);
-%                     elseif strcmpi(self.model_type, 'npls')
-%                         [self, terminate_cv] = PLS_cross_validation(self, cv_pred);
-%                     end
-% 
-%                 end % cross-validation termination loop
-
-            else
-                % Just build the model. But in that case 
-                % calculate A = max(opt.min_lv, 0) components.
-                if nargin==2 && isa(varargin{1}, 'numeric')
-                    given_A = varargin{1};
-                else
-                    given_A = 0;
-                end
-                
-                self.A = max([self.opt.min_lv, 0, given_A]);
-                self.stats.timing = zeroexp([self.A, 1], self.stats.timing);
-                self.stats.itern = zeroexp([self.A, 1], self.stats.itern);
-                self = calc_model(self, self.A);
-                self = calc_statistics(self); 
-                self = calc_limits(self);    
-                if strcmpi(self.model_type, 'pca')
-                    % TODO(KGD): support npls soon
-                    self = monitoring_limits(self);
-                end
-            end
-        end % ``build``
+        
         
         function self = calc_model(self, A)
-            % Calculates the LVM parameters, handling missing data.
-            % The number of latent variables, ``A``,  must be given.
-                       
-            % TODO: handle the case where the model is shrunk or grown.
             
-            
-            for b = 1:self.B
-                if ~self.blocks{b}.is_preprocessed
-                    self.blocks{b} = self.blocks{b}.preprocess();
-                end
-                % Resize the storage for ``A`` components
-                self.blocks{b} = self.blocks{b}.initialize_storage(A);
-            end
-
             % Single-block PCA model
             if strcmp(self.model_type, 'pca') && self.B == 1
                 [self, self.blocks{1}] = fit_PCA(self, self.blocks{1}, A);
@@ -448,81 +308,6 @@ classdef lvm
             end % ``for every batch block``
         end
                   
-        function self = calc_statistics(self, varargin)
-            % Calculate summary statistics for the model.
-            %
-            % TODO
-            % ----
-            % * Modelling power of each variable
-            % * Eigenvalues (still to come)
-            % * Squared prediction error and T2
-            
-            % If ``varargin`` is supplied, then we must calculate the
-            % statistics on the ``varargin{1}``
-            model = self;
-            if nargin==2 && isa(varargin{1}, 'struct')
-                testing_data = true;
-                self = varargin{1};
-            else
-                testing_data = false;
-                model = self;
-            end
-            
-            for b = 1:model.B
-                % ``block`` could be a training or a testing data set.
-                % If unsure, rather use model.blocks{b} instead of
-                % ``block``.
-                
-                if self.A == 0
-                    continue
-                end
-                
-                
-                block = self.blocks{b};
-                % Calculate the R2 explained on a per-component basis, for the block
-                block.stats.R2_a = [block.stats.R2(1); diff(block.stats.R2)];
-                % Calculate R2 explained on a per-component basis, for each variable
-                first_PC = block.stats.R2k_cum(:,1);
-                block.stats.R2k_a = [first_PC, diff(block.stats.R2k_cum, 1, 2)];
-
-                % VIP values =  sqrt{ SSQ[ (P.^2) * (R2_per_LV), row_wise ] }
-                % TODO(KGD): come back to VIP calculation and find a
-                % reference for it
-
-                % Check on maximum number of iterations
-                if any(model.stats.itern >= model.opt.max_iter)
-                    warn_string = ['The maximum number of iterations was reached ' ...
-                                   'when calculating the latent variable(s). Please ' ...
-                                   'check the raw data - is it correct? and also ' ...
-                                   'adjust the number of iterations in the options.'];
-                    warning('lvm:calculate_statistics', warn_string)
-                end
-
-                % Variance of each latent variable score. 
-                if testing_data
-                    block.S = model.blocks{b}.S;
-                else
-                    block.S = std(block.T, 1);
-                end
-                
-                % Not calculated  for certain blocks: e.g. in PLS, the 
-                % block.T is empty.                
-                if size(block.T, 2) == block.A                    
-                    for a = 1:block.A
-                        block.stats.T2(:,a) = sum((block.T(:,1:a) ./ ...
-                                 repmat(block.S(:,1:a), block.N,1)).^2, 2);
-                    end
-                end
-
-                % TODO(KGD): Modelling power = 1 - (RSD_k)/(RSD_0k)
-                % TODO(KGD): Is this valid/useful for Y-blocks?
-                % Strictly speaking, RSD is a standard deviation.  We will use
-                % sums of squares though, because the DoF are the same.
-                %block.stats.model_power(1,:) = ...
-                %       1.0 - sqrt(ssq(block.data, 1) ./ block.stats.start_SS_col);
-                self.blocks{b} = block;
-            end
-        end % ``calc_statistics``
         
         function self = calc_limits(self)
             % Calculate the limits for the latent variable model.
@@ -611,24 +396,7 @@ classdef lvm
             end
         end %``calc_limits``
         
-        function out = should_terminate(t_a_guess, t_a, itern, tolerance, model, conditions)
-            % The PCA iterative algorithm is terminated when any one of these
-            % conditions is True
-            %  #. scores converge: the norm between two successive iterations
-            %  #. a max number of iterations is reached
-            score_tol = norm(t_a_guess - t_a);
-                       
-            conditions.converged = score_tol < tolerance;
-            conditions.max_iter = itern > model.opt.max_iter;
-            
-            % TODO(KGD): This is not a nice way; unfortunately MATLAB 
-            % makes it hard to implement a hashtable (e.g. Python dictionary)
-            if conditions.converged || conditions.max_iter
-                out = true;  % algorithm has converged
-            else
-                out = false;
-            end
-        end
+        
         
         function [self, block] = fit_PCA(self, block, A)
             % Fits a PCA model to the current block of data.          
@@ -1158,20 +926,7 @@ classdef lvm
         end % ``apply_PLS``        
   
         function disp(self)
-            % Displays a text summary of the model
-            if self.A == 0
-                word = ' components (unfitted)';
-            elseif self.A == 1
-                word = ' component';
-            else
-                word = ' components';
-            end
-            disp(['Latent Variable Model: ', upper(self.model_type), ' model: '...
-                   num2str(self.A), word, '.'])
-               
-            if self.A == 0
-                return
-            end
+            
             
             try
                 risk_rate = self.stats.risk.rate;
@@ -1329,60 +1084,7 @@ classdef lvm
 end % end classdef
 
 %-------- Helper functions (usually used in 2 or more places). May NOT use ``self``
-function [out, model_type] = lvm_setup_from_data(rawblocks)
-
-% SYNTAX: the only requirements are
-%    * that 'Y' be used for PLS models
-%    * that a block should be pre-made into a batch block for batch models
-%
-% PCA model: lvm({'my data', X})
-% PLS model: lvm({'predictors', X, 'Y', Y})
-% 
-% Multiblock PCA: lvm({'X1', X1, 'X2', X2, ....})
-% Multiblock PLS: lvm({'X1', X1, 'X2', X2, ...., 'Y', Y})
-%
-% Batch PCA: batch_X = block(X, 'batch', ....)
-%            lvm({'my batch data', batch_X})
-%
-% Batch PCA with a Z matrix:
-%            batch_X = block(X, 'batch', ....)
-%            lvm({'initial', Z, 'my batch data', batch_X})
-%        or  lvm({'my batch data', batch_X, 'initial', Z})  % in any order
-%
-% Batch PLS:
-%            batch_X = block(X, 'batch', ....)
-%            lvm({'my batch data', batch_X, 'Y', Y})
-
-    if mod(numel(rawblocks), 2) ~= 0
-        error('lvm:lvm', 'First input must be provided as a cell array of pairs, e.g. {''X'', x_data, ''Y'', y_data}')    
-    end
-    if iscell(rawblocks)
-        out = cell(1, numel(rawblocks)/2);
-        model_type = 'pca';
-        for b = 1:numel(rawblocks)
-            if mod(b, 2) ~= 0
-                block_name = rawblocks{b};
-                if not(ischar(block_name))
-                    error('lvm:lvm', 'Block name must be a character string.') 
-                end
-                if strcmpi(block_name, 'y')
-                    model_type = 'npls';
-                end
-            else 
-                out{b/2} = block(rawblocks{b});
-                if strcmp(out{b/2}.name_type, 'default')
-                    out{b/2}.name = block_name;
-                    out{b/2}.name_type = 'given';
-                end
-            end
-        end
-        if numel(out) > 2
-            model_type = ['mb', model_type];
-        end
-    else
-        error('lvm:lvm', 'Please provide data in a cell arrays of pairs.')    
-    end
-end
+f
 
 function stat = calculate_randomization_statistic(model_type, A, blocks)
     function v = robust_scale(a)

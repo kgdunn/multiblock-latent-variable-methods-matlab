@@ -34,8 +34,9 @@ function self = lvm(blocks, varargin)
         error('lvm:lvm', 'First input must be provided as a cell array of pairs, e.g. {''X'', x_data, ''Y'', y_data}')    
     end
     if iscell(blocks)
+        % FUTURE(KGD): use a dictionary, or MATLAB/Java hashtable for the blocks
         out = cell(1, numel(blocks)/2);
-        model_type = 'pca';
+        model_type = 'PCA';
         for b = 1:numel(blocks)
             if mod(b, 2) ~= 0
                 block_name = blocks{b};
@@ -43,7 +44,7 @@ function self = lvm(blocks, varargin)
                     error('lvm:lvm', 'Block name must be a character string.') 
                 end
                 if strcmpi(block_name, 'y')
-                    model_type = 'pls';
+                    model_type = 'PLS';
                 end
             else 
                 out{b/2} = block(blocks{b});
@@ -58,17 +59,17 @@ function self = lvm(blocks, varargin)
     end
 
     % Just create an empty (shell) class instance
-    if strcmp(model_type, 'pca')
-        self = pca();
-    elseif strcmp(model_type, 'pls')
-        self = pls();
+    if strcmpi(model_type, 'pca')
+        self = mbpca(varargin{:});
+    elseif strcmpi(model_type, 'pls')
+        self = mbpls(varargin);
     end
  
     % Now set the data blocks:
     self.blocks = out;
     
     if numel(out) > 2
-        self.model_type = ['mb', model_type];
+        self.model_type = ['MB-', model_type];
     else
         self.model_type = model_type;
     end    
