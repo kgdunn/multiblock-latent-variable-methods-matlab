@@ -25,7 +25,9 @@ classdef block_base < handle
         function self = block_base(given_data, block_name, varargin)
             % SYNTAX:
             % block_base(data, block_name, variable arguments in cell arrays)
-
+            
+            % Store whatever data was given us
+            self.data = given_data;
             
             [self.N, self.K] = size(given_data);
             self.labels = cell(ndims(given_data), 0);    % 0-columns of labels
@@ -51,9 +53,9 @@ classdef block_base < handle
             
             % Third and subsequent arguments: 
             if nargin > 2
-                for i = 1:numel(varargin(3:end))
-                    key = varargin{i+2}{1};
-                    value = varargin{i+2}{2};
+                for i = 1:numel(varargin)
+                    key = varargin{i}{1};
+                    value = varargin{i}{2};
                         
                     % ``row_labels``
                     if strcmpi(key, 'row_labels')
@@ -319,64 +321,9 @@ classdef block_base < handle
             % plot(block, 'weights', ...)    : same as `loadings`, just for weights
             % plot(block, 'onebatch', xx)    : plots scaled values of batch xx
 
-            if nargin == 1
-                plottypes = 'raw';
-            else
-                plottypes = varargin{1};
-            end
             
-            if strcmpi(plottypes, 'all')
-                plottypes = {'raw', 'loadings', 'weights'};
-            end
-            if ~isa(plottypes, 'cell')
-                plottypes = cellstr(plottypes);
-            end
+            plottypes = 'raw';
             
-            if strcmpi(plottypes{1}, 'raw') || strcmpi(plottypes{1}, 'highlight')
-                try
-                    nrow = floor(varargin{2});
-                catch ME
-                    nrow = 2;
-                end
-                try
-                    ncol = floor(varargin{3});
-                catch ME
-                    ncol = 4;
-                end
-            end
-            if strcmpi(plottypes{1}, 'loadings') || strcmpi(plottypes{1}, 'weights') 
-                try
-                    which_loadings = floor(varargin{2});
-                catch ME
-                    if self.A > 1
-                        which_loadings = [1, 2];
-                    elseif self.A == 1
-                        which_loadings = 1;
-                    elseif self.A <= 0;
-                        which_loadings = [];
-                    end
-                end                
-            end
-            if strcmpi(plottypes{1}, 'highlight')
-                try
-                    which_batch = floor(varargin{4});
-                catch ME                    
-                    which_batch = 1;
-                end                
-            end
-            if strcmpi(plottypes{1}, 'onebatch')
-                try
-                    which_batch = floor(varargin{2});
-                catch ME                    
-                    which_batch = 1;
-                end    
-                try
-                    which_tags = floor(varargin{3});
-                catch ME                    
-                    which_tags = 1:self.nTags;
-                end  
-            end
-                           
             % Iterate over all plots requested by the user
             for i = 1:numel(plottypes)
                 plottype = plottypes{i};
@@ -394,53 +341,53 @@ function plot_raw(self, nrow, ncol)
     
 end
 
-function plot_loadings(self, which_loadings)  
-        
-    if strcmpi(self.block_type, 'batch')
-
-        nSamples = self.J;                                                              % Number of samples per tag
-        nTags = self.nTags;                                                                  % Number of tags in the batch data
-        tagNames = char(self.tagnames);
-        
-        for a = which_loadings
-            data = self.P(:, a);
-            y_axis_label = ['Loadings, p_', num2str(a)];
-            
-            data = reshape(data, self.nTags, self.J)';
-            cum_area = sum(abs(data));
-            data = data(:);
-            hF = figure('Color', 'White');
-            hA = axes;
-            bar(data);
-
-            x_r = xlim;
-            y_r = ylim;
-            xlim([x_r(1,1) nSamples*self.nTags]);
-            tick = zeros(self.nTags,1);
-            for k=1:self.nTags
-                tick(k) = nSamples*k;
-            end
-
-            for k=1:self.nTags
-                text(round((k-1)*nSamples+round(nSamples/2)), ...
-                     diff(y_r)*0.9 + y_r(1),deblank(tagNames(k,:)), ...
-                     'FontWeight','bold','HorizontalAlignment','center');
-                text(round((k-1)*nSamples+round(nSamples/2)), ...
-                     diff(y_r)*0.05 + y_r(1), sprintf('%.2f',cum_area(k)), ...
-                     'FontWeight','bold','HorizontalAlignment','center');
-            end
-
-            set(hA,'XTick',tick);
-            set(hA,'XTickLabel',[]);
-            set(hA,'Xgrid','On');
-            xlabel('Batch time repeated for each variable');
-            ylabel(y_axis_label);
-            pos0 = get(0,'ScreenSize');
-            delta = pos0(3)/100*2;
-            posF = get(hF,'Position');
-            set(hF,'Position',[delta posF(2) pos0(3)-delta*2 posF(4)]);
-        end
-        
-        
-    end
-end
+% function plot_loadings(self, which_loadings)  
+%         
+%     if strcmpi(self.block_type, 'batch')
+% 
+%         nSamples = self.J;                                                              % Number of samples per tag
+%         nTags = self.nTags;                                                                  % Number of tags in the batch data
+%         tagNames = char(self.tagnames);
+%         
+%         for a = which_loadings
+%             data = self.P(:, a);
+%             y_axis_label = ['Loadings, p_', num2str(a)];
+%             
+%             data = reshape(data, self.nTags, self.J)';
+%             cum_area = sum(abs(data));
+%             data = data(:);
+%             hF = figure('Color', 'White');
+%             hA = axes;
+%             bar(data);
+% 
+%             x_r = xlim;
+%             y_r = ylim;
+%             xlim([x_r(1,1) nSamples*self.nTags]);
+%             tick = zeros(self.nTags,1);
+%             for k=1:self.nTags
+%                 tick(k) = nSamples*k;
+%             end
+% 
+%             for k=1:self.nTags
+%                 text(round((k-1)*nSamples+round(nSamples/2)), ...
+%                      diff(y_r)*0.9 + y_r(1),deblank(tagNames(k,:)), ...
+%                      'FontWeight','bold','HorizontalAlignment','center');
+%                 text(round((k-1)*nSamples+round(nSamples/2)), ...
+%                      diff(y_r)*0.05 + y_r(1), sprintf('%.2f',cum_area(k)), ...
+%                      'FontWeight','bold','HorizontalAlignment','center');
+%             end
+% 
+%             set(hA,'XTick',tick);
+%             set(hA,'XTickLabel',[]);
+%             set(hA,'Xgrid','On');
+%             xlabel('Batch time repeated for each variable');
+%             ylabel(y_axis_label);
+%             pos0 = get(0,'ScreenSize');
+%             delta = pos0(3)/100*2;
+%             posF = get(hF,'Position');
+%             set(hF,'Position',[delta posF(2) pos0(3)-delta*2 posF(4)]);
+%         end
+%         
+%         
+%     end
+% end

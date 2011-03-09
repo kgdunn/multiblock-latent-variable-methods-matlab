@@ -68,7 +68,7 @@ end
 
 
 if is_batch
-    out = block_batch(given_data, given_name, rest);
+    out = block_batch(given_data, given_name, rest{:});
 else
-    out = block_base(given_data, given_name, rest);
+    out = block_base(given_data, given_name, rest{:});
 end
