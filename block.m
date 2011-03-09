@@ -1,44 +1,42 @@
-% Copyright (c) 2010 ConnectMV, Inc. All rights reserved.
+% Copyright (c) 2010-2011 ConnectMV, Inc. All rights reserved.
 % -------------------------------------------------------------------------
 %
-% Code for creating data blocks.
-%
-% A block is the smallest subset in a latent variable model.  It has ``N``
-% rows and ``K`` columns.
-% 
-% This class holds both the data, and summary statistics from the data.
+% Code for creating data blocks. A block is the smallest subset of data in a
+% model.
 
-
-classdef block
+classdef block < handle
+    
     % Class attributes
     properties
         raw_data = false;       % Raw data for the block: only used for batch blocks
         data = false;           % Working data: will be processed by the software
-        %data_pred = [];         % Predicted values of the data: only used in PLS models
-        %data_pred_pp = [];      % Predicted values of the data, pre-processed: only used in PLS models
-        
         has_missing = false;
         is_preprocessed = false;
-        
         block_type = 'ordinary';
         name = '';
         name_type = 'default';
         
         % Labelling
-        tagnames = {};
+        tagnames = {};  % <----- delete later
+        
+        labels = {};            % Cell array: rows are the modes; columns are sets of labels
+                                % 2 x 3: row labels and columns labels, with
+                                % up to 3 sets of labels for each dimension
+        
         
         % Internal structures
-        mmap = false;        
-        PP = struct;        % Preprocessing options
-        stats = struct;     % Statistics for this block
-        lim = struct;       % Statstical limits for the model entries
+        mmap = false;  
+        
+        %PP = struct;        % Preprocessing options
+        %stats = struct;     % Statistics for this block
+        %lim = struct;       % Statstical limits for the model entries
         
         % Batch data specific
-%        
+       
         nTags = 0;          % Number of batch tags
         
         % Block parameters
-        A = 0;       % Number of components
+        %A = 0;       % Number of components
         N = 0;       % Number of observations
         K = 0;       % Number of variables (columns)
         J = 0;       % Number of batch time steps (non-zero for batch blocks)
@@ -49,8 +47,22 @@ classdef block
     methods
         function self = block(varargin)
             % SYNTAX
-            % block(data, block name, type of data, 'tagNames', tag names, 'nBatches', num batches)
-          
+            %
+            % block(data)
+            % block(data, block name)
+            % block(data, block name, type of data)  <-- must be given for batch data sets
+            %                         type of data = {'batch', 'array'}
+            % block(data, block name, type of data, {'nBatches', num batches})
+            % block(data, block name, type of data, {'row_labels', row_names})
+            % block(data, block name, type of data, {'col_labels', tag_names})
+            
+            % Batch data
+            % -----------
+            % block(data, 'My batch data', 'batch')
+            % block(data, 'My batch data', 'batch'), ...
+            %                   {'tag_names', tag_names}, ...     <-- name of each tag in batch  
+            %                   {'time_names', time_names}, ...   <-- cell array, or vector of integers
+            %                   {'batch_names', batch_names})     <-- name of each batch
             
             if nargin == 0
                 given_data = [];
@@ -58,11 +70,13 @@ classdef block
                 given_data = varargin{1};
             end
             if isa(given_data, 'block')
-                self = given_data;
-                return
+                given_data = given_data.data;
             end            
             
             [self.N, self.K] = size(given_data);
+            self.labels = cell(ndims(given_data), 0);  % 0-columns of labels
+            
+            
             self.mmap = false;            
             missing_map = ~isnan(given_data);   % 0=missing, 1=present
             if all(missing_map)
@@ -81,13 +95,13 @@ classdef block
                 self.name_type = 'default';
             end
             
-            % Third argument: block type
+            % Third argument: block type: either 'batch' or 'array'
             try
                self.block_type = lower(varargin{3});
             catch ME
-               self.block_type = 'ordinary';
+               self.block_type = 'array';
             end
-            valid_types = {'ordinary', 'batch'};
+            valid_types = {'array', 'batch'};
             found = false;
             for t = 1:numel(valid_types)
                 if strcmp(self.block_type, valid_types{t})
@@ -95,34 +109,48 @@ classdef block
                 end
             end
             if not(found)
-                message = 'Invalid block type: it should be either "ordinary" or "batch"';                
+                message = 'Invalid block type: it should be either "array" or "batch"';                
                 error('block:invalid_block_type', message)
             end
             
-            
-            % Fourth/Fifth argument: 'tagNames', tag names
-            try                
-                self.tagnames = varargin{5};
-            catch ME
-                self.tagnames = [];
-            end
-            if isempty(self.tagnames)
-                self.tagnames = cell(self.K, 1);
-                for k = 1:self.K
-                    self.tagnames{k} = ['V', num2str(k)];
-                end 
-            end
-            
-            % Sixth/Seventh argument: 'nBatches', number of batches
-            try                
-                nBatches = floor(varargin{7});
-            catch ME
-                if strcmp(self.block_type, 'batch')
-                    error('block:number_of_batches_not_specified', ...
-                        ['If specifying batch data, you must also specify ', ...
-                        'the number of batches.'])
+            nBatches = 0;            
+            % Subsequent arguments
+            if nargin > 3
+                for i = 1:numel(varargin(4:end))
+                    key = varargin{i+3}{1};
+                    value = varargin{i+3}{2};
+                    
+                    % ``nBatches``
+                    if strcmpi(key, 'nbatches')
+                        nBatches = floor(value);
+                        if strcmp(self.block_type, 'batch')
+                            error('block:number_of_batches_not_specified', ...
+                                ['If specifying batch data, you must also specify ', ...
+                                'the number of batches.'])
+                        end
+                        
+                    % ``row_labels``
+                    elseif strcmpi(key, 'row_labels')
+                        self.add_labels(1, value);
+                        
+                    % ``col_labels``
+                    elseif strcmpi(key, 'col_labels')
+                        self.add_labels(2, value);
+                    
+                       
+                    % ``tag_names``: for batch blocks
+                    elseif strcmpi(key, 'tag_names')
+                        
+                    elseif strcmpi(key, 'time_names')
+                        
+                    elseif strcmpi(key, 'batch_names')
+                    end
+                    
+                    
                 end
             end
+            
+            % Extra processing for batch blocks: reshape the data
             if strcmp(self.block_type, 'batch')
                 self.J = self.N / nBatches;
                 self.nTags = self.K;
@@ -153,139 +181,150 @@ classdef block
                 self.data = given_data;
                 self.raw_data = given_data;
             end
+        end
+        
+        function add_labels(self, dim, to_add)           
+            added = false;
+            for k = 1:numel(self.labels(dim, :))
+                if isempty(self.labels{dim, k})
+                    self.labels{dim, k} = to_add;
+                    return
+                end
+            end
             
-
-            % Create storage for other associated matrices
-            %self = self.initialize_storage(self.A);
+            if ~added
+                self.labels{dim, end+1} = to_add;
+            end
+            
         end
         
 
 
-        function self = preprocess(self, varargin)
-            % Calculates the preprocessing vectors for a block
-            %
-            % Currently the only preprocessing model supported is to mean center
-            % and scale.
-            
-            % We'd like to preprocess the ``other`` block using settings 
-            % from the current block.
-            if nargin==2 && self.is_preprocessed
-                other = varargin{1};
-                if ~isa(other, 'block')
-                    error('The new data must be a ``block`` instance.');
-                end
-                % Don't worry about preprocessing empty blocks.
-                if ~isempty(other)
-                    mean_center = self.PP.mean_center;
-                    scaling = self.PP.scaling;
-                    if ~other.is_preprocessed                    
-                        other.data = other.data - repmat(mean_center, other.N, 1);
-                        other.data = other.data .* repmat(scaling, other.N, 1);
-                    end
-                else
-                    % Catches the case when empty blocks are preprocessed
-                    scaling = NaN;
-                end
-                other.is_preprocessed = true;
-                
-                % Will scaling introduce missing values?
-                if any(isnan(scaling))
-                    other.has_missing = true;
-                end
-                self = other;
-                return
-            end
-            
-            % Apply the preprocesing to the training data
-            if not(self.is_preprocessed)
-                
-            
-                % Centering based on the mean
-                mean_center = nanmean(self.data, 1);
-                scaling = nanstd(self.data, 1);
-
-                % Replace zero entries with NaN: this is handled later on with scaling
-                % This will create missing data, so we need to set the flag
-                % correctly
-                if any(scaling < sqrt(eps))
-                    scaling(scaling < sqrt(eps)) = NaN;
-                    self.has_missing = true;
-                end                
-                scaling = 1./scaling;
-            
-            
-                self.data = self.data - repmat(mean_center, self.N, 1);
-                self.data = self.data .* repmat(scaling, self.N, 1);
-
-                % Store the preprocessing vectors for later on
-                self.PP.mean_center = mean_center;
-                self.PP.scaling = scaling;  
-
-                self.is_preprocessed = true;
-            end
-        end
-        
-        function self = un_preprocess(self, varargin)
-            % UNdoes preprocessing for a block.
-            %
-            % Currently the only preprocessing model supported is to mean center
-            % and scale.
-            
-            % We'd like to preprocess the ``other`` block using settings 
-            % from the current block.
-            if nargin==2 && self.is_preprocessed
-                other = varargin{1};
-                if ~isa(other, 'block')
-                    error('The new data must be a ``block`` instance.');
-                end
-                % Don't worry about preprocessing empty blocks.
-                if ~isempty(other)
-                    mean_center = self.PP.mean_center;
-                    scaling = self.PP.scaling;
-                    if ~other.is_preprocessed                    
-                        other.data = other.data - repmat(mean_center, other.N, 1);
-                        other.data = other.data .* repmat(scaling, other.N, 1);
-                    end
-                end                
-                other.is_preprocessed = true;
-                
-                % Will scaling introduce missing values?
-                if any(isnan(scaling))
-                    other.has_missing = true;
-                end
-                self = other;
-                return
-            end
-            
-            % Apply the preprocesing to the training data
-            if not(self.is_preprocessed)
-                
-            
-                % Centering based on the mean
-                mean_center = nanmean(self.data, 1);
-                scaling = nanstd(self.data, 1);
-
-                % Replace zero entries with NaN: this is handled later on with scaling
-                % This will create missing data, so we need to set the flag
-                % correctly
-                if any(scaling < sqrt(eps))
-                    scaling(scaling < sqrt(eps)) = NaN;
-                    self.has_missing = true;
-                end                
-                scaling = 1./scaling;
-            
-            
-                self.data = self.data - repmat(mean_center, self.N, 1);
-                self.data = self.data .* repmat(scaling, self.N, 1);
-
-                % Store the preprocessing vectors for later on
-                self.PP.mean_center = mean_center;
-                self.PP.scaling = scaling;  
-
-                self.is_preprocessed = true;
-            end
-        end
-        
+%         function self = preprocess(self, varargin)
+%             % Calculates the preprocessing vectors for a block
+%             %
+%             % Currently the only preprocessing model supported is to mean center
+%             % and scale.
+%             
+%             % We'd like to preprocess the ``other`` block using settings 
+%             % from the current block.
+%             if nargin==2 && self.is_preprocessed
+%                 other = varargin{1};
+%                 if ~isa(other, 'block')
+%                     error('The new data must be a ``block`` instance.');
+%                 end
+%                 % Don't worry about preprocessing empty blocks.
+%                 if ~isempty(other)
+%                     mean_center = self.PP.mean_center;
+%                     scaling = self.PP.scaling;
+%                     if ~other.is_preprocessed                    
+%                         other.data = other.data - repmat(mean_center, other.N, 1);
+%                         other.data = other.data .* repmat(scaling, other.N, 1);
+%                     end
+%                 else
+%                     % Catches the case when empty blocks are preprocessed
+%                     scaling = NaN;
+%                 end
+%                 other.is_preprocessed = true;
+%                 
+%                 % Will scaling introduce missing values?
+%                 if any(isnan(scaling))
+%                     other.has_missing = true;
+%                 end
+%                 self = other;
+%                 return
+%             end
+%             
+%             % Apply the preprocesing to the training data
+%             if not(self.is_preprocessed)
+%                 
+%             
+%                 % Centering based on the mean
+%                 mean_center = nanmean(self.data, 1);
+%                 scaling = nanstd(self.data, 1);
+% 
+%                 % Replace zero entries with NaN: this is handled later on with scaling
+%                 % This will create missing data, so we need to set the flag
+%                 % correctly
+%                 if any(scaling < sqrt(eps))
+%                     scaling(scaling < sqrt(eps)) = NaN;
+%                     self.has_missing = true;
+%                 end                
+%                 scaling = 1./scaling;
+%             
+%             
+%                 self.data = self.data - repmat(mean_center, self.N, 1);
+%                 self.data = self.data .* repmat(scaling, self.N, 1);
+% 
+%                 % Store the preprocessing vectors for later on
+%                 self.PP.mean_center = mean_center;
+%                 self.PP.scaling = scaling;  
+% 
+%                 self.is_preprocessed = true;
+%             end
+%         end
+%         
+%         function self = un_preprocess(self, varargin)
+%             % UNdoes preprocessing for a block.
+%             %
+%             % Currently the only preprocessing model supported is to mean center
+%             % and scale.
+%             
+%             % We'd like to preprocess the ``other`` block using settings 
+%             % from the current block.
+%             if nargin==2 && self.is_preprocessed
+%                 other = varargin{1};
+%                 if ~isa(other, 'block')
+%                     error('The new data must be a ``block`` instance.');
+%                 end
+%                 % Don't worry about preprocessing empty blocks.
+%                 if ~isempty(other)
+%                     mean_center = self.PP.mean_center;
+%                     scaling = self.PP.scaling;
+%                     if ~other.is_preprocessed                    
+%                         other.data = other.data - repmat(mean_center, other.N, 1);
+%                         other.data = other.data .* repmat(scaling, other.N, 1);
+%                     end
+%                 end                
+%                 other.is_preprocessed = true;
+%                 
+%                 % Will scaling introduce missing values?
+%                 if any(isnan(scaling))
+%                     other.has_missing = true;
+%                 end
+%                 self = other;
+%                 return
+%             end
+%             
+%             % Apply the preprocesing to the training data
+%             if not(self.is_preprocessed)
+%                 
+%             
+%                 % Centering based on the mean
+%                 mean_center = nanmean(self.data, 1);
+%                 scaling = nanstd(self.data, 1);
+% 
+%                 % Replace zero entries with NaN: this is handled later on with scaling
+%                 % This will create missing data, so we need to set the flag
+%                 % correctly
+%                 if any(scaling < sqrt(eps))
+%                     scaling(scaling < sqrt(eps)) = NaN;
+%                     self.has_missing = true;
+%                 end                
+%                 scaling = 1./scaling;
+%             
+%             
+%                 self.data = self.data - repmat(mean_center, self.N, 1);
+%                 self.data = self.data .* repmat(scaling, self.N, 1);
+% 
+%                 % Store the preprocessing vectors for later on
+%                 self.PP.mean_center = mean_center;
+%                 self.PP.scaling = scaling;  
+% 
+%                 self.is_preprocessed = true;
+%             end
+%         end
+         
         function [self, other] = exclude(self, dim, which)
             % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
             % given by entries in the vector ``which``.
