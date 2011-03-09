@@ -111,13 +111,30 @@ classdef block_base < handle
         function plot(self, varargin)
             % SYNTAX
             %
-            % plot(block)                   % plots all the data in 2 x 4 subplots
+            % plot(block)                   % plots all the data in 2 x 4 subplots, or fewer
             % plot(block, {'sub', [2, 5]})  % plots all the data in 2 x 5 subplots
             % plot(block, {'one', <column name or number>})
             % plot(block, {'mark', <row name(s) or number(s)>})
-
-            subplot_size = [2,4];
             tags = 1:self.K;
+            if self.K == 1
+                subplot_size = [1, 1];
+            elseif self.K == 2
+                subplot_size = [1, 2];
+            elseif self.K == 3
+                subplot_size = [1, 3];
+            elseif self.K == 4
+                subplot_size = [2, 2];
+            elseif self.K == 5
+                subplot_size = [2, 3];
+            elseif self.K == 6
+                subplot_size = [2, 3];
+            elseif self.K == 7
+                subplot_size = [2, 3];
+            else
+                subplot_size = [2, 4];
+            end
+                
+            
             mark = [];
             for i = 1:numel(varargin)
                 key = varargin{i}{1};
@@ -341,6 +358,7 @@ end % end classdef
 function plot_tags(self, tags, subplot_size, mark)
     K = size(self.data(:, tags),2);
     hA = zeros(K, 1);
+    count = -prod(subplot_size);
     for k = 1:K
         if mod(k-1, prod(subplot_size))==0
             figure('Color', 'White');
@@ -348,13 +366,16 @@ function plot_tags(self, tags, subplot_size, mark)
         end
         hA(k) = subplot(subplot_size(1), subplot_size(2), k-count);
     end
+    if numel(self.labels)
+        tagnames = self.labels{2,1};
+    end
+            
     for k = 1:K
-        plot(axes(hA(k)), data(:,tags(k)), 'k')
-        hold on
-        set(hA(k),'FontSize',14)
+        plot(hA(k), self.data(:,tags(k)), 'k')
+        title(hA(k), tagnames{k}, 'FontSize',14)
+        set(hA(k), 'FontSize',14)
         axis tight
-        grid('on')
-        self.labels(2);
+        grid(hA(k),'on')
     end
         
 end
