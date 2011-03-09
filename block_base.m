@@ -71,9 +71,7 @@ classdef block_base < handle
             
             
         end
-            
-
-        
+  
         function add_labels(self, dim, to_add)           
             added = false;
             for k = 1:numel(self.labels(dim, :))
@@ -89,7 +87,53 @@ classdef block_base < handle
             
         end
         
+        function disp(self)
+            % Displays a text summary of the block
+            fprintf('%s: %d observations and %d variables\n', self.name, self.N, self.K)
+            
+            if self.has_missing
+                fprintf('* Has missing data\n')
+            else
+                fprintf('* Has _no_ missing data\n')
+            end
+            if self.is_preprocessed
+                fprintf('* Has been preprocessed\n')
+            else
+                fprintf('* Has _not been_ preprocessed\n')
+            end            
+        end
 
+        function out = isempty(self)
+            % Determines if the block is empty
+            out = isempty(self.data);
+        end
+        
+        function plot(self, varargin)
+            % SYNTAX
+            %
+            % plot(block)                   % plots all the data in 2 x 4 subplots
+            % plot(block, {'sub', [2, 5]})  % plots all the data in 2 x 5 subplots
+            % plot(block, {'one', <column name or number>})
+            % plot(block, {'mark', <row name(s) or number(s)>})
+
+            subplot_size = [2,4];
+            tags = 1:self.K;
+            mark = [];
+            for i = 1:numel(varargin)
+                key = varargin{i}{1};
+                value = varargin{i}{2};
+                if strcmpi(key, 'sub')
+                    subplot_size = value;
+                elseif strcmpi(key, 'one')
+                    subplot_size = [1, 1];
+                    tags = self.get_vector(2, value);
+                elseif strcmpi(key, 'mark')
+                    mark = self.get_vector(1, value);
+                end 
+            end
+            
+            plot_tags(self, tags, subplot_size, mark)
+        end
 
 %         function self = preprocess(self, varargin)
 %             % Calculates the preprocessing vectors for a block
@@ -289,56 +333,30 @@ classdef block_base < handle
 %             end
 %         end
         
-        function disp(self)
-            % Displays a text summary of the block
-            fprintf('%s: %d observations and %d variables\n', self.name, self.N, self.K)
-            
-            if self.has_missing
-                fprintf('* Has missing data\n')
-            else
-                fprintf('* Has _no_ missing data\n')
-            end
-            if self.is_preprocessed
-                fprintf('* Has been preprocessed\n')
-            else
-                fprintf('* Has _not been_ preprocessed\n')
-            end            
-        end
-
-        function out = isempty(self)
-            % Determines if the block is empty
-            out = isempty(self.data);
-        end
-        
-        function plot(self, varargin)
-            % SYNTAX
-            %
-            % plot(block, 'all')             : uses defaults for all plots.
-            %                                : Defaults are as shown below
-            % plot(block, 'raw', 2, 4)       : raw data in a 2 row, 4 column layout
-            % plot(block, 'loadings', 1)     : p_1 as a bar plot
-            % plot(block, 'loadings', [1,2]) : p_1 vs p_2 as a scatter plot
-            % plot(block, 'weights', ...)    : same as `loadings`, just for weights
-            % plot(block, 'onebatch', xx)    : plots scaled values of batch xx
-
-            
-            plottypes = 'raw';
-            
-            % Iterate over all plots requested by the user
-            for i = 1:numel(plottypes)
-                plottype = plottypes{i};
-                if strcmpi(plottype, 'raw')
-                    plot_raw(self, nrow, ncol)
-                end
-            end
-
-        end
+ 
     end % end methods
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.
-function plot_raw(self, nrow, ncol)
-    
+function plot_tags(self, tags, subplot_size, mark)
+    K = size(self.data(:, tags),2);
+    hA = zeros(K, 1);
+    for k = 1:K
+        if mod(k-1, prod(subplot_size))==0
+            figure('Color', 'White');
+            count = count + prod(subplot_size);
+        end
+        hA(k) = subplot(subplot_size(1), subplot_size(2), k-count);
+    end
+    for k = 1:K
+        plot(axes(hA(k)), data(:,tags(k)), 'k')
+        hold on
+        set(hA(k),'FontSize',14)
+        axis tight
+        grid('on')
+        self.labels(2);
+    end
+        
 end
 
 % function plot_loadings(self, which_loadings)  
