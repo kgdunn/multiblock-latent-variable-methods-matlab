@@ -17,7 +17,8 @@ classdef block_base < handle
         labels = {};            % Cell array: rows are the modes; columns are sets of labels
                                 % 2 x 3: row labels and columns labels, with
                                 % up to 3 sets of labels for each dimension
-        N = 0;                  % Number of observations
+                                
+        N = 0;                  % Number of observations (rows)
         K = 0;                  % Number of variables (columns)
     end
     
@@ -86,29 +87,19 @@ classdef block_base < handle
             end
             
         end
-        
-        function disp(self)
-            % Displays a text summary of the block
-            fprintf('%s: %d observations and %d variables\n', self.name, self.N, self.K)
-            
-            if self.has_missing
-                fprintf('* Has missing data\n')
-            else
-                fprintf('* Has _no_ missing data\n')
-            end
-            if self.is_preprocessed
-                fprintf('* Has been preprocessed\n')
-            else
-                fprintf('* Has _not been_ preprocessed\n')
-            end            
-        end
 
         function out = isempty(self)
             % Determines if the block is empty
             out = isempty(self.data);
         end
         
-        function plot(self, varargin)
+        function disp_header(self)
+            % Displays a text summary of the block
+            fprintf('%s: %d observations and %d variables\n', self.name, self.N, self.K)
+            
+        end
+        
+        function h = plot(self, varargin)
             % SYNTAX
             %
             % plot(block)                   % plots all the data in 2 x 4 subplots, or fewer
@@ -149,7 +140,7 @@ classdef block_base < handle
                 end 
             end
             
-            plot_tags(self, tags, subplot_size, mark)
+            h = plot_tags(self, tags, subplot_size, mark);
         end
 
 %         function self = preprocess(self, varargin)
@@ -351,11 +342,35 @@ classdef block_base < handle
 %         end
         
  
-    end % end methods
+    end % end methods (ordinary)
+    
+    % Subclasses may not redefine these methods
+    methods (Sealed=true)
+        function disp(self)
+            
+            disp_header(self)
+            
+            if self.has_missing
+                fprintf('* Has missing data\n')
+            else
+                fprintf('* Has _no_ missing data\n')
+            end
+            if self.is_preprocessed
+                fprintf('* Has been preprocessed\n')
+            else
+                fprintf('* Has _not been_ preprocessed\n')
+            end            
+        end
+        
+    end % end methods (sealed)
+    
+%     methods (Abstract=true)
+%         disp_header(self)
+%     end % end methods (abstract)
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.
-function plot_tags(self, tags, subplot_size, mark)
+function hA = plot_tags(self, tags, subplot_size, mark)
     K = size(self.data(:, tags),2);
     hA = zeros(K, 1);
     count = -prod(subplot_size);
@@ -384,8 +399,8 @@ end
 %         
 %     if strcmpi(self.block_type, 'batch')
 % 
-%         nSamples = self.J;                                                              % Number of samples per tag
-%         nTags = self.nTags;                                                                  % Number of tags in the batch data
+%         nSamples = self.J;                   % Number of samples per tag
+%         nTags = self.nTags;                  % Number of tags in the batch data
 %         tagNames = char(self.tagnames);
 %         
 %         for a = which_loadings
