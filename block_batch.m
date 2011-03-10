@@ -235,60 +235,6 @@ function plot_raw(self, nrow, ncol)
     end
 end
 
-function plot_loadings(self, which_loadings)  
-        
-    if strcmpi(self.block_type, 'batch')
-
-        nSamples = self.J;                                                              % Number of samples per tag
-        nTags = self.nTags;                                                                  % Number of tags in the batch data
-        tagNames = char(self.tagnames);
-        
-        for a = which_loadings
-            data = self.P(:, a);
-            y_axis_label = ['Loadings, p_', num2str(a)];
-            
-            data = reshape(data, self.nTags, self.J)';
-            cum_area = sum(abs(data));
-            data = data(:);
-            hF = figure('Color', 'White');
-            hA = axes;
-            bar(data);
-
-            x_r = xlim;
-            y_r = ylim;
-            xlim([x_r(1,1) nSamples*self.nTags]);
-            tick = zeros(self.nTags,1);
-            for k=1:self.nTags
-                tick(k) = nSamples*k;
-            end
-
-            for k=1:self.nTags
-                text(round((k-1)*nSamples+round(nSamples/2)), ...
-                     diff(y_r)*0.9 + y_r(1),deblank(tagNames(k,:)), ...
-                     'FontWeight','bold','HorizontalAlignment','center');
-                text(round((k-1)*nSamples+round(nSamples/2)), ...
-                     diff(y_r)*0.05 + y_r(1), sprintf('%.2f',cum_area(k)), ...
-                     'FontWeight','bold','HorizontalAlignment','center');
-            end
-
-            set(hA,'XTick',tick);
-            set(hA,'XTickLabel',[]);
-            set(hA,'Xgrid','On');
-            xlabel('Batch time repeated for each variable');
-            ylabel(y_axis_label);
-            pos0 = get(0,'ScreenSize');
-            delta = pos0(3)/100*2;
-            posF = get(hF,'Position');
-            set(hF,'Position',[delta posF(2) pos0(3)-delta*2 posF(4)]);
-        end
-        
-        
-    end
-end
-
-function plot_weights(self)
-end
-
 function plot_highlight_batch(self, nrow, ncol, which_batch)
     hA = zeros(nrow*ncol, 1);
     
