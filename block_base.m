@@ -392,6 +392,9 @@ classdef block_base < handle
                 if any(isnan(scaling))
                     other.has_missing = true;
                 end
+                
+                other.data = block_data;
+                block_data = other;
                 return
             end
             

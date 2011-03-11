@@ -313,7 +313,7 @@ function test_preprocessing()
 
     b = block(batch_data, 'DuPont X', {'batch_tag_names', tagNames}, ...
                            {'nBatches', nBatches});
-    [data, PP] = preprocess(b); 
+    [data_PP, PP] = preprocess(b); 
 
     % The mean centering vector should be [4, 4, 4, 3], page 40
     assertTrue(numel(PP.mean_center()) == 1000);
@@ -322,7 +322,12 @@ function test_preprocessing()
     assertTrue(numel(PP.scaling) == 1000);
     
     
-    
+    % Apply preprocessing to a new block
+    new_data = block(batch_data(1:200, :), 'DuPont X', ...
+            {'batch_tag_names', tagNames},  {'nBatches', 2});
+        
+    new = b.preprocess(new_data, PP);
+    assertElementsAlmostEqual(new.data, data_PP.data(1:2,:), 8)
 end
 
 
