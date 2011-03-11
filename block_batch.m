@@ -111,6 +111,11 @@ classdef block_batch < block_base
             
         end
         
+        function out = get_data(self)
+            % Returns the data array stored in self.
+            out = self.data;
+        end
+        
         function disp_header(self)
             % Displays a text summary of the block
             fprintf('%s: %d batches, %d variables, %d time samples (batch unfolded)\n', self.name, self.N, self.nTags, self.J)

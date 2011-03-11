@@ -11,7 +11,6 @@ classdef block_base < handle
         data = false;           % Block's data
         has_missing = false;    % {true, false}
         mmap = false;           % Missing data map
-        is_preprocessed = false;% {true, false}
         name = '';
         name_type = 'auto';     % {'auto', 'given'}
         labels = {};            % Cell array: rows are the modes; columns are sets of labels
@@ -80,14 +79,162 @@ classdef block_base < handle
             end
         end
         
+        function out = get_data(self)
+            % Returns the data array stored in self.
+            out = self.data;
+        end
+        
         function out = shape(self, varargin)
             out = size(self.data);
             if nargin > 1
                 out = out(varargin{1});
             end
         end
-  
-        function add_labels(self, dim, to_add)           
+        
+        function out = copy(self)
+            props = properties(self);
+            out = block_base([], [], '');
+            for i=1:numel(props)
+                out.(props{i}) = self.(props{i});
+            end
+        end
+        
+        function y = mean(self, varargin)
+            y = nanmean(self.data, varargin{:});
+        end
+        
+        function y = std(self, dim, flag)
+            % FORMAT: Y = NANSTD(X,DIM,FLAG)
+            % 
+            %    Standard deviation ignoring NaNs
+            %
+            %    This function enhances the functionality of NANSTD as distributed in
+            %    the MATLAB Statistics Toolbox and is meant as a replacement (hence the
+            %    identical name).  
+            %
+            %    NANSTD(X,DIM) calculates the standard deviation along any dimension of
+            %    the N-D array X ignoring NaNs.  
+            %
+            %    NANSTD(X,DIM,0) normalizes by (N-1) where N is SIZE(X,DIM).  This make
+            %    NANSTD(X,DIM).^2 the best unbiased estimate of the variance if X is
+            %    a sample of a normal distribution. If omitted FLAG is set to zero.
+            %    
+            %    NANSTD(X,DIM,1) normalizes by N and produces the square root of the
+            %    second moment of the sample about the mean.
+            %
+            %    If DIM is omitted NANSTD calculates the standard deviation along first
+            %    non-singleton dimension of X.
+            %
+            %    Similar replacements exist for NANMEAN, NANMEDIAN, NANMIN, NANMAX, and
+            %    NANSUM which are all part of the NaN-suite.
+            %
+            %    See also STD
+
+            % -------------------------------------------------------------------------
+            %    author:      Jan Gläscher
+            %    affiliation: Neuroimage Nord, University of Hamburg, Germany
+            %    email:       glaescher@uke.uni-hamburg.de
+            %    
+            %    $Revision: 1.1 $ $Date: 2004/07/15 22:42:15 $
+            
+            x = self.data;
+            
+            if isempty(x)
+                y = NaN;
+                return
+            end
+
+            if nargin < 3
+                flag = 0;
+            end
+
+            if nargin < 2
+                dim = min(find(size(x)~=1));
+                if isempty(dim)
+                    dim = 1; 
+                end	  
+            end
+
+            % Find NaNs in x and nanmean(x)
+            nans = isnan(x);
+            avg = nanmean(x,dim);
+
+            % create array indicating number of element 
+            % of x in dimension DIM (needed for subtraction of mean)
+            tile = ones(1,max(ndims(x),dim));
+            tile(dim) = size(x,dim);
+
+            % remove mean
+            x = x - repmat(avg,tile);
+
+            count = size(x,dim) - sum(nans,dim);
+
+            % Replace NaNs with zeros.
+            x(isnan(x)) = 0; 
+
+            % Protect against a  all NaNs in one dimension
+            i = find(count==0);
+
+            if flag == 0
+                y = sqrt(sum(x.*x,dim)./max(count-1,1));
+            else
+                y = sqrt(sum(x.*x,dim)./max(count,1));
+            end
+            y(i) = i + NaN;
+            % $Id: nanstd.m,v 1.1 2004/07/15 22:42:15 glaescher Exp glaescher $
+        end
+            
+        function y = sum(self, dim)
+            % FORMAT: Y = NANSUM(X,DIM)
+            % 
+            %    Sum of values ignoring NaNs
+            %
+            %    This function enhances the functionality of NANSUM as distributed in
+            %    the MATLAB Statistics Toolbox and is meant as a replacement (hence the
+            %    identical name).  
+            %
+            %    NANSUM(X,DIM) calculates the mean along any dimension of the N-D array
+            %    X ignoring NaNs.  If DIM is omitted NANSUM averages along the first
+            %    non-singleton dimension of X.
+            %
+            %    Similar replacements exist for NANMEAN, NANSTD, NANMEDIAN, NANMIN, and
+            %    NANMAX which are all part of the NaN-suite.
+            %
+            %    See also SUM
+
+            % -------------------------------------------------------------------------
+            %    author:      Jan Gläscher
+            %    affiliation: Neuroimage Nord, University of Hamburg, Germany
+            %    email:       glaescher@uke.uni-hamburg.de
+            %    
+            %    $Revision: 1.2 $ $Date: 2005/06/13 12:14:38 $
+            x = self.data;
+            if isempty(x)
+                y = [];
+                return
+            end
+
+            if nargin < 2
+                dim = min(find(size(x)~=1));
+                if isempty(dim)
+                    dim = 1;
+                end
+            end
+
+            % Replace NaNs with zeros.
+            nans = isnan(x);
+            x(isnan(x)) = 0; 
+
+            % Protect against all NaNs in one dimension
+            count = size(x,dim) - sum(nans,dim);
+            i = find(count==0);
+
+            y = sum(x,dim);
+            y(i) = NaN;
+            % $Id: nansum.m,v 1.2 2005/06/13 12:14:38 glaescher Exp glaescher $
+        end
+        
+        function add_labels(self, dim, to_add)
             added = false;
             for k = 1:numel(self.labels(dim, :))
                 if isempty(self.labels{dim, k})
@@ -199,72 +346,82 @@ classdef block_base < handle
             end
         end
         
-        
-        
+        function [block_data, varargout] = preprocess(self, varargin)
+            % Calculates the preprocessing vectors for a block, ``pp`` and 
+            % returns the preprocessed ``data``, computed on ``self``, 
+            % but does not modify ``self``.
+            %
+            % Currently the only preprocessing model supported is to mean center
+            % and scale.
+            %
+            % SYNTAX:
+            %
+            % Preprocesses ``self`` and returns the PP structure and the PP data.
+            %
+            % [data, pp] = self.preprocess()
+            %
+            %
+            % Returns the ``other_block`` in preprocessed form, from the given
+            % preprocessing structure, ``pp``:
+            %
+            % other_pp = self.preprocess(other_block, pp)
+            
+            
+            
+            % We'd like to preprocess the ``other`` block using settings 
+            % from the current block.
+            if nargin==3 
+                other = varargin{1};
+                PP = varargin{2};
+                if ~isa(other, 'block_base')
+                    error('The new data must be a ``block`` instance.');
+                end
+                % Don't worry about preprocessing empty blocks.
+                if ~isempty(other)
+                    mean_center = PP.mean_center;
+                    scaling = PP.scaling;
+                    block_data = other.get_data() - repmat(mean_center, other.N, 1);
+                    block_data = block_data .* repmat(scaling, other.N, 1);
+                else
+                    % Catches the case when empty blocks are preprocessed
+                    scaling = NaN;
+                end
+                
+                % Will scaling introduce missing values?
+                if any(isnan(scaling))
+                    other.has_missing = true;
+                end
+                return
+            end
+            
+            % Calculate the preprocesing information from the training data
+            block_data = self.copy();
+            
+            % Centering based on the mean
+            mean_center = mean(block_data, 1);
+            scaling = std(block_data, 1);
 
-%         function self = preprocess(self, varargin)
-%             % Calculates the preprocessing vectors for a block
-%             %
-%             % Currently the only preprocessing model supported is to mean center
-%             % and scale.
-%             
-%             % We'd like to preprocess the ``other`` block using settings 
-%             % from the current block.
-%             if nargin==2 && self.is_preprocessed
-%                 other = varargin{1};
-%                 if ~isa(other, 'block')
-%                     error('The new data must be a ``block`` instance.');
-%                 end
-%                 % Don't worry about preprocessing empty blocks.
-%                 if ~isempty(other)
-%                     mean_center = self.PP.mean_center;
-%                     scaling = self.PP.scaling;
-%                     if ~other.is_preprocessed                    
-%                         other.data = other.data - repmat(mean_center, other.N, 1);
-%                         other.data = other.data .* repmat(scaling, other.N, 1);
-%                     end
-%                 else
-%                     % Catches the case when empty blocks are preprocessed
-%                     scaling = NaN;
-%                 end
-%                 other.is_preprocessed = true;
-%                 
-%                 % Will scaling introduce missing values?
-%                 if any(isnan(scaling))
-%                     other.has_missing = true;
-%                 end
-%                 self = other;
-%                 return
-%             end
-%             
-%             % Apply the preprocesing to the training data
-%             if not(self.is_preprocessed)
-%                 
-%             
-%                 % Centering based on the mean
-%                 mean_center = nanmean(self.data, 1);
-%                 scaling = nanstd(self.data, 1);
-% 
-%                 % Replace zero entries with NaN: this is handled later on with scaling
-%                 % This will create missing data, so we need to set the flag
-%                 % correctly
-%                 if any(scaling < sqrt(eps))
-%                     scaling(scaling < sqrt(eps)) = NaN;
-%                     self.has_missing = true;
-%                 end                
-%                 scaling = 1./scaling;
-%             
-%             
-%                 self.data = self.data - repmat(mean_center, self.N, 1);
-%                 self.data = self.data .* repmat(scaling, self.N, 1);
-% 
-%                 % Store the preprocessing vectors for later on
-%                 self.PP.mean_center = mean_center;
-%                 self.PP.scaling = scaling;  
-% 
-%                 self.is_preprocessed = true;
-%             end
-%         end
+            % Replace zero entries with NaN: this is handled later on with scaling
+            % This will create missing data, so we need to set the flag
+            % correctly
+            if any(scaling < sqrt(eps))
+                scaling(scaling < sqrt(eps)) = NaN;
+                self.has_missing = true;
+            end                
+            scaling = 1./scaling;
+
+
+            block_data.data = block_data.data - repmat(mean_center, self.N, 1);
+            block_data.data = block_data.data .* repmat(scaling, self.N, 1);
+
+            % Store the preprocessing vectors for later on
+            if nargout > 1
+                PP = struct;
+                PP.mean_center = mean_center;
+                PP.scaling = scaling;
+                varargout{1} = PP;
+            end
+        end
 %         
 %         function self = un_preprocess(self, varargin)
 %             % UNdoes preprocessing for a block.
@@ -414,11 +571,6 @@ classdef block_base < handle
             else
                 fprintf('* Has _no_ missing data\n')
             end
-            if self.is_preprocessed
-                fprintf('* Has been preprocessed\n')
-            else
-                fprintf('* Has _not been_ preprocessed\n')
-            end            
         end
         
     end % end methods (sealed)
@@ -535,6 +687,58 @@ function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_siz
         grid(hA(k),'on')
     end
     title_str = 'Plots of raw data';
+end
+
+function y = nanmean(x, dim)
+    % FORMAT: Y = NANMEAN(X,DIM)
+    % 
+    %    Average or mean value ignoring NaNs
+    %
+    %    This function enhances the functionality of NANMEAN as distributed in
+    %    the MATLAB Statistics Toolbox and is meant as a replacement (hence the
+    %    identical name).  
+    %
+    %    NANMEAN(X,DIM) calculates the mean along any dimension of the N-D
+    %    array X ignoring NaNs.  If DIM is omitted NANMEAN averages along the
+    %    first non-singleton dimension of X.
+    %
+    %    Similar replacements exist for NANSTD, NANMEDIAN, NANMIN, NANMAX, and
+    %    NANSUM which are all part of the NaN-suite.
+    %
+    %    See also MEAN
+
+    % -------------------------------------------------------------------------
+    %    author:      Jan Gläscher
+    %    affiliation: Neuroimage Nord, University of Hamburg, Germany
+    %    email:       glaescher@uke.uni-hamburg.de
+    %    
+    %    $Revision: 1.1 $ $Date: 2004/07/15 22:42:13 $
+    if isempty(x)
+        y = NaN;
+        return
+    end
+
+    if nargin < 2
+        dim = min(find(size(x)~=1));
+        if isempty(dim)
+            dim = 1;
+        end
+    end
+
+    % Replace NaNs with zeros.
+    nans = isnan(x);
+    x(isnan(x)) = 0; 
+
+    % denominator
+    count = size(x,dim) - sum(nans,dim);
+
+    % Protect against a  all NaNs in one dimension
+    i = find(count==0);
+    count(i) = ones(size(i));
+
+    y = sum(x,dim)./count;
+    y(i) = i + NaN;
+    % $Id: nanmean.m,v 1.1 2004/07/15 22:42:13 glaescher Exp glaescher $
 end
 
 % function plot_loadings(self, which_loadings)  
