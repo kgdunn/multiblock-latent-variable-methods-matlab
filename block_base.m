@@ -93,7 +93,8 @@ classdef block_base < handle
         
         function out = copy(self)
             props = properties(self);
-            out = block_base([], [], '');
+            
+            out = self.new();
             for i=1:numel(props)
                 out.(props{i}) = self.(props{i});
             end
@@ -575,7 +576,13 @@ classdef block_base < handle
         
     end % end methods (sealed)
     
+    % These methods don't invoke ``self``
     methods (Static=true)
+        function out = new()
+            % Create a new copy of self with no data.
+            out = block_base([], [], '');
+        end
+        
         function subplot_size = optimal_layout(nTags, default_layout, override)
             % This function can be improved so that the optimal layout "builds
             % up" to the default_layout.  E.g what if default_layout is [3,6]?
@@ -652,10 +659,11 @@ classdef block_base < handle
         end
         
     end % end methods (static)
-    
-%     methods (Abstract=true)
-%         disp_header(self)
-%     end % end methods (abstract)
+
+    % Subclass must redefine these methods
+    %methods (Abstract=true)
+    %    new(self);
+    %end % end methods (abstract)
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.

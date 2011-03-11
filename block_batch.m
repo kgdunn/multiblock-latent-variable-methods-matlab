@@ -32,7 +32,10 @@ classdef block_batch < block_base
                     key = varargin{i}{1};
                     value = varargin{i}{2};
                     
-                    if strcmpi(key, 'nbatches')
+                    if strcmpi(key, '__shell__')
+                        return
+                    
+                    elseif strcmpi(key, 'nbatches')
                         nBatches = max(nBatches, floor(value));     
                     
                     elseif strcmpi(key, 'batch_names')
@@ -213,6 +216,14 @@ classdef block_batch < block_base
 
         end
     end % end methods
+    
+    methods (Static=true)
+        function out = new()
+            % Create a new copy of self with no data.
+            out = block_batch([], [], '', {'__shell__', true});
+        end
+    end
+    
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.

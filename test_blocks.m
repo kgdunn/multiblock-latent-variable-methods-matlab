@@ -256,7 +256,13 @@ function test_plotting()
     % many batches there are in the aligned data
     b = block(batch_data, 'DuPont X', {'batch_tag_names', tagNames}, ...
                            {'nBatches', nBatches});
-    plot(b, {'layout', [2,2]}, {'mark', 32})
+    h = plot(b, {'layout', [2,2]}, {'mark', 32});
+    assert(numel(h) == 10);
+    hF = unique(cell2mat(get(h, 'Parent')));
+    assert(numel(hF) == 3);
+    for f = 1:numel(hF)
+        delete(hF(f))
+    end
     
 end
 
@@ -282,6 +288,41 @@ function test_preprocessing()
     
     % Output is preprocessed
     assertElementsAlmostEqual(out.data, [-1 -1/sqrt(2) -1/sqrt(2); 0 NaN 1/sqrt(2); 1 1/sqrt(2) NaN], 4)
+    
+    
+    X_raw = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
+    X = block(X_raw);
+    [data, PP] = preprocess(X);  % or X = X.preprocess();
+
+    % The mean centering vector should be [4, 4, 4, 3], page 40
+    assertTrue(all(PP.mean_center == [4, 4, 4, 3]));
+
+    % The (inverted) scaling vector [1, 1, 0.5, 1], page 40
+    assertTrue(all(PP.scaling == [1, 1, 0.5, 1]));
+    
+    
+    % Batch preprocessing
+    dupont = load('datasets/DuPont.mat');
+    batch_data = dupont.tech;
+
+    % Specify the data dimensions
+    nBatches = 55;
+    tagNames = {'TempR-1','TempR-2','TempR-3','Press-1', ...
+                'Flow-1', 'TempH-1','TempC-1','Press-2', ...
+                'Press-3','Flow-2'};
+
+    b = block(batch_data, 'DuPont X', {'batch_tag_names', tagNames}, ...
+                           {'nBatches', nBatches});
+    [data, PP] = preprocess(b); 
+
+    % The mean centering vector should be [4, 4, 4, 3], page 40
+    assertTrue(numel(PP.mean_center()) == 1000);
+
+    % The (inverted) scaling vector [1, 1, 0.5, 1], page 40
+    assertTrue(numel(PP.scaling) == 1000);
+    
+    
+    
 end
 
 
