@@ -20,10 +20,11 @@ classdef block_base < handle
                                 
         N = 0;                  % Number of observations (rows)
         K = 0;                  % Number of variables (columns)
+        source = '';            % Where the data came from
     end
     
     methods
-        function self = block_base(given_data, block_name, varargin)
+        function self = block_base(given_data, block_name, source, varargin)
             % SYNTAX:
             % block_base(data, block_name, variable arguments in cell arrays)
             
@@ -52,6 +53,10 @@ classdef block_base < handle
                 self.name_type = 'given';
             end
             
+            % Third argument: block source
+            self.source = source;
+            
+            
             % Third and subsequent arguments: 
             if nargin > 2
                 for i = 1:numel(varargin)
@@ -66,11 +71,20 @@ classdef block_base < handle
                     elseif strcmpi(key, 'col_labels')
                         self.add_labels(2, value);
                         
+                    % ``source``
+                    elseif strcmpi(key, 'source')
+                        self.source = value;
+                        
                     end
                 end
             end
-            
-            
+        end
+        
+        function out = shape(self, varargin)
+            out = size(self.data);
+            if nargin > 1
+                out = out(varargin{1});
+            end
         end
   
         function add_labels(self, dim, to_add)           
@@ -85,6 +99,45 @@ classdef block_base < handle
             if ~added
                 self.labels{dim, end+1} = to_add;
             end
+            
+        end
+        
+        function [idx, idx_names] = index_by_name(self, axis, names)
+            % Gets the index/indicies into an ``axis`` from the label names
+            % provided in ``names``.
+            idx = [];
+            idx_names = {};
+            ax_labels = self.labels(axis,1);
+            ax_labels = ax_labels{1};
+            
+            if ischar(names)
+                names = {names};
+            end
+            
+            % Perhaps the ``names`` are just a vector of indices
+            if isempty(ax_labels)
+                ax_dim = self.shape(axis);
+                for j = 1:numel(names)
+                    if names(j) <= ax_dim
+                        idx(end+1) = names(j);
+                        idx_names{end+1} = num2str(names(j));
+                    end
+                end
+                return
+            end
+            
+            for j = 1:numel(names)
+                name_j = names(j);
+                for k = 1:numel(ax_labels)
+                    if strcmp(name_j, ax_labels(k))
+                        idx(end+1) = k;
+                        idx_names(end+1) = ax_labels(k);
+                    end
+                end
+                
+            end
+            
+            
             
         end
 
@@ -106,27 +159,14 @@ classdef block_base < handle
             % plot(block, {'sub', [2, 5]})  % plots all the data in 2 x 5 subplots
             % plot(block, {'one', <column name or number>})
             % plot(block, {'mark', <row name(s) or number(s)>})
-            tags = 1:self.K;
-            if self.K == 1
-                subplot_size = [1, 1];
-            elseif self.K == 2
-                subplot_size = [1, 2];
-            elseif self.K == 3
-                subplot_size = [1, 3];
-            elseif self.K == 4
-                subplot_size = [2, 2];
-            elseif self.K == 5
-                subplot_size = [2, 3];
-            elseif self.K == 6
-                subplot_size = [2, 3];
-            elseif self.K == 7
-                subplot_size = [2, 3];
-            else
-                subplot_size = [2, 4];
-            end
-                
             
-            mark = [];
+            % Set the defaults
+            default_layout = [2, 4];
+            subplot_size = block_base.optimal_layout(self.K, default_layout);
+            tags = 1:self.K;
+            mark = NaN;
+            footer_string = {datestr(now)};
+            
             for i = 1:numel(varargin)
                 key = varargin{i}{1};
                 value = varargin{i}{2};
@@ -140,8 +180,27 @@ classdef block_base < handle
                 end 
             end
             
-            h = plot_tags(self, tags, subplot_size, mark);
+            [h, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_size, mark);
+            self.add_plot_footers(hFooters, footer_string);
+            self.add_plot_window_title(hHeaders, title_str)
         end
+               
+        function add_plot_footers(self, hFooters, footer_string)
+            % Convert the cell string to a long char string
+            foot = footer_string{1};
+            for j = 2:numel(footer_string)
+                foot = [foot, footer_string{j}];
+            end
+            
+            % Append the source file to the figure
+            footer_string = [foot, ' (source: ', self.source, ')'];
+            for k = 1:numel(hFooters)
+                set(hFooters(k), 'String', footer_string)
+            end
+        end
+        
+        
+        
 
 %         function self = preprocess(self, varargin)
 %             % Calculates the preprocessing vectors for a block
@@ -364,19 +423,102 @@ classdef block_base < handle
         
     end % end methods (sealed)
     
+    methods (Static=true)
+        function subplot_size = optimal_layout(nTags, default_layout, override)
+            % This function can be improved so that the optimal layout "builds
+            % up" to the default_layout.  E.g what if default_layout is [3,6]?
+            
+            if nargin>2 && not(any(isnan(override(:))))
+                subplot_size = override;
+                return;
+            end
+            
+            if nTags == 1
+                subplot_size = [1, 1];
+            elseif nTags == 2
+                subplot_size = [1, 2];
+            elseif nTags == 3
+                subplot_size = [1, 3];
+            elseif nTags == 4
+                subplot_size = [2, 2];
+            elseif nTags == 5
+                subplot_size = [2, 3];
+            elseif nTags == 6
+                subplot_size = [2, 3];
+            elseif nTags == 7
+                subplot_size = [2, 3];
+            else
+                subplot_size = default_layout;
+            end
+        end
+        
+        function [hF, hHead, hFoot] = add_figure()
+            % Adds a new figure
+            background_colour = [1, 1, 1];
+            font_size = 14;
+            hF = figure('Color', background_colour);
+            set(hF, 'ToolBar', 'figure')
+            units = get(hF, 'Units');
+            set(hF, 'units', 'Pixels');
+             
+            screen = get(0,'ScreenSize');   
+            fPos = get(hF, 'position');
+            fPos(1) = round(0.10*screen(3));
+            fPos(2) = round(0); %.10*screen(4));
+            fPos(3) = screen(3)-2*screen(1);
+            fPos(4) = screen(4)-2*screen(2);
+            set(hF, 'Position', fPos);
+  
+            Txt.Interruptible = 'off';  % Text fields different to default values
+            Txt.BusyAction    = 'queue';
+            Txt.Style         = 'text';
+            Txt.Units         = 'normalized';
+            Txt.HorizontalAli = 'center';
+            Txt.Background    = background_colour;
+            Txt.FontSize      = font_size;
+            Txt.Parent        = hF;
+            set(hF, 'Units', 'normalized')
+            
+            hHead = uicontrol(Txt, ...
+                             'Position',[0, 0, eps, eps], ...  %'Position',[0.02, 0.95, 0.96 0.04], ...
+                             'ForegroundColor',[0 0 0], 'String', '');
+            %set(hHead, 'Units', 'Pixels')
+            %p = get(hHead, 'Position')
+            Txt.FontSize = 10;
+            hFoot = uicontrol(Txt, ...
+                             'Position',[0.02, 0.005, 0.96 0.04], ...
+                             'ForegroundColor',[0 0 0], 'String', '', ...
+                             'HorizontalAlignment', 'left');
+            set(hF, 'units', units);
+        end
+        
+        function add_plot_window_title(hHeaders, text_to_add)
+            for k = 1:numel(hHeaders)
+                hF = get(hHeaders(k), 'Parent');
+                set(hF, 'Name', text_to_add);
+            end
+        end
+        
+    end % end methods (static)
+    
 %     methods (Abstract=true)
 %         disp_header(self)
 %     end % end methods (abstract)
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.
-function hA = plot_tags(self, tags, subplot_size, mark)
+function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_size, mark)
     K = size(self.data(:, tags),2);
     hA = zeros(K, 1);
+    hHeaders = [];
+    hFooters = [];
+    
     count = -prod(subplot_size);
     for k = 1:K
         if mod(k-1, prod(subplot_size))==0
-            figure('Color', 'White');
+            [hF, hHead, hFoot] = self.add_figure(); %#ok<ASGLU>
+            hHeaders(end+1) = hHead; %#ok<*AGROW>
+            hFooters(end+1) = hFoot;
             count = count + prod(subplot_size);
         end
         hA(k) = subplot(subplot_size(1), subplot_size(2), k-count);
@@ -392,7 +534,7 @@ function hA = plot_tags(self, tags, subplot_size, mark)
         axis tight
         grid(hA(k),'on')
     end
-        
+    title_str = 'Plots of raw data';
 end
 
 % function plot_loadings(self, which_loadings)  
@@ -410,7 +552,7 @@ end
 %             data = reshape(data, self.nTags, self.J)';
 %             cum_area = sum(abs(data));
 %             data = data(:);
-%             hF = figure('Color', 'White');
+%             [hF, hHead, hFoot] = add_figure();
 %             hA = axes;
 %             bar(data);
 % 

@@ -16,9 +16,10 @@ classdef block_batch < block_base
     end
     
     methods
-        function self = block_batch(given_data, block_name, varargin)
-            % Initialize the superclass
-            self = self@block_base([], []);
+        function self = block_batch(given_data, block_name, source, varargin)
+            
+            % Initialize the superclass, but do almost nothing
+            self = self@block_base([], [], source);
             
             % Batch data blocks are always 3-dimensional
             self.labels = cell(3, 0); 
@@ -46,6 +47,10 @@ classdef block_batch < block_base
                         
                     elseif strcmpi(key, 'time_names')
                         self.add_labels(3, value);
+                        
+                    elseif strcmpi(key, 'source')
+                        self.source = value;
+                        
                     end
                 end
             end
@@ -110,195 +115,172 @@ classdef block_batch < block_base
             % Displays a text summary of the block
             fprintf('%s: %d batches, %d variables, %d time samples (batch unfolded)\n', self.name, self.N, self.nTags, self.J)
         end
+        
+        function out = shape(self, varargin)
+            out = zeros(1, 3);
+            out(1) = self.N;
+            out(2) = self.nTags;
+            out(3) = self.J;
+            
+            if nargin > 1
+                out = out(varargin{1});
+            end
+        end
 
-        function plot(self, varargin)
-            % SYNTAX
+        function varargout = plot(self, varargin)
+            % X = randn(50,4);
+            % batch_names = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'Ten'};
+            % time_names = {'1', '2', '3', '4', '5'};
+            % tag_names = {'Temp', 'Pres', 'Flow', 'Heat input', 'Flow2'};
+            % b = block(X, 'X block', {'batch_names', batch_names}, ...
+            %                         {'batch_tag_names', tag_names}, ....
+            %                         {'time_names', time_names});
+            % 
+            % % Basic batch block plot: shows each trajectory for all batches
+            % h = plot(b);
             %
-            % plot(block, 'all')             : uses defaults for all plots.
-            %                                : Defaults are as shown below
-            % plot(block, 'raw', 2, 4)       : raw data in a 2 row, 4 column layout
-            % plot(block, 'loadings', 1)     : p_1 as a bar plot
-            % plot(block, 'loadings', [1,2]) : p_1 vs p_2 as a scatter plot
-            % plot(block, 'weights', ...)    : same as `loadings`, just for weights
-            % plot(block, 'onebatch', xx)    : plots scaled values of batch xx
+            % % Specify the layout for the trajectories: 2x5 subplots per window
+            % h = plot(b, {'layout', [2, 5]});
+            % 
+            % % Specify a batch or batches to highlight
+            % h = plot(b, {'mark', 'X18'});
+            % h = plot(b, {'mark', [42, 43]});
+            % 
+            % % Plot only a certain batch (TODO)
+            % h = plot(b, {'some', 'A'});
+            % h = plot(b, {'some', ['A', 'B']});
+            % 
+            % % Show the preprocessed batch data instead (the default is to show the raw
+            % % data)
+            % h = plot(b, {'pp', true});
 
-            if nargin == 1
-                plottypes = 'raw';
-            else
-                plottypes = varargin{1};
-            end
+            % Set the defaults
+            default_layout = [2, 5];
+            layout_override = NaN;
+            layout = block_batch.optimal_layout(self.nTags, default_layout, layout_override);
+            which_tags = 1:self.nTags;
+            mark = NaN;
+            show_preprocessed = false;
+            footer_string = {datestr(now)};
             
-            if strcmpi(plottypes, 'all')
-                plottypes = {'raw', 'loadings', 'weights'};
-            end
-            if ~isa(plottypes, 'cell')
-                plottypes = cellstr(plottypes);
-            end
-            
-            if strcmpi(plottypes{1}, 'raw') || strcmpi(plottypes{1}, 'highlight')
-                try
-                    nrow = floor(varargin{2});
-                catch ME
-                    nrow = 2;
-                end
-                try
-                    ncol = floor(varargin{3});
-                catch ME
-                    ncol = 4;
-                end
-            end
-            if strcmpi(plottypes{1}, 'loadings') || strcmpi(plottypes{1}, 'weights') 
-                try
-                    which_loadings = floor(varargin{2});
-                catch ME
-                    if self.A > 1
-                        which_loadings = [1, 2];
-                    elseif self.A == 1
-                        which_loadings = 1;
-                    elseif self.A <= 0;
-                        which_loadings = [];
+            % Process the options
+            for i = 1:numel(varargin)
+                key = varargin{i}{1};
+                value = varargin{i}{2};
+                
+                if strcmpi(key, 'layout')
+                    layout = block_batch.optimal_layout(self.nTags, default_layout, value);
+                    
+                elseif strcmpi(key, 'mark')
+                    [mark, mark_names] = self.index_by_name(1, value);
+                    if numel(mark)>0
+                        footer_names = mark_names{1};
+                        for n = 2:numel(mark_names)
+                            footer_names = [footer_names, ', ', mark_names{n}];
+                        end
+                        footer_string{end+1} = ['; marked batches: ', footer_names]; %#ok<*AGROW>
                     end
-                end                
+                elseif strcmpi(key, 'some')
+                    which_tags = self.index_by_name(1, value);
+                    layout = block_batch.optimal_layout(numel(which_tags), default_layout, layout_override);
+                    
+                elseif strcmpi(key, 'pp')
+                    show_preprocessed = value;
+                    footer_string{end+1} = '; preprocessed data';
+                end 
             end
-            if strcmpi(plottypes{1}, 'highlight')
-                try
-                    which_batch = floor(varargin{4});
-                catch ME                    
-                    which_batch = 1;
-                end                
+            
+            if show_preprocessed
+                error('TODO still')
             end
-            if strcmpi(plottypes{1}, 'onebatch')
-                try
-                    which_batch = floor(varargin{2});
-                catch ME                    
-                    which_batch = 1;
-                end    
-                try
-                    which_tags = floor(varargin{3});
-                catch ME                    
-                    which_tags = 1:self.nTags;
-                end  
-            end
+            
                            
-            % Iterate over all plots requested by the user
-            for i = 1:numel(plottypes)
-                plottype = plottypes{i};
-                if strcmpi(plottype, 'raw')
-                    plot_raw(self, nrow, ncol)
-                elseif strcmpi(plottype, 'loadings')
-                    plot_loadings(self, which_loadings)                    
-                elseif strcmpi(plottype, 'weights')
-                    plot_weights(self, which_loadings)
-                elseif strcmpi(plottype, 'highlight')
-                    plot_highlight_batch(self, nrow, ncol, which_batch)
-                elseif strcmpi(plottype, 'onebatch')
-                    plot_one_batch(self, which_batch, which_tags)
-                end
+            [hA, hHeaders, hFooters] = plot_raw(self, layout, which_tags, mark);
+            
+            self.add_plot_footers(hFooters, footer_string);
+            
+            self.add_plot_window_title(hHeaders, 'Plots of batch data');
+            
+            for i=1:nargout
+                varargout{i} = hA;
             end
+                         
 
         end
     end % end methods
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.
-function plot_raw(self, nrow, ncol)
-    hA = zeros(nrow*ncol, 1);
-    count = -nrow*ncol;
+function [hA, hHeaders, hFooters] = plot_raw(self, layout, which_tags, mark)
+    % Plots the raw batch data
+    % * layout:        2x1 vector, telling the desired subplot layout
+    % * which_tags:    a vector of indicies into 1:self.nTags
+
+    plot_colour = [0.1, 0.1, 0.1];
     
-    % Ordinary data blocks
-    if strcmpi(self.block_type, 'ordinary')
-    end
+    highlight_colour = [255, 102, 0]/255;
+    
+    hA = zeros(numel(which_tags), 1);
+    hHeaders = [];
+    hFooters = [];
+    n_plots = prod(layout);
+    count = -n_plots;
     
    
-    if strcmpi(self.block_type, 'batch')
-        for j = 1:self.nTags
-            if mod(j-1, nrow*ncol)==0
-                figure('Color', 'White');
-                count = count + nrow*ncol;
-            end
-            hA(j) = subplot(nrow, ncol, j-count);
+    for k = 1:numel(which_tags)
+        if mod(k-1, n_plots)==0
+            [hF, hHead, hFoot] = self.add_figure(); %#ok<ASGLU>
+            hHeaders(end+1) = hHead;
+            hFooters(end+1) = hFoot;
+            count = count + n_plots;
         end
-
-        for k = 1:self.nTags
-            axes(hA(k))
-            for n = 1:self.N
-                plot(self.raw_data{n}(:,k),'k'),hold on
-            end
-            set(hA(k),'FontSize',14)
-            axis tight
-            grid('on')
-            a=axis;
-            r = a(4)-a(3);
-            axis([1 self.J+1 a(3)-0.1*r a(4)+0.1*r]);
-            title(self.tagnames{k})
-        end
+        hA(k) = subplot(layout(1), layout(2), k-count);
     end
-end
 
-function plot_highlight_batch(self, nrow, ncol, which_batch)
-    hA = zeros(nrow*ncol, 1);
-    
-    
-    % Ordinary data blocks
-    if strcmpi(self.block_type, 'ordinary')
-        return
-    end
-    
-    count = -nrow*ncol;
-    if strcmpi(self.block_type, 'batch')
-        for j = 1:self.nTags
-            if mod(j-1, nrow*ncol)==0
-                figure('Color', 'White');
-                count = count + nrow*ncol;
-            end
-            hA(j) = subplot(nrow, ncol, j-count);
-        end
-
-        for k = 1:self.nTags
-            axes(hA(k))
-            for n = 1:self.N
-                plot(self.raw_data{n}(:,k), 'Color', [0.2, 0.2 0.2]),hold on
-            end
-            plot(self.raw_data{which_batch}(:,k), 'r', 'Linewidth', 1.5)
-            set(hA(k),'FontSize',14)
-            axis tight
-            grid('on')
-            a=axis;
-            r = a(4)-a(3);
-            axis([1 self.J+1 a(3)-0.1*r a(4)+0.1*r]);
-            title(self.tagnames{k})
-        end
-    end
-end
-
-function plot_one_batch(self,  which_batch, which_tags)
-    
-    
-    % Ordinary data blocks
-    if strcmpi(self.block_type, 'ordinary')
-        return
-    end
-    
-    if strcmpi(self.block_type, 'batch')
-        figure('Color', 'White');
-        hA = axes;
-        maxrow = zeros(1, self.nTags)*-Inf;
-        minrow = zeros(1, self.nTags)*Inf;
+    for k = 1:numel(which_tags)
+        tag = which_tags(k);
+        axes(hA(k)) %#ok<LAXES>
+        hold on
         for n = 1:self.N            
-            maxrow = max(maxrow, max(self.raw_data{n}));
-            minrow = min(minrow, min(self.raw_data{n}));
+            plot(self.batch_raw{n}(:,tag), 'Color', plot_colour)
         end
-            
+        % Add the highlights afterwards
+        for n = 1:self.N            
+            if find(mark == n)
+                plot(self.batch_raw{n}(:,tag), 'Color', highlight_colour, 'Linewidth', 1.5)
+            end
+        end
         
-        for k = which_tags
-            plot((self.raw_data{which_batch}(:,k)-minrow(k))/maxrow(k),'k', ...
-                  'LineWidth',2)
-            hold on
-            set(hA,'FontSize',14)
-            axis tight
-            a=axis;
-            r = a(4)-a(3);
-            axis([1 self.J+1 a(3)-0.1*r a(4)+0.1*r]);
-        end
+        set(hA(k),'FontSize',14)
+        axis tight
+        grid('on')
+        a=axis;
+        r = a(4) - a(3);
+        axis([0.5 self.J+1 a(3)-0.1*r a(4)+0.1*r]);
+        title(self.labels{2}{k})
     end
 end
+
+
+% function plot_one_batch(self,  which_batch, which_tags)
+%     figure('Color', 'White');
+%     hA = axes;
+%     maxrow = zeros(1, self.nTags)*-Inf;
+%     minrow = zeros(1, self.nTags)*Inf;
+%     for n = 1:self.N            
+%         maxrow = max(maxrow, max(self.raw_data{n}));
+%         minrow = min(minrow, min(self.raw_data{n}));
+%     end
+% 
+% 
+%     for k = which_tags
+%         plot((self.raw_data{which_batch}(:,k)-minrow(k))/maxrow(k),'k', ...
+%               'LineWidth',2)
+%         hold on
+%         set(hA,'FontSize',14)
+%         axis tight
+%         a=axis;
+%         r = a(4)-a(3);
+%         axis([1 self.J+1 a(3)-0.1*r a(4)+0.1*r]);
+%     end
+% end

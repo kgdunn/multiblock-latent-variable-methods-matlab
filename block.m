@@ -66,9 +66,15 @@ for i = 1:numel(rest)
     end 
 end
 
-
-if is_batch
-    out = block_batch(given_data, given_name, rest{:});
+% Default source
+stack = dbstack(1);
+if numel(stack) == 0
+    source = '<MATLAB command window>';
 else
-    out = block_base(given_data, given_name, rest{:});
+    source = [stack(1).file, ', line ', num2str(stack(1).line)];
+end
+if is_batch
+    out = block_batch(given_data, given_name, source, rest{:});
+else
+    out = block_base(given_data, given_name, source, rest{:});
 end
