@@ -12,7 +12,8 @@ classdef mblvm < handle
         blocks = {};        % a cell array of data blocks; last block is always "Y" (can be empty)
         A = 0;              % number of latent variables
         B = 0;              % number of blocks
-        
+        K = 0;              % size (width) of each block in the model
+        N = 0;              % number of observations in the model
         
         opt = struct();     % model options
         stats = cell({});   % Model statistics for each block
@@ -33,6 +34,8 @@ classdef mblvm < handle
         % Specific to batch models
         T_j = [];    % Instantaneous scores
         error_j = [];% Instantaneous errors
+        
+        
     end
     
     % Subclasses may choose to redefine these methods
@@ -80,6 +83,20 @@ classdef mblvm < handle
         function out = get.B(self)
             % Purely a convenience function to get ".B"
             out = numel(self.blocks);
+        end
+        
+        function N = get.N(self)
+            N = size(self.blocks{1}.data, 1);
+            for b = 1:self.B
+                assert(N == self.blocks{b}.N);
+            end
+        end
+        
+        function K = get.K(self)
+            K = zeros(1, self.B);            
+            for b = 1:self.B
+                K(b) = self.blocks{b}.K;
+            end
         end
         
         function out = iter_terminate(self, lv_prev, lv_current, itern, tolerance, conditions)
@@ -196,7 +213,9 @@ classdef mblvm < handle
                 
                 % Block preprocessing options: resets them
                 if numel(self.PP{b}) == 0
-                    self.PP{b} = struct('mean_center', [], 'scaling', []);                    
+                    self.PP{b} = struct('mean_center', [], ...
+                                        'scaling', [], ...
+                                        'is_preprocessed', false);
                 end
 
                 % Calculated statistics for this block
@@ -231,8 +250,10 @@ classdef mblvm < handle
                 end
 
                 self.stats{b}.SPE = zeroexp([dblock.N, A], self.stats{b}.SPE);
+                
+                
                 % Instantaneous SPE limit using all A components (batch models)
-                self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
+                %self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
 
 
                 % R^2 per variable, per component; cumulative R2 per variable
@@ -254,8 +275,9 @@ classdef mblvm < handle
 
                 % Overall T2 value for each observation
                 self.stats{b}.T2 = zeroexp([dblock.N, 1], self.stats{b}.T2);
+                
                 % Instantaneous T2 limit using all A components (batch models)
-                self.stats{b}.T2_j = zeroexp([dblock.N, dblock.J], self.stats{b}.T2_j);
+                %self.stats{b}.T2_j = zeroexp([dblock.N, dblock.J], self.stats{b}.T2_j);
 
                 % Modelling power = 1 - (RSD_k)/(RSD_0k)
                 % RSD_k = residual standard deviation of variable k after A PC's
@@ -268,7 +290,7 @@ classdef mblvm < handle
                 % Limits for the (possibly time-varying) scores
                 %siglevels = {'95.0', '99.0'};
                 self.lim{b}.t = zeroexp([1, A], self.lim{b}.t);
-                self.lim{b}.t_j = zeroexp([dblock.J, A], self.lim{b}.t_j, true); 
+                %self.lim{b}.t_j = zeroexp([dblock.J, A], self.lim{b}.t_j, true); 
 
                 % Hotelling's T2 limits using A components (column)
                 % (this is actually the instantaneous T2 limit,
@@ -281,23 +303,52 @@ classdef mblvm < handle
                 self.lim{b}.SPE = zeroexp([1, A], self.lim{b}.SPE);
 
                 % SPE instantaneous limits using all A components
-                self.lim{b}.SPE_j = zeroexp([dblock.J, 1], self.lim{b}.SPE_j);
+                %self.lim{b}.SPE_j = zeroexp([dblock.J, 1], self.lim{b}.SPE_j);
 
             end
   
             % Give the subclass the chance to expand storage, if required
-            self.expand_storage(A)
+            self.expand_storage(A);
         end % ``initialize_storage``
         
         function self = preprocess_blocks(self)
             % Preprocesses each block.            
             for b = 1:self.B
-                if ~self.blocks{b}.is_preprocessed
-                    self.blocks{b} = self.blocks{b}.preprocess();
+                if ~self.PP{b}.is_preprocessed
+                    [self.blocks{b}, PP_block] = self.blocks{b}.preprocess();
+                    self.PP{1}.is_preprocessed = true;
+                    self.PP{1}.mean_center = PP_block.mean_center;
+                    self.PP{1}.scaling = PP_block.scaling;                    
                 end                
             end
         end % ``preprocess_blocks``
         
+        function self = split_result(self, result, rootfield, subfield)
+            % Splits the result from a merged calculation (over all blocks)
+            % into the storage elements for each block.  It uses block size,
+            % self.blocks{b}.K to learn where to split the result.
+            %
+            % e.g. self.split_result(loadings, 'P', '')
+            %
+            % Before:
+            %     loadings = [0.2, 0.3, 0.4, 0.1, 0.2]
+            % After:
+            %     self.P{1} = [0.2, 0.3, 0.4]
+            %     self.P{2} = [0.1, 0.2]
+            % 
+            % e.g. self.split_result(SS_col, 'stats', 'start_SS_col')
+            %
+            % Before: 
+            %     ss_col = [6, 6, 6, 9, 9]
+            %
+            % After:
+            %     self.stats{1}.start_SS_col = [6, 6, 6]
+            %     self.stats{2}.start_SS_col = [9, 9]
+            
+            
+            
+            
+        end
     end % methods (sealed)
     
     % Subclasses must redefine these methods

@@ -100,9 +100,9 @@ function test_significant_figures()
     assertElementsAlmostEqual(0.5412, 0.5414, 3)
     assertExceptionThrown('assertElementsAlmostEqual:tolExceeded', ...
                             @assertElementsAlmostEqual, 0.5412, 0.5414, 4)
-    %assertElementsAlmostEqual(1.5412E-5, 1.5414E-5, 4)
-    %assertExceptionThrown('assertElementsAlmostEqual:tolExceeded', ...
-    %            @assertElementsAlmostEqual, 1.5412E-5, 1.5414E-5, 5)
+    assertElementsAlmostEqual(1.5412E-5, 1.5414E-5, 4)
+    assertExceptionThrown('assertElementsAlmostEqual:tolExceeded', ...
+                @assertElementsAlmostEqual, 1.5412E-5, 1.5414E-5, 5)
     %1.5412 == 1.5414       is True if sig_figs = 4, but False if sig_figs = 5
     %1.5412E-5 == 1.5414E-5 is True if sig_figs = 4, but False if sig_figs = 5
     %1.5412E+5 == 1.5414E+5 is True if sig_figs = 4, but False if sig_figs = 5

@@ -38,8 +38,11 @@ if nargin == 0
 else
     given_data = varargin{1};
 end
-if isa(given_data, 'block')
-    given_data = given_data.data;
+if isa(given_data, 'block_base')
+    % TODO(KGD): later on, continue processing this block; the user might want
+    %            to add features, such as labels, etc to the existing block
+    out = given_data;
+    return    
 end            
 
 % Optional second argument: block name

@@ -19,20 +19,47 @@ classdef mbpca < mblvm
             % Fits a multiblock PCA model on the data, extracting A components
             % We assume the data are preprocessed already.
             
-            % FUTURE(expand to MBPCA)
-            block_id = 1;
-            
             start_time = cputime;
-            dblock = self.blocks{block_id};
-            which_components = max(self.A+1, 1) : A;
+            %block_scaling = zeros(1, self.B);
+            block_scaling = 1 ./ sqrt(self.K);
+            if self.B == 1
+                block_scaling = 1;
+            end
+%             N = size(self.blocks{1}.data, 1);
+%             for b = 1:self.B
+%                 K(b) = self.blocks{b}.K;
+%                 block_scaling(b) = 1 ./ sqrt(K(b));
+%                 assert(N == self.blocks{b}.N);
+%             end
             
-            K = size(dblock.data, 2);
+            
+                        
+            X_merged = ones(N, sum(K)) .* NaN;
+            has_missing = false;
+            start_col = 1;
+            for b = 1:self.B
+                last_col = start_col + K(b) - 1;
+                X_merged(:, start_col:last_col) = self.blocks{b}.data .* block_scaling(b);
+                if self.blocks{b}.has_missing
+                    has_missing = true;
+                end
+                start_col = start_col + K(b);
+                
+                %stats_PCA.R2X_baseline{b} = ssq(self.blocks{b} / sqrt(K_b(b)));
+            end
+            %K = size(X_merged, 2);
+            %assert(abs(sum(cell2mat(stats_PCA.R2X_baseline))-ssq(X_merged)) <sqrt(eps))
+
+
+            % Perform ordinary missing data PCA on the merged block of data
+            which_components = max(self.A+1, 1) : A;            
             for a = which_components
-                if a == 1                
-                    dblock.stats.start_SS_col = ssq(dblock.data, 1);
-                    initial_ssq = dblock.stats.start_SS_col;
+                if a == 1             
+                    
+                    self.split_result(ssq(X_merged, 1), 'stats', 'start_SS_col');
+                    initial_ssq = ssq(X_merged, 1);
                 else
-                    initial_ssq = ssq(dblock.data, 1);
+                    initial_ssq = ssq(X_merged, 1);
                 end
                 % Baseline for all R^2 calculations
                 start_SS_col = dblock.stats.start_SS_col;
@@ -40,14 +67,15 @@ classdef mbpca < mblvm
                         warning('lvm:fit_PCA', 'There is no variance left in the data')
                 end
                 
-                % Do the work elsewhere
-                [t_a, p_a, itern] = mbpca.single_block_PCA(dblock, self, a);                
+                % Converge onto a single component
+                [t_a, p_a, itern] = mbpca.single_block_PCA(X_merged, self, a, has_missing);                
                 
                 % Store results
                 % -------------
                 % Flip the signs of the column vectors in P so that the largest
-                % magnitude element is positive (Wold, Esbensen, Geladi, PCA,
-                % CILS, 1987, p 42)
+                % magnitude element is positive.
+                % (Wold, Esbensen, Geladi, PCA, CILS, 1987, p 42
+                %  http://dx.doi.org/10.1016/0169-7439(87)80084-9)
                 [max_el, max_el_idx] = max(abs(p_a));
                 if sign(p_a(max_el_idx)) < 1
                     self.P{block_id}(:,a) = -1.0 * p_a;
@@ -254,11 +282,13 @@ classdef mbpca < mblvm
     
     % These methods don't require a class instance
     methods(Static)
-        function [t_a, p_a, itern] = single_block_PCA(dblock, self, a)
+        function [t_a, p_a, itern] = single_block_PCA(dblock, self, a, has_missing)
             % Extracts a PCA component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
             % The ``a`` entry is merely used to show which component is being
             % extracted in the progress bar.
+            % The ``has_missing`` flag is used to indicate if any entries in 
+            % ``dblock`` are missing.
             %
             %
             % 1.   Wold, Esbensen and Geladi, 1987, Principal Component Analysis,
@@ -267,9 +297,9 @@ classdef mbpca < mblvm
             % 2.   Missing data: http://dx.doi.org/10.1016/B978-044452701-1.00125-3
             
             tolerance = self.opt.tolerance;
-            N = size(dblock.data, 1);
+            N = size(dblock, 1);
             if self.opt.show_progress
-                h = awaitbar(0, sprintf('Calculating component %d on block %s', a, dblock.name));
+                h = awaitbar(0, sprintf('Calculating component %d', a));
             end
             rand('state', 0)
             t_a_guess = rand(N,1)*2-1;
@@ -305,7 +335,7 @@ classdef mbpca < mblvm
                 %p_a = X.T * t_a / (t_a.T * t_a)
                 %p_a = (X.T)(t_a) / ((t_a.T)(t_a))
                 %p_a = dot(X.T, t_a) / ssq(t_a)
-                p_a = regress_func(dblock.data, t_a, dblock.has_missing);
+                p_a = regress_func(dblock.data, t_a, has_missing);
                 
                 % 2: Normalize p_a to unit length
                 p_a = p_a / sqrt(ssq(p_a));
@@ -315,7 +345,7 @@ classdef mbpca < mblvm
                 %t_a = X * p_a / (p_a.T * p_a)
                 %t_a = (X)(p_a) / ((p_a.T)(p_a))
                 %t_a = dot(X, p_a) / ssq(p_a)
-                t_a = regress_func(dblock.data, p_a, dblock.has_missing);
+                t_a = regress_func(dblock.data, p_a, has_missing);
                 
                 itern = itern + 1;
             end
