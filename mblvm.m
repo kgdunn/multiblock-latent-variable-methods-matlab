@@ -144,6 +144,7 @@ classdef mblvm < handle
             self.lim = cell(1,nb);
             
         end
+        
         function self = build(self, varargin)
             % Build the multiblock latent variable model.
             % * preprocess the data if it has not been already
