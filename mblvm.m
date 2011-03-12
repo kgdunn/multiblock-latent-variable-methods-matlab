@@ -8,16 +8,16 @@
 % This is the highest level latent variable model class
 classdef mblvm < handle
     properties
-        model_type = ''; % for convenience, shouldn't be used in code; displays model type
-        blocks = {};     % a cell array of data blocks; last block is always "Y" (can be empty)
-        A = 0;           % number of latent variables
-        B = 0;           % number of blocks
+        model_type = '';    % for convenience, shouldn't be used in code; displays model type
+        blocks = {};        % a cell array of data blocks; last block is always "Y" (can be empty)
+        A = 0;              % number of latent variables
+        B = 0;              % number of blocks
         
         
-        opt = struct();  % model options
-        stats = cell({});% Model statistics for each block
-        model = cell({});% Model-related statistics (timing, iterations, risk)
-        lim = cell({});  % Model limits
+        opt = struct();     % model options
+        stats = cell({});   % Model statistics for each block
+        model = cell({});   % Model-related statistics (timing, iterations, risk)
+        lim = cell({});     % Model limits
         
         % Model parameters for each block (each cell entry is a block)
         P = cell({});       % Block loadings, P
@@ -75,8 +75,6 @@ classdef mblvm < handle
             % Create storage structures
             self = self.create_storage();
              
-
-            
         end % ``lvm``
         
         function out = get.B(self)
