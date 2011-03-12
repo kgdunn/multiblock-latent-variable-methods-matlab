@@ -136,6 +136,8 @@ function Wold_article_PCA_test()
     T = PCA_model_2.T{1};
     assertElementsAlmostEqual(T(:,1), [-1.6229, -0.3493, 1.9723]', 2)
     assertElementsAlmostEqual(T(:,2), [0.6051, -0.9370, 0.3319]', 2)
+    
+    Tests for VIP, T2 and SPE
 
     % R2 values, given on page 43
     R2_a = PCA_model_2.stats{1}.R2_a;

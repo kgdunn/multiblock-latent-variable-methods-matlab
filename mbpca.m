@@ -34,13 +34,7 @@ classdef mbpca < mblvm
                 if self.blocks{b}.has_missing
                     has_missing = true;
                 end
-                
-                
-                %stats_PCA.R2X_baseline{b} = ssq(self.blocks{b} / sqrt(K_b(b)));
             end
-            %K = size(X_merged, 2);
-            %assert(abs(sum(cell2mat(stats_PCA.R2X_baseline))-ssq(X_merged)) <sqrt(eps))
-
 
             % Perform ordinary missing data PCA on the merged block of data
             which_components = max(self.A+1, 1) : A;            
@@ -49,13 +43,13 @@ classdef mbpca < mblvm
                 start_time = cputime;
                 % Baseline for all R2 calculations and variance check
                 if a == 1             
-                    initial_ssq = ssq(X_merged, 1);
-                    self.split_result(initial_ssq, 'stats', 'start_SS_col');                    
+                    ssq_before = ssq(X_merged, 1);
+                    self.split_result(ssq_before, 'stats', 'start_SS_col');                    
                 else
-                    initial_ssq = ssq(X_merged, 1);
+                    ssq_before = ssq(X_merged, 1);
                 end
                 
-                if all(initial_ssq < self.opt.tolerance)
+                if all(ssq_before < self.opt.tolerance)
                     warning('lvm:fit_PCA', 'There is no variance left in the data')
                 end
                 
@@ -76,12 +70,12 @@ classdef mbpca < mblvm
                 self.model.stats.itern(a) = itern;
                 
                 % Recover block information and store that.
-                % TODO(KGD): optimize so we don't repeat this for single block
-                
-                p_superblock = zeros(self.B, 1);
+                % TODO(KGD): optimize so we don't repeat this for single block                
                 t_superblock = zeros(self.N, self.B);
+                ssq_cumul = 0;
                 for b = 1:self.B
-                    X_portion  = X_merged(:, self.b_iter(b));
+                    idx = self.b_iter(b);
+                    X_portion  = X_merged(:, idx);
                     
                     % Regress sub-columns of X_merged onto the superscore
                     % to get the block loadings.
@@ -98,6 +92,27 @@ classdef mbpca < mblvm
                     self.T{b}(:,a) = t_b;
                     self.P{b}(:,a) = p_b;
                     
+                    % Store statistics for each block.  The part we explain by
+                    % this component is due to the *superscore*, t_a, not the
+                    % blockscore.
+                    X_portion_hat = t_a * p_b';
+                    col_ssq = ssq(X_portion_hat, 1)';
+                    row_ssq = ssq(X_portion_hat, 2);
+                    ssq_cumul = ssq_cumul + sum(row_ssq);
+                    self.stats{b}.R2k_a(:,a) = col_ssq ./ ssq_before(1, idx)';                    
+                    self.stats{b}.R2b_a(1,a) = sum(row_ssq) / sum(ssq_before(1, idx));
+                    
+                    
+                    ssq_after = ssq(X_portion - X_portion_hat, 2);
+                    self.stats{b}.SPE(:,a) = sqrt(ssq_after ./ numel(idx));
+                    VIP_temp = zeros(self.K(b), 1);
+                    for a_iter = 1:a
+                        self.stats{b}.VIP_f{a_iter,a} = sum(col_ssq) / (sum(ssq_before(1, idx)) - sum(ssq_after));
+                        VIP_temp = VIP_temp + p_b .^ 2 * self.stats{b}.VIP_f{a_iter,a} * self.K(b);
+                    end
+                    self.stats{b}.VIP_a(:,a) = sqrt(VIP_temp);
+                    
+                    self.stats{b}.T2(:,a) = self.mahalanobis_distance(self.T{b}(:,1:a));
                 end
                 p_super = regress_func(t_superblock, t_a, false);
                      
@@ -108,30 +123,30 @@ classdef mbpca < mblvm
                 % Now deflate the data matrix
                 X_merged = X_merged - t_a * p_a';
                 
-                self.calc_statistics_and_limits(X_merged, a);
+                % Cumulative R2 value for the whole component
+                self.model.stats.R2(a) = ssq_cumul/sum(ssq_before);
+                
+                % Model summary SPE (not the superblock's SPE!), merely the
+                % overall SPE from the merged model
+                self.model.stats.SPE(:,a) = sqrt(ssq(X_merged, 2) ./ sum(self.K));
+                
+                % Model summary T2 (not the superblock's T2!), merely the
+                % overall T2 from the merged model
+                self.model.stats.T2(:,a) = self.mahalanobis_distance(self.model.T(:,1:a));
+                
+                self.model.stats.VIP_f
+                self.model.stats.VIP
                 
                 
                 
-                % These are the Residual Sums of Squares (RSS); i.e X - X_hat
-                row_SSX = ssq(X_merged, 2); % sum of squares along the row
-                col_SSX = ssq(X_merged, 1); % sum of squares down the column
-
-                SPE(:,a) = sqrt(row_SSX/K);
-                deflated_SS_col(:,a) = col_SSX(:);
-                R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
-
-                % Cumulative R2 value for the whole block
-                R2(a) = 1 - sum(row_SSX)/sum(start_SS_col);
+                self.calc_statistics_and_limits(X_merged, ssq_before, a);
                 
-
-                % VIP value (only calculated for X-blocks); only last column is useful
-                
-                 self.A = a;
+                self.A = a;
                 
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
-        function self = calc_statistics_and_limits(self, dblock, a)
+        function self = calc_statistics_and_limits(self, dblock, ssq_before, a)
             % Calculate summary statistics for the model. Given:
             % ``dblock``: the deflated block of data
             %
@@ -139,66 +154,18 @@ classdef mbpca < mblvm
             % ----
             % * Modelling power of each variable
             % * Eigenvalues (still to come)
-            % * Squared prediction error and T2
             
-            % If ``varargin`` is supplied, then we must calculate the
-            % statistics on the ``varargin{1}``
-            model = self;
-            if nargin==2 && isa(varargin{1}, 'struct')
-                testing_data = true;
-                self = varargin{1};
-            else
-                testing_data = false;
-                model = self;
+            % Check on maximum number of iterations
+            if any(self.model.stats.itern >= self.opt.max_iter)
+                warn_string = ['The maximum number of iterations was reached ' ...
+                    'when calculating the latent variable(s). Please ' ...
+                    'check the raw data - is it correct? and also ' ...
+                    'adjust the number of iterations in the options.'];
+                warning('lvm:calculate_statistics', warn_string)
             end
-            
-            for b = 1:model.B
-                if self.A == 0
-                    continue
-                end
+            self.lim{b}.t
                 
                 
-                %block = self.blocks{b};
-                % Calculate the R2 explained on a per-component basis, for the block
-                self.stats{b}.R2_a = [self.stats{b}.R2(1); diff(self.stats{b}.R2)];
-                
-                % Calculate R2 explained on a per-component basis, for each variable
-                first_PC = self.stats{b}.R2k_cum(:,1);
-                self.stats{b}.R2k_a = [first_PC, diff(self.stats{b}.R2k_cum, 1, 2)];
-                
-                % VIP values =  sqrt{ SSQ[ (P.^2) * (R2_per_LV), row_wise ] }
-                % TODO(KGD): come back to VIP calculation and find a
-                % reference for it
-                
-                % Check on maximum number of iterations
-                if any(model.model.stats.itern >= model.opt.max_iter)
-                    warn_string = ['The maximum number of iterations was reached ' ...
-                        'when calculating the latent variable(s). Please ' ...
-                        'check the raw data - is it correct? and also ' ...
-                        'adjust the number of iterations in the options.'];
-                    warning('lvm:calculate_statistics', warn_string)
-                end
-                
-                % Variance of each latent variable score.
-                self.S{b} = std(self.T{b}, 1);
-                
-%                 % Not calculated  for certain blocks: e.g. in PLS, the
-%                 % block.T is empty.
-%                 if size(self.T{b}, 2) == self.A
-%                     for a = 1:self.A
-%                         self.stats.T2(:,a) = sum((block.T(:,1:a) ./ ...
-%                             repmat(block.S(:,1:a), block.N,1)).^2, 2);
-%                     end
-%                 end
-%                 
-%                 % TODO(KGD): Modelling power = 1 - (RSD_k)/(RSD_0k)
-%                 % TODO(KGD): Is this valid/useful for Y-blocks?
-%                 % Strictly speaking, RSD is a standard deviation.  We will use
-%                 % sums of squares though, because the DoF are the same.
-%                 %block.stats.model_power(1,:) = ...
-%                 %       1.0 - sqrt(ssq(block.data, 1) ./ block.stats.start_SS_col);
-%                 self.blocks{b} = block;
-            end
             
             % Calculate the limits for the latent variable model.
             %
@@ -277,15 +244,7 @@ classdef mbpca < mblvm
                 self.blocks{b} = block;
             end
             
-            Then call the subclass methods
             
-%             if self.opt.batch.calculate_monitoring_limits
-%                 for b = 1:self.B
-%                     if strcmp(self.blocks{b}.block_type, 'batch')
-%                         
-%                     end
-%                 end
-%             end
         end % ``calc_statistics_and_limits``
     end % end methods (ordinary)
     

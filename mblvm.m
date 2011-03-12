@@ -23,7 +23,6 @@ classdef mblvm < handle
         % Model parameters for each block (each cell entry is a block)
         P = cell({});       % Block loadings, P
         T = cell({});       % Block scores, T        
-        S = cell({});       % Std deviation of the scores
         W = cell({});       % Block weights (for PLS only)
         R = cell({});       % Block weights (W-star matrix, for PLS only) 
         C = cell({});       % Block loadings (for PLS only)
@@ -31,6 +30,9 @@ classdef mblvm < handle
         beta = cell({});    % Beta-regression coeffients 
         super = struct();   % Superblock parameters (weights, scores)
         PP = cell({});      % Preprocess model parameters 
+        
+        % Removed: this is not orthogonal: best we calculate it when required
+        %S = cell({});       % Std deviation of the scores
         
         % Specific to batch models
         T_j = [];    % Instantaneous scores
@@ -40,8 +42,8 @@ classdef mblvm < handle
     end
     
     % Subclasses may choose to redefine these methods
-    methods        
-        function self = mblvm(varargin)            
+    methods
+        function self = mblvm(varargin)
             
             % Process model options, if provided
             % -----------------------
@@ -160,7 +162,8 @@ classdef mblvm < handle
                 return
             end
         end % ``disp``
-    end % methods (ordinary)
+        
+    end % end: methods (ordinary)
     
     % Subclasses may not redefine these methods
     methods (Sealed=true)
@@ -170,19 +173,36 @@ classdef mblvm < handle
             %       sized in the ``initialize_storage`` function.
             
             % General model statistics
+            % -------------------------
+            % Time used to calculate each component
             self.model.stats.timing = [];
-            self.model.stats.itern = [];     
+            
+            % Iterations per component
+            self.model.stats.itern = []; 
+            
+            % R2 for each component
+            self.model.stats.R2 = [];
+            
+            % SPE, after each component, in the superblock
+            self.model.stats.SPE = [];
+            
+            % T2, using all components 1:A, in the superblock
+            self.model.stats.T2 = [];
+            
+            % The VIP's for each block, and the VIP calculation factor
+            self.model.stats.VIP = [];
+            self.model.stats.VIP_f = cell({});
             
             nb = self.B;
             
             % Latent variable parameters
             self.P = cell(1,nb);
-            self.T = cell(1,nb);
-            self.S = cell(1,nb);
+            self.T = cell(1,nb);            
             self.W = cell(1,nb);
             self.R = cell(1,nb);
             self.C = cell(1,nb);
             self.U = cell(1,nb);
+            %self.S = cell(1,nb);
 
             % Block preprocessing 
             self.PP = cell(1,nb);
@@ -239,17 +259,27 @@ classdef mblvm < handle
             
             self.model.stats.timing = zeroexp([A, 1], self.model.stats.timing);
             self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);
+            self.model.stats.R2 = zeroexp([A, 1], self.model.stats.R2);
+            self.model.stats.T2 = zeroexp([A, 1], self.model.stats.R2);
+            self.model.stats.SPE = zeroexp([self.N, A], self.model.stats.SPE);
+            
+            % T2, using all components 1:A, in the superblock
+            self.model.stats.T2 = zeroexp([self.N, A], self.model.stats.T2);
+            
+            % The VIP's for each block, and the VIP calculation factor
+            self.model.stats.VIP = zeroexp([self.B, 1], self.model.stats.VIP);
+            %self.model.stats.VIP_f = cell({});
             
             % Storage for each block
             for b = 1:self.B
                 dblock = self.blocks{b};
                 self.P{b} = zeroexp([dblock.K, A], self.P{b});  % loadings; .C for PLS
-                self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores, .U for PLS
-                self.S{b} = zeroexp([1, A], self.S{b});         % score scaling factors
+                self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores, .U for PLS                
                 self.W{b} = zeroexp([dblock.K, A], self.W{b});  % PLS weights
                 self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS weights
                 self.C{b} = zeroexp([dblock.K, A], self.C{b});  % PLS Y-space loadings
                 self.U{b} = zeroexp([dblock.N, A], self.U{b});  % PLS Y-space scores
+               %self.S{b} = zeroexp([1, A], self.S{b});         % score scaling factors
                 
                 % Block preprocessing options: resets them
                 if numel(self.PP{b}) == 0
@@ -264,13 +294,12 @@ classdef mblvm < handle
                     self.stats{b}.SPE_j = [];
 
                     self.stats{b}.start_SS_col = [];
-                    self.stats{b}.deflated_SS_col = [];                
                     self.stats{b}.R2k_a = [];
                     self.stats{b}.R2k_cum = [];
-                    self.stats{b}.R2_a = [];
+                    self.stats{b}.R2b_a = [];
                     self.stats{b}.R2 = [];
                     self.stats{b}.VIP_a = [];
-                    self.stats{b}.VIP = [];
+                    %self.stats{b}.VIP_f = cell({});
 
                     self.stats{b}.T2 = [];
                     self.stats{b}.T2_j = [];
@@ -289,32 +318,37 @@ classdef mblvm < handle
                     self.lim{b}.T2_j = []; %not used: we monitoring based on final T2 value
                 end
 
+                % SPE per block
+                % N x A
                 self.stats{b}.SPE = zeroexp([dblock.N, A], self.stats{b}.SPE);
                 
                 
                 % Instantaneous SPE limit using all A components (batch models)
+                % N x J
                 %self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
 
-
-                % R^2 per variable, per component; cumulative R2 per variable
+                
                 % Baseline value for all R2 calculations: before any components are
                 % extracted, but after the data have been preprocessed.
+                % 1 x K(b)
                 self.stats{b}.start_SS_col = zeroexp([1, dblock.K], self.stats{b}.start_SS_col);
-                % Used in cross-validation calculations: ssq of each column,
-                % per component, after deflation with the a-th component.
-                self.stats{b}.deflated_SS_col = zeroexp([dblock.K, A], self.stats{b}.deflated_SS_col);
+                
+                % R^2 for every variable in the block, per component
+                % K(b) x A
                 self.stats{b}.R2k_a = zeroexp([dblock.K, A], self.stats{b}.R2k_a);
-                self.stats{b}.R2k_cum = zeroexp([dblock.K, A], self.stats{b}.R2k_cum);
-                % R^2 per block, per component; cumulate R2 for the block
-                self.stats{b}.R2_a = zeroexp([A, 1], self.stats{b}.R2_a);
-                self.stats{b}.R2 = zeroexp([A, 1], self.stats{b}.R2);
+                
+                % R^2 for the block, per component
+                % 1 x A
+                self.stats{b}.R2b_a = zeroexp([1, A], self.stats{b}.R2b_a);
 
-                % VIP value (only calculated for X-blocks); only last column is useful
+                % VIP value using all 1:A components (only last column is useful though)
+                % K(b) x A
                 self.stats{b}.VIP_a = zeroexp([dblock.K, A], self.stats{b}.VIP_a);
-                self.stats{b}.VIP = zeroexp([dblock.K, 1], self.stats{b}.VIP);
-
-                % Overall T2 value for each observation
-                self.stats{b}.T2 = zeroexp([dblock.N, 1], self.stats{b}.T2);
+                
+                % Overall T2 value for each observation in the block using
+                % all components 1:A
+                % N x A
+                self.stats{b}.T2 = zeroexp([dblock.N, A], self.stats{b}.T2);
                 
                 % Instantaneous T2 limit using all A components (batch models)
                 %self.stats{b}.T2_j = zeroexp([dblock.N, dblock.J], self.stats{b}.T2_j);
@@ -323,12 +357,15 @@ classdef mblvm < handle
                 % RSD_k = residual standard deviation of variable k after A PC's
                 % RSD_0k = same, but before any latent variables are extracted
                 % RSD_0k = 1.0 if the data have been autoscaled.
-                self.stats{b}.model_power = zeroexp([1, dblock.K], self.stats{b}.model_power);
+                %self.stats{b}.model_power = zeroexp([1, dblock.K], self.stats{b}.model_power);
 
                 % Actual limits for the block: to be calculated later on
                 % ---------------------------
                 % Limits for the (possibly time-varying) scores
-                %siglevels = {'95.0', '99.0'};
+                % 1 x A
+                % NOTE: these limits really only make sense for uncorrelated
+                % scores (I don't think it's too helpful to monitor based on limits 
+                % from correlated variables)
                 self.lim{b}.t = zeroexp([1, A], self.lim{b}.t);
                 %self.lim{b}.t_j = zeroexp([dblock.J, A], self.lim{b}.t_j, true); 
 
@@ -336,10 +373,12 @@ classdef mblvm < handle
                 % (this is actually the instantaneous T2 limit,
                 % but we don't call it that, because at time=J the T2 limit is the
                 % same as the overall T2 limit - not so for SPE!).
+                % 1 x A
                 self.lim{b}.T2 = zeroexp([1, A], self.lim{b}.T2);            
 
-                % SPE limits for the block and instaneous (i.e. time-varying) limits
-                % Overall SPE limit using for ``a`` components (column)
+                % Overall SPE limit for the block using 1:A components (use the 
+                % last column for the limit with all A components)
+                % 1 x A
                 self.lim{b}.SPE = zeroexp([1, A], self.lim{b}.SPE);
 
                 % SPE instantaneous limits using all A components
@@ -395,19 +434,28 @@ classdef mblvm < handle
             for b = 1:self.B
                 self.(rootfield){b}.(subfield)(1:n,:) = result(:, self.b_iter(b));
             end
-            
-            
         end
-    end % methods (sealed)
+
+    end % end: methods (sealed)
     
     % Subclasses must redefine these methods
     methods (Abstract=true)
         self = calc_model(self, A)
         self = expand_storage(self, A)
-    end % methods (abstract)
+    end % end: methods (abstract)
+    
+    methods (Sealed=true, Static=true)
+        function out = mahalanobis_distance(T)
+            % TODO(KGD): calculate this in a smarter way. Can create unnecessarily
+            % large matrices
+            N = size(T, 1);
+            out = diag(T * inv((T'*T)/(N-1)) * T'); %#ok<MINV>
+        end
+    end % end: methods (sealed and static)
     
 end % end classdef
 
 %-------- Helper functions (usually used in 2 or more places). May NOT use ``self``
 
+% Calculates the leverage 
 
