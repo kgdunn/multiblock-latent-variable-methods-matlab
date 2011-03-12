@@ -18,32 +18,23 @@ classdef mbpca < mblvm
         function self = calc_model(self, A)
             % Fits a multiblock PCA model on the data, extracting A components
             % We assume the data are preprocessed already.
+            % 
+            % Must also calculate all summary statistics for each block.
             
-            start_time = cputime;
-            %block_scaling = zeros(1, self.B);
             block_scaling = 1 ./ sqrt(self.K);
             if self.B == 1
                 block_scaling = 1;
             end
-%             N = size(self.blocks{1}.data, 1);
-%             for b = 1:self.B
-%                 K(b) = self.blocks{b}.K;
-%                 block_scaling(b) = 1 ./ sqrt(K(b));
-%                 assert(N == self.blocks{b}.N);
-%             end
-            
-            
                         
-            X_merged = ones(N, sum(K)) .* NaN;
+            X_merged = ones(self.N, sum(self.K)) .* NaN;
             has_missing = false;
-            start_col = 1;
+            
             for b = 1:self.B
-                last_col = start_col + K(b) - 1;
-                X_merged(:, start_col:last_col) = self.blocks{b}.data .* block_scaling(b);
+                X_merged(:, self.b_iter(b)) = self.blocks{b}.data .* block_scaling(b);
                 if self.blocks{b}.has_missing
                     has_missing = true;
                 end
-                start_col = start_col + K(b);
+                
                 
                 %stats_PCA.R2X_baseline{b} = ssq(self.blocks{b} / sqrt(K_b(b)));
             end
@@ -54,66 +45,83 @@ classdef mbpca < mblvm
             % Perform ordinary missing data PCA on the merged block of data
             which_components = max(self.A+1, 1) : A;            
             for a = which_components
+                
+                start_time = cputime;
+                % Baseline for all R2 calculations and variance check
                 if a == 1             
-                    
-                    self.split_result(ssq(X_merged, 1), 'stats', 'start_SS_col');
                     initial_ssq = ssq(X_merged, 1);
+                    self.split_result(initial_ssq, 'stats', 'start_SS_col');                    
                 else
                     initial_ssq = ssq(X_merged, 1);
                 end
-                % Baseline for all R^2 calculations
-                start_SS_col = dblock.stats.start_SS_col;
+                
                 if all(initial_ssq < self.opt.tolerance)
-                        warning('lvm:fit_PCA', 'There is no variance left in the data')
+                    warning('lvm:fit_PCA', 'There is no variance left in the data')
                 end
                 
                 % Converge onto a single component
                 [t_a, p_a, itern] = mbpca.single_block_PCA(X_merged, self, a, has_missing);                
                 
-                % Store results
-                % -------------
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
                 % (Wold, Esbensen, Geladi, PCA, CILS, 1987, p 42
                 %  http://dx.doi.org/10.1016/0169-7439(87)80084-9)
                 [max_el, max_el_idx] = max(abs(p_a));
                 if sign(p_a(max_el_idx)) < 1
-                    self.P{block_id}(:,a) = -1.0 * p_a;
-                    self.T{block_id}(:,a) = -1.0 * t_a;
-                else
-                    self.P{block_id}(:,a) = p_a;
-                    self.T{block_id}(:,a) = t_a;
-                end                
+                    p_a = -1.0 * p_a;
+                    t_a = -1.0 * t_a;
+                end    
                 
-                % We should do our randomization test internal to the PLS
-                % algorithm, before we deflate.
-                if self.opt.randomize_test.quick_return
-                    self = cell(1);
-                    self{1}.T = zeros(N, A);
-                    self{1}.T(:,a) = t_a;
-                    self{1}.itern = itern;
-                    return;
-                end
-                if self.opt.randomize_test.use_internal
-                    self = PCA_randomization_model(self, block_id);                    
-                end                
-
                 self.model.stats.timing(a) = cputime - start_time;
                 self.model.stats.itern(a) = itern;
-
-                % Loop terminated!  Now deflate the data matrix
-                dblock.data = dblock.data - t_a * p_a';
+                
+                % Recover block information and store that.
+                % TODO(KGD): optimize so we don't repeat this for single block
+                
+                p_superblock = zeros(self.B, 1);
+                t_superblock = zeros(self.N, self.B);
+                for b = 1:self.B
+                    X_portion  = X_merged(:, self.b_iter(b));
+                    
+                    % Regress sub-columns of X_merged onto the superscore
+                    % to get the block loadings.
+                    p_b = regress_func(X_portion, t_a, has_missing);
+                    
+                    p_b = p_b / norm(p_b);
+                    
+                    % Block scores: regress rows of X onto the block loadings
+                    t_b = regress_func(X_portion, p_b, has_missing);
+                    
+                    t_superblock(:,b) = t_b;
+                    
+                    % Store the block scores and loadings
+                    self.T{b}(:,a) = t_b;
+                    self.P{b}(:,a) = p_b;
+                    
+                end
+                p_super = regress_func(t_superblock, t_a, false);
+                     
+                
+                self.super.T(:,a) = t_a;
+                self.super.P(:,a) = p_super;
+                
+                % Now deflate the data matrix
+                X_merged = X_merged - t_a * p_a';
+                
+                self.calc_statistics_and_limits(X_merged, a);
+                
+                
                 
                 % These are the Residual Sums of Squares (RSS); i.e X - X_hat
-                row_SSX = ssq(dblock.data, 2); % sum of squares along the row
-                col_SSX = ssq(dblock.data, 1); % sum of squares down the column
+                row_SSX = ssq(X_merged, 2); % sum of squares along the row
+                col_SSX = ssq(X_merged, 1); % sum of squares down the column
 
-                self.stats{block_id}.SPE(:,a) = sqrt(row_SSX/K);
-                self.stats{block_id}.deflated_SS_col(:,a) = col_SSX(:);
-                self.stats{block_id}.R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
+                SPE(:,a) = sqrt(row_SSX/K);
+                deflated_SS_col(:,a) = col_SSX(:);
+                R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
 
                 % Cumulative R2 value for the whole block
-                self.stats{block_id}.R2(a) = 1 - sum(row_SSX)/sum(start_SS_col);
+                R2(a) = 1 - sum(row_SSX)/sum(start_SS_col);
                 
 
                 % VIP value (only calculated for X-blocks); only last column is useful
@@ -123,8 +131,9 @@ classdef mbpca < mblvm
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
-        function self = calc_statistics_and_limits(self, varargin)
-            % Calculate summary statistics for the model.
+        function self = calc_statistics_and_limits(self, dblock, a)
+            % Calculate summary statistics for the model. Given:
+            % ``dblock``: the deflated block of data
             %
             % TODO
             % ----
@@ -278,7 +287,7 @@ classdef mbpca < mblvm
 %                 end
 %             end
         end % ``calc_statistics_and_limits``
-    end % methods
+    end % end methods (ordinary)
     
     % These methods don't require a class instance
     methods(Static)
@@ -335,7 +344,7 @@ classdef mbpca < mblvm
                 %p_a = X.T * t_a / (t_a.T * t_a)
                 %p_a = (X.T)(t_a) / ((t_a.T)(t_a))
                 %p_a = dot(X.T, t_a) / ssq(t_a)
-                p_a = regress_func(dblock.data, t_a, has_missing);
+                p_a = regress_func(dblock, t_a, has_missing);
                 
                 % 2: Normalize p_a to unit length
                 p_a = p_a / sqrt(ssq(p_a));
@@ -345,7 +354,7 @@ classdef mbpca < mblvm
                 %t_a = X * p_a / (p_a.T * p_a)
                 %t_a = (X)(p_a) / ((p_a.T)(p_a))
                 %t_a = dot(X, p_a) / ssq(p_a)
-                t_a = regress_func(dblock.data, p_a, has_missing);
+                t_a = regress_func(dblock, p_a, has_missing);
                 
                 itern = itern + 1;
             end
@@ -357,7 +366,7 @@ classdef mbpca < mblvm
             end
             
         end
-    end % methods (static)
+    end % end methods (static)
     
 end % end classdef
 

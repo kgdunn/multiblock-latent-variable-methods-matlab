@@ -29,6 +29,7 @@ classdef mblvm < handle
         C = cell({});       % Block loadings (for PLS only)
         U = cell({});       % Block scores (for PLS only) 
         beta = cell({});    % Beta-regression coeffients 
+        super = struct();   % Superblock parameters (weights, scores)
         PP = cell({});      % Preprocess model parameters 
         
         % Specific to batch models
@@ -99,6 +100,34 @@ classdef mblvm < handle
             end
         end
         
+        function idx = b_iter(self, varargin)
+            % An iterator for working across a series of merged blocks
+            % e.g. if we have 10, 15 and 18 columns, giving a total of 43 cols
+            %      idx = [[ 1, 10],
+            %             [11, 25],
+            %             [26, 43]]
+            % Quick result: e.g. if self.b_iter(2), then it will return a 
+            %               the indices 11:25.
+            if nargin > 1
+                splits = self.K;
+                start = 1;                
+                for b = 2:varargin{1}
+                    start = start + splits(b-1);                    
+                end
+                finish = start + splits(varargin{1}) - 1;
+                idx = start:finish;
+                return
+            end
+            idx = zeros(self.B, 2) .* NaN;
+            idx(1,1) = 1;
+            for b = 1:self.B
+                if b>1
+                    idx(b,1) = idx(b-1,2) + 1;
+                end
+                idx(b,2) = idx(b,1) + self.K(b) - 1;
+            end
+        end
+        
         function out = iter_terminate(self, lv_prev, lv_current, itern, tolerance, conditions)
             % The latent variable algorithm is terminated when any one of these
             % conditions is True
@@ -136,6 +165,9 @@ classdef mblvm < handle
     % Subclasses may not redefine these methods
     methods (Sealed=true)
         function self = create_storage(self)
+            % Creates only the subfields required for each block.
+            % NOTE: this function does not depend on ``A``.  That storage is
+            %       sized in the ``initialize_storage`` function.
             
             % General model statistics
             self.model.stats.timing = [];
@@ -154,9 +186,17 @@ classdef mblvm < handle
 
             % Block preprocessing 
             self.PP = cell(1,nb);
-
+            
+            % Statistics and limits for each block
             self.stats = cell(1,nb);
             self.lim = cell(1,nb);
+            
+            % Super block
+            self.super = struct();
+            self.super.T = [];
+            self.super.P = [];   % Used in PCA only 
+            self.super.W = [];   % Used in PLS only (we could combine them)
+            
             
         end
         
@@ -179,7 +219,6 @@ classdef mblvm < handle
                 
             self = preprocess_blocks(self);               % superclass method
             self = calc_model(self, requested_A);         % must be subclassed
-            self = calc_statistics_and_limits(self);      % must be subclassed           
         end % ``build``
         
         function self = initialize_storage(self, A)
@@ -201,6 +240,7 @@ classdef mblvm < handle
             self.model.stats.timing = zeroexp([A, 1], self.model.stats.timing);
             self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);
             
+            % Storage for each block
             for b = 1:self.B
                 dblock = self.blocks{b};
                 self.P{b} = zeroexp([dblock.K, A], self.P{b});  % loadings; .C for PLS
@@ -306,7 +346,13 @@ classdef mblvm < handle
                 %self.lim{b}.SPE_j = zeroexp([dblock.J, 1], self.lim{b}.SPE_j);
 
             end
-  
+            
+            % Superblock storage
+            self.super.T = zeroexp([self.N, self.B, A], self.super.T); 
+            self.super.P = zeroexp([self.B, A], self.super.P);
+            self.super.W = zeroexp([self.B, A], self.super.W);
+            
+            
             % Give the subclass the chance to expand storage, if required
             self.expand_storage(A);
         end % ``initialize_storage``
@@ -345,7 +391,10 @@ classdef mblvm < handle
             %     self.stats{1}.start_SS_col = [6, 6, 6]
             %     self.stats{2}.start_SS_col = [9, 9]
             
-            
+            n = size(result, 1);
+            for b = 1:self.B
+                self.(rootfield){b}.(subfield)(1:n,:) = result(:, self.b_iter(b));
+            end
             
             
         end
@@ -354,7 +403,6 @@ classdef mblvm < handle
     % Subclasses must redefine these methods
     methods (Abstract=true)
         self = calc_model(self, A)
-        self = calc_statistics_and_limits(self);
         self = expand_storage(self, A)
     end % methods (abstract)
     
