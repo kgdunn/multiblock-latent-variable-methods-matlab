@@ -8,7 +8,7 @@
 % This is the highest level latent variable model class
 classdef mblvm < handle
     properties
-        model_type = '';    % for convenience, shouldn't be used in code; displays model type
+        model_type = '';    % for convenience, shouldn't be used in code; used to display model type
         blocks = {};        % a cell array of data blocks; last block is always "Y" (can be empty)
         A = 0;              % number of latent variables
         B = 0;              % number of blocks
@@ -17,7 +17,7 @@ classdef mblvm < handle
         
         opt = struct();     % model options
         stats = cell({});   % Model statistics for each block
-        model = cell({});   % Model-related statistics (timing, iterations, risk)
+        model = cell({});   % Model-related propert (timing, iterations, risk)
         lim = cell({});     % Model limits
         
         % Model parameters for each block (each cell entry is a block)
@@ -43,6 +43,7 @@ classdef mblvm < handle
     properties (SetAccess = protected)
         data = [];
         has_missing = false;
+        block_scaling = [];
     end
     
     % Subclasses may choose to redefine these methods
@@ -193,16 +194,47 @@ classdef mblvm < handle
             calc_model(self, requested_A); % method must be subclassed
         end % ``build``
         
-        function self = apply(self, varargin)
+        function state = apply(self, new)
             % Apply the multiblock latent variable model to new data.
             % * preprocess the data if it has not been already
             
-            new = {};
+            newb = cell(1, numel(new)/2);
+            Nnew = 0;
+            for b = 1:numel(new)
+                if mod(b, 2) ~= 0
+                    block_name = new{b};
+                    if not(strcmpi(block_name, self.blocks{b}.name))
+                        error('lvm:lvm', 'Block names on the new data do not agree with training data.') 
+                    end                    
+                else 
+                    newb{b/2} = block(new{b});                    
+                    Nnew = max(Nnew, newb{b/2}.N);
+                end
+            end        
+            
             for b = 1:self.B
-                new{b} = self.blocks{b}.preprocess(new{b}, self.blocks{b}.PP);
+                newb{b} = self.blocks{b}.preprocess(newb{b}, self.PP{b});
             end
-            apply_model(self, new); % method must be subclassed
-        end % ``build``
+            
+            % Initialize the states (this could go in another function later)
+            state = struct;
+            for b = 1:self.B
+                % Block scores
+                state.T_new{b} = ones(Nnew, self.A);                
+            end
+            % Superblock collection of scores
+            state.T_sb_new = ones(Nnew, self.B, self.A);
+            
+            % Super scores
+            state.T_super_new = ones(Nnew, self.A);
+            
+            % Summary statistics
+            state.stats.T2 = ones(Nnew, 1);
+            state.stats.SPE = ones(Nnew, 1);
+            
+            
+            state = apply_model(self, newb, state); % method must be subclassed
+        end % ``apply``
         
         function self = create_storage(self)
             % Creates only the subfields required for each block.
@@ -215,8 +247,7 @@ classdef mblvm < handle
             self.model.stats.timing = [];
             
             % Iterations per component
-            self.model.stats.itern = []; 
-            
+            self.model.stats.itern = [];             
             
             nb = self.B;
             
@@ -798,7 +829,7 @@ classdef mblvm < handle
             p(p < 0 | 1 < p) = NaN;
 
             x0 = -sqrt(2).*erfcinv(2*p);
-            try
+            try %#ok<TRYNC>
                 x = sigma.*x0 + mu;
             end
 
@@ -826,7 +857,11 @@ classdef mblvm < handle
             % the SPE limit back.  That's why this function requires ``ncol``,
             % which is the same as K in the above equation.
             
-            values = values.^2 .* ncol;            
+            values = values.^2 .* ncol;
+            if all(values) < sqrt(eps)
+                limits = 0.0;
+                return
+            end
             var_SPE = var(values);
             avg_SPE = mean(values);
             chi2_mult = var_SPE/(2.0 * avg_SPE);

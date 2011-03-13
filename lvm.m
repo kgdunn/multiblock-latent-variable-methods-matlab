@@ -48,7 +48,7 @@ function self = lvm(blocks, varargin)
                 end
             else 
                 out{b/2} = block(blocks{b});
-                if strcmp(out{b/2}.name_type, 'default')
+                if strcmp(out{b/2}.name_type, 'auto')
                     out{b/2}.name = block_name;
                     out{b/2}.name_type = 'given';
                 end

@@ -116,6 +116,7 @@ function Wold_article_PCA_test()
     X_raw = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
     X = block(X_raw);
     PCA_model_1 = lvm({'X', X}, 1);
+    assertTrue(strcmp(PCA_model_1.blocks{1}.name, 'X'))
 
     X = block(X_raw);
     PCA_model_2 = lvm({'X', X}, 2);
@@ -195,9 +196,10 @@ function Wold_article_PCA_test()
     assertElementsAlmostEqual(testing_type_C.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     assertElementsAlmostEqual(testing_type_D.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     
-    
-    
 
+    Unit tests based on ``test_mbpca.m`` here still
+    
+    
 return
 
 function basic_PLS_test()
@@ -357,7 +359,6 @@ function PLS_with_missing_data()
     % TODO(KGD): complete tests: check limits also.    
 return
 
-
 function PCA_batch_data()    
     fprintf('Batch PCA test (SBR data set): ');
     data = load('tests/SBRDATA.mat');
@@ -389,7 +390,6 @@ function PCA_batch_data()
     % TODO(KGD): compare values with the Technometrics paper (55 batches, 10
     % tags, 100 time steps). As on page 45, 46, 47, 48 (table)
 return
-
 
 function PCA_cross_validation_no_missing()
     % Generates several cases of loadings matrices and scores matrices and

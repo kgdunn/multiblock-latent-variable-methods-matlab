@@ -21,16 +21,16 @@ classdef mbpca < mblvm
             % 
             % Must also calculate all summary statistics for each block.
             
-            block_scaling = 1 ./ sqrt(self.K);
+            self.block_scaling = 1 ./ sqrt(self.K);
             if self.B == 1
-                block_scaling = 1;
+                self.block_scaling = 1;
             end
             
             if isempty(self.data)
                 self.data = ones(self.N, sum(self.K)) .* NaN;
                 self.has_missing = false;            
                 for b = 1:self.B
-                    self.data(:, self.b_iter(b)) = self.blocks{b}.data .* block_scaling(b);
+                    self.data(:, self.b_iter(b)) = self.blocks{b}.data .* self.block_scaling(b);
                     if self.blocks{b}.has_missing
                         self.has_missing = true;
                     end
@@ -156,7 +156,57 @@ classdef mbpca < mblvm
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
-        function self = apply_model(self, new) 
+        function self = apply_model(self, new, state, varargin) 
+            % Applies a PCA model to the given ``block`` of (new) data.
+            % 
+            % TODO(KGD): allow user to specify ``A``
+            
+            which_components = 1 : min(self.A);
+            for a = which_components
+%                 if a == 1                
+%                     block.stats.start_SS_col = ssq(X, 1);
+%                     initial_ssq = block.stats.start_SS_col;
+%                 else
+%                     initial_ssq = ssq(X, 1);
+%                 end
+%                 % Baseline for all R^2 calculations
+%                 start_SS_col = block.stats.start_SS_col;
+%                 if all(initial_ssq < self.opt.tolerance)
+%                         warning('lvm:apply_PCA', 'There is no variance left in the data')
+%                 end    
+
+                for b = 1:self.B
+                    % Block score
+                    state.T_new{b}(:,a) = regress_func(new{b}.data, self.P{b}(:,a), new{b}.has_missing);
+                    state.T_new{b}(:,a) = state.T_new{b}(:,a) .* self.block_scaling;
+                    % Transfer it to the superscore matrix
+                    state.T_sb_new(:,b,a) = state.T_new{b}(:,a);
+                end
+                
+                % Calculate the superscore, T_new_s
+                state.T_super_new(:,a) = state.T_sb_new(:,:,a) * self.super.P(:,a);
+                
+                
+                % Deflate each block: using the SUPERSCORE and the block loading
+                for b = 1:self.B
+                    new{b}.data = new{b}.data - state.T_super_new(:,a) * self.P{1}(:,a)';
+                end            
+                new.A = a;
+            end % looping on ``a`` latent variables
+            
+            state.stats.T2
+            state.stats.SPE
+            % These are the Residual Sums of Squares (RSS); i.e X-X_hat
+                row_SSX = ssq(X, 2);
+                col_SSX = ssq(X, 1);
+
+                block.stats.SPE(:,a) = sqrt(row_SSX/K);
+                block.stats.deflated_SS_col(:,a) = col_SSX(:);
+                block.stats.R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
+            
+            
+            block.data = X; % Write the deflated array back to the block
+            
         end % ``apply_model``
         
         function self = calc_statistics_and_limits(self, a)
