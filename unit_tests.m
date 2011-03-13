@@ -171,7 +171,7 @@ function Wold_article_PCA_test()
     ProMV_values = sqrt(ProMV_values ./ 4);
     assertElementsAlmostEqual(PCA_model_1.super.SPE(:,1), ProMV_values', 4)
     assertElementsAlmostEqual(PCA_model_2.super.SPE(:,1), ProMV_values', 4)    
-    assertElementsAlmostEqual(PCA_model_2.super.SPE(:,2), [0.792655, 0.036726, 1.1706]', 4)
+    assertElementsAlmostEqual(PCA_model_2.super.SPE(:,2), [0, 0, 0]', 4)
     
     % Statistical limits
     assertElementsAlmostEqual(PCA_model_1.super.lim.T2, 24.684, 3)
@@ -183,6 +183,8 @@ function Wold_article_PCA_test()
     X_test_raw = [3, 4, 3, 4; 1, 2, 3, 4.0];
     X_test = block(X_test_raw);
     assertElementsAlmostEqual(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
+    
+    % Apply the new data to an existing model
     testing_type_A = PCA_model_1.apply({'X', X_test});      % send in a block variable
     testing_type_B = PCA_model_1.apply({'X', X_test_raw});  % send in a raw array 
     assertElementsAlmostEqual(testing_type_A.T{1}, [-0.2705, -2.0511]', 4)
