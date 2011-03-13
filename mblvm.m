@@ -48,7 +48,9 @@ classdef mblvm < handle
     
     % Subclasses may choose to redefine these methods
     methods
-        function self = mblvm(varargin)
+        function self = mblvm(data, varargin)
+            
+            self.blocks = data;
             
             % Process model options, if provided
             % -----------------------
@@ -284,7 +286,7 @@ classdef mblvm < handle
             % Iterations per component
             self.model.stats.itern = [];             
             
-            nb = self.B;
+            nb = self.B; 
             
             % Latent variable parameters
             self.P = cell(1,nb);
@@ -355,10 +357,10 @@ classdef mblvm < handle
             % Storage for each block
             for b = 1:self.B
                 dblock = self.blocks{b};
-                self.P{b} = zeroexp([dblock.K, A], self.P{b});  % loadings; .C for PLS
-                self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores, .U for PLS                
-                self.W{b} = zeroexp([dblock.K, A], self.W{b});  % PLS weights
-                self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS weights
+                self.P{b} = zeroexp([dblock.K, A], self.P{b});  % block loadings; 
+                self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores
+                self.W{b} = zeroexp([dblock.K, A], self.W{b});  % PLS block weights
+                self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS block weights
                 self.C{b} = zeroexp([dblock.K, A], self.C{b});  % PLS Y-space loadings
                 self.U{b} = zeroexp([dblock.N, A], self.U{b});  % PLS Y-space scores
                %self.S{b} = zeroexp([1, A], self.S{b});         % score scaling factors

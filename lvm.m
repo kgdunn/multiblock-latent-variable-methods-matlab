@@ -60,13 +60,13 @@ function self = lvm(blocks, varargin)
 
     % Just create an empty (shell) class instance
     if strcmpi(model_type, 'pca')
-        self = mbpca(varargin{:});
+        self = mbpca(out, varargin{:});
     elseif strcmpi(model_type, 'pls')
-        self = mbpls(varargin);
+        self = mbpls(out, varargin{:});
     end
  
     % Now set the data blocks:
-    self.blocks = out;
+    %self.blocks = out;
     
     if numel(out) > 2
         self.model_type = ['MB-', model_type];

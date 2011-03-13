@@ -4,18 +4,18 @@ function unit_tests(varargin)
     test_significant_figures()    
     
     
-   
-    
-    basic_PLS_test()
-    PLS_no_missing_data()    
-    PLS_with_missing_data()
-    
-    Wold_article_PCA_test()
+   Wold_article_PCA_test()
     MBPCA_tests()    
     PCA_no_missing_data()      
     PCA_with_missing_data()    
     PCA_batch_data()
     PCA_cross_validation_no_missing()
+    
+    basic_PLS_test()
+    PLS_no_missing_data()    
+    PLS_with_missing_data()
+    
+    
     
     
     PLS_randomization_tests()
@@ -322,11 +322,17 @@ function PLS_no_missing_data()
     Y = block(raw_data.blocks{2});
     Y = Y.preprocess();
     assertEAE(Y.data, raw_data.scaled_blocks{2}, 4)
+    assertEAE(shape(Y), [54, 5], 4)
+    assertTrue(shape(Y, 1) == 54)
+    assertTrue(shape(Y, 2) == 5)
     
     % Build the PCA model with LVM.m
     % ------------------------------
     A = exp_m.A;
-    PLS = lvm({'X', X, 'Y', Y}, A);
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = A;
+    PLS = lvm({'X', X, 'Y', Y}, options);
 
 
     % Now test the PLS model
@@ -334,12 +340,12 @@ function PLS_no_missing_data()
     % T-scores
     scores_col = 3:8;
     T = exp_m.observations{1}.data(:, scores_col);
-    assertEAE(PLS.blocks{1}.T, T, 2, true);
+    assertEAE(PLS.T{1}, T, 2, true);
     
     % T^2
     T2_col = 2;
     T2 = exp_m.observations{1}.data(:, T2_col);
-    assertEAE(PLS.blocks{1}.stats.T2(:,PLS.A), T2, 4);
+    assertEAE(PLS.stats{1}.T2(:,PLS.A), T2, 4);
     
     % Y-hat
     Y_hat_col = 7:11;

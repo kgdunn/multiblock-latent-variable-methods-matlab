@@ -7,41 +7,34 @@
 classdef mbpls < mblvm
     properties (SetAccess = protected)
         Y = [];
-        Y_has_missing = false;
     end
         
     methods 
         function self = mbpls(varargin)
-            self = self@mblvm(varargin{:});            
+            
+            % Pull out the Y-block and place it into a specific variable
+            blocks_given = varargin{1};
+            for b = 1:numel(blocks_given)
+                if strcmpi(blocks_given{b}.name, 'y')
+                    Y_block = blocks_given{b};
+                    blocks_given(b) = []; % delete the Y-block
+                    
+                    %Ny = shape(self.Y, 1);
+                    %if self.N ~= Ny
+                    %    warning('mbpls:merge_blocks', 'The number of observations in all blocks must match.')
+                    %end
+                end 
+            end
+            varargin{1} = blocks_given;
+            self = self@mblvm(varargin{:});  
+            self.Y = Y_block;
+            
         end % ``mbpls``        
         
         % Superclass abstract method implementation
         function self = expand_storage(self, varargin)
             % Do nothing: super-class methods are good enough
         end % ``expand_storage``
-        
-        % Superclass abstract method implementation
-        function self = merge_blocks(self)
-            
-            % We will call the PCA class to do the work for us, after removing
-            % the Y-block out to a new variable
-            
-            for b = 1:self.B
-                if strcmpi(self.blocks{b}.name, 'y')
-                    self.Y = self.blocks{b};
-                    self.Y_has_missing = self.Y.has_missing;
-                    self.blocks(b) = []; % delete the Y-block
-                    
-                    Ny = size(self.Y, 1);
-                    if self.N ~= Ny
-                        warning('mbpls:merge_blocks', 'The number of observations in all blocks must match.')
-                    end
-                end
-            end
-            
-            merge_blocks@mblvm(self);
-            
-        end % ``merge_blocks``
         
         % Superclass abstract method implementation
         function self = calc_model(self, A)
@@ -51,13 +44,11 @@ classdef mbpls < mblvm
             % Must also calculate all summary statistics for each block.
             
             % Perform ordinary missing data PLS on the merged block of data
-            if self.Y_has_missing
-                if any(sum(self.Y.mmap, 2) == 0)
-                    warning('mbpls:calc_model', ...
-                            ['Cannot handle the case yet where the entire '...
-                             'observation in Y-matrix is missing.  Please '...
-                             'remove those rows and refit model.'])
-                end
+            if numel(self.Y.mmap) > 1 && any(sum(self.Y.mmap, 2) == 0)
+                warning('mbpls:calc_model', ...
+                        ['Cannot handle the case yet where the entire '...
+                         'observation in Y-matrix is missing.  Please '...
+                         'remove those rows and refit model.'])
             end
             
             which_components = max(self.A+1, 1) : A;            
@@ -69,12 +60,10 @@ classdef mbpls < mblvm
                     ssq_before = ssq(self.data, 1);
                     self.split_result(ssq_before, 'stats', 'start_SS_col');
                     
-                    ssq_before_Y = ssq(self.Y, 1);
-                    self.stats.start_SS_col_Y = ssq_before_Y;
-                    
+                    ssq_before_Y = ssq(self.Y.data, 1);
                 else
                     ssq_before = ssq(self.data, 1);
-                    ssq_before_Y = ssq(self.Y, 1);
+                    ssq_before_Y = ssq(self.Y.data, 1);
                 end
                 
                 if all(ssq_before < self.opt.tolerance)
@@ -82,10 +71,10 @@ classdef mbpls < mblvm
                 end
                 if all(ssq_before_Y < self.opt.tolerance)
                     warning('mbpls:calc_model', 'There is no variance left in the Y-data')
-                end
-                                
+                end 
+                                 
                 % Converge onto a single component
-                [t_a, p_a, w_a, c_a, u_a, itern] = mbpls.single_block_PLS(self.data, self.Y, self, a, self.has_missing); 
+                [t_a, p_a, w_a, c_a, u_a, itern] = mbpls.single_block_PLS(self.data, self.Y.data, self, a, self.has_missing); 
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
@@ -104,8 +93,84 @@ classdef mbpls < mblvm
                 self.model.stats.itern(a) = itern;
                 
                 % Recover block information and store that.
+                t_superblock = zeros(self.N, self.B);
+                for b = 1:self.B
+                    idx = self.b_iter(b);
+                    X_portion  = self.data(:, idx);
+                    
+                    % Regress sub-columns of self.data onto the superscore
+                    % to get the block weights.
+                    w_b = regress_func(X_portion, u_a, self.has_missing);
+                    
+                    w_b = w_b / norm(w_b);
+                    
+                    % Block scores: regress rows of X onto the block loadings
+                    t_b = regress_func(X_portion, w_b, self.has_missing);
+                    t_superblock(:,b) = t_b;
+                    %T_b_recovered{b}(:,a) = X_portion * w_b / (w_b'*w_b) / sqrt(K_b(b));
+                    
+                    
+                    % Block loadings: that would have been used to deflate the
+                    % X-blocks
+                    p_b = regress_func(X_portion, t_a, self.has_missing);
+                    
+                    % Store the block scores, weights and loadings
+                    self.T{b}(:,a) = t_b;
+                    self.W{b}(:,a) = w_b;
+                    self.P{b}(:,a) = p_b;
+                   
+                    % Store the SS prior to deflation 
+                    X_portion_hat = t_a * p_b';
+                    self.stats{b}.col_ssq_prior(:, a) = ssq(X_portion_hat,1);
+                    
+                    % VIP calculations
+                    % -----------------                    
+                    ssq_after = ssq(X_portion - X_portion_hat, 1);
+                    VIP_temp = zeros(self.K(b), 1);
+                    for a_iter = 1:a
+                        denom = sum(self.stats{b}.start_SS_col - ssq_after);
+                        self.stats{b}.VIP_f{a_iter,a} = sum(self.stats{b}.col_ssq_prior(:,a_iter)) /  denom;
+                        % was dividing by /(sum(self.stats{b}.start_SS_col) - sum(ssq_after));
+                        VIP_temp = VIP_temp + self.P{b}(:,a_iter) .^ 2 * self.stats{b}.VIP_f{a_iter,a} * self.K(b);
+                    end
+                    self.stats{b}.VIP_a(:,a) = sqrt(VIP_temp);
                 
+                    % Block T2 using the number of components calculated so far
+                    self.stats{b}.T2(:,a) = self.mahalanobis_distance(self.T{b}(:,1:a));
+                end
+                w_super = regress_func(t_superblock, u_a, false);
+                w_super = w_super / norm(w_super);
+                
+                % Store the super-level results
+                self.super.T_summary(:,:,a) = t_superblock;
+                self.super.T(:,a) = t_a;
+                self.super.W(:,a) = w_super;
+                                
                 % Now deflate the data matrix using the superscore
+                self.data = self.data - t_a * p_a';
+                self.Y.data = self.Y.data - t_a * c_a';
+                
+                ssq_cumul = 0;
+                ssq_before = 0;
+                for b = 1:self.B
+                    idx = self.b_iter(b);
+                    X_portion = self.data(:, idx);
+                    col_ssq = ssq(X_portion, 1)';
+                    row_ssq = ssq(X_portion, 2);
+                    ssq_cumul = ssq_cumul + sum(col_ssq);
+                    ssq_before = ssq_before + sum(self.stats{b}.start_SS_col);
+                    
+                    self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ self.stats{b}.start_SS_col';
+                    self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
+                    self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
+                    if a>1
+                        self.stats{b}.R2k_a(:,a) = self.stats{b}.R2k_a(:,a) - self.stats{b}.R2k_a(:,a-1);
+                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - self.stats{b}.R2b_a(1,a-1);
+                    end
+                    
+                    self.stats{b}.SPE(:,a) = sqrt(row_ssq ./ numel(idx));
+                end
+                
                 
                 % Calculate the limits                
                 self.calc_statistics_and_limits(a);
@@ -218,7 +283,7 @@ classdef mbpls < mblvm
             % deflate afterwards.
             % Note the similarity with step 4! and that similarity helps
             % understand the deflation process.
-            p_a = regress_func(X, t_a, blockX.has_missing); 
+            p_a = regress_func(X, t_a, has_missing); 
 
             if self.opt.show_progress
                 if ishghandle(h)

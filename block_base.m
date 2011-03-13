@@ -91,6 +91,10 @@ classdef block_base < handle
             end
         end
         
+        function out = size(self)
+            error('block_base:size', 'Use the ``shape(...)`` function to obtain the shape of a block object.');
+        end
+        
         function out = copy(self)
             props = properties(self);
             
@@ -430,7 +434,10 @@ classdef block_base < handle
                 varargout{1} = PP;
             end
         end
-%         
+
+        function out = ssq(self, varargin)
+            out = ssq(self.data, varargin{:});
+        end
 %         function self = un_preprocess(self, varargin)
 %             % UNdoes preprocessing for a block.
 %             %
