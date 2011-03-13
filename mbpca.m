@@ -95,6 +95,9 @@ classdef mbpca < mblvm
                     % Store statistics for each block.  The part we explain by
                     % this component is due to the *superscore*, t_a, not the
                     % blockscore.
+                    
+                    THIS VERSION GIVES R2 that can be > 1 
+                    
                     X_portion_hat = t_a * p_b';
                     col_ssq = ssq(X_portion_hat, 1)';
                     row_ssq = ssq(X_portion_hat, 2);
@@ -123,6 +126,21 @@ classdef mbpca < mblvm
                 
                 % Now deflate the data matrix using the superscore
                 self.data = self.data - t_a * p_a';
+                for b = 1:self.B
+                    idx = self.b_iter(b);
+                    X_portion = self.data(:, idx);
+                    col_ssq = ssq(X_portion, 1)';
+                    
+                    
+                    THIS VERSION GIVES R2 <= 1
+                    
+                    
+                    self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ ssq_before(1, idx)';
+                    self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
+                    self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
+                end
+                    
+                    
                 
                 % Cumulative R2 value for the whole component
                 self.super.stats.R2(a) = ssq_cumul/sum(ssq_before);

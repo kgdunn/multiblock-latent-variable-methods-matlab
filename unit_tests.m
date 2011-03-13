@@ -1,7 +1,7 @@
 function unit_tests(varargin)
     close all;
     test_significant_figures()
-    Wold_article_PCA_test()
+    %Wold_article_PCA_test()
     MBPCA_tests()
     basic_PLS_test()
     PCA_no_missing_data()  
@@ -822,6 +822,19 @@ function MBPCA_tests()
     assertEAE(mbmodel.T{2},            T_b{2}, 5, true)    
     assertEAE(mbmodel.super.T_summary, T_sum,  5, true)
     assertEAE(mbmodel.super.T,         T_s,    5, true)
+    
+    % Compare superblock's loadings
+    assertEAE(mbmodel.super.P,         P_s,    8, true)
+    
+    % Compare overall R2
+    assertEAE(mbmodel.super.stats.R2,  stats_MB.R2X_overall, 5)
+    assertEAE(mbmodel.super.stats.R2,  stats_PCA.R2X_overall, 5)
+    
+    % Compare block R2 values for block 1 and 2
+    assertEAE(mbmodel.stats{1}.R2b_a,  stats_MB.R2X{1}, 5)
+    assertEAE(mbmodel.stats{1}.R2b_a,  stats_PCA.R2X{1}, 5)
+    assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 5)
+    assertEAE(mbmodel.stats{2}.R2b_a,  stats_PCA.R2X{2}, 5)
     
 
 return
