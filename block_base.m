@@ -411,9 +411,9 @@ classdef block_base < handle
             if any(scaling < sqrt(eps))
                 scaling(scaling < sqrt(eps)) = NaN;
                 self.has_missing = true;
+                block_data.has_missing = true;
             end                
             scaling = 1./scaling;
-
 
             block_data.data = block_data.data - repmat(mean_center, self.N, 1);
             block_data.data = block_data.data .* repmat(scaling, self.N, 1);
