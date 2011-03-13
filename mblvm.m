@@ -180,18 +180,6 @@ classdef mblvm < handle
             % Iterations per component
             self.model.stats.itern = []; 
             
-            % R2 for each component
-            self.model.stats.R2 = [];
-            
-            % SPE, after each component, in the superblock
-            self.model.stats.SPE = [];
-            
-            % T2, using all components 1:A, in the superblock
-            self.model.stats.T2 = [];
-            
-            % The VIP's for each block, and the VIP calculation factor
-            self.model.stats.VIP = [];
-            self.model.stats.VIP_f = cell({});
             
             nb = self.B;
             
@@ -211,11 +199,25 @@ classdef mblvm < handle
             self.stats = cell(1,nb);
             self.lim = cell(1,nb);
             
-            % Super block
+            % Super block parameters
             self.super = struct();
+            % Superblock scores
             self.super.T = [];
-            self.super.P = [];   % Used in PCA only 
-            self.super.W = [];   % Used in PLS only (we could combine them)
+            % Superblock's loadings (used in PCA only)
+            self.super.P = [];    
+            % Superblocks's weights (used in PLS only)
+            self.super.W = [];   
+            % R2 for each component for the overall model
+            self.super.stats.R2 = [];
+            % SPE, after each component, for the overall model
+            self.super.stats.SPE = [];            
+            % T2, using all components 1:A, for the overall model
+            self.super.stats.T2 = [];            
+            % The VIP for each block, and the VIP calculation factor
+            self.super.stats.VIP = [];
+            self.super.stats.VIP_f = cell({});
+            % Limits for various parameters in the overall model
+            self.super.lim = cell({});
             
             
         end
@@ -258,17 +260,7 @@ classdef mblvm < handle
             end
             
             self.model.stats.timing = zeroexp([A, 1], self.model.stats.timing);
-            self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);
-            self.model.stats.R2 = zeroexp([A, 1], self.model.stats.R2);
-            self.model.stats.T2 = zeroexp([A, 1], self.model.stats.R2);
-            self.model.stats.SPE = zeroexp([self.N, A], self.model.stats.SPE);
-            
-            % T2, using all components 1:A, in the superblock
-            self.model.stats.T2 = zeroexp([self.N, A], self.model.stats.T2);
-            
-            % The VIP's for each block, and the VIP calculation factor
-            self.model.stats.VIP = zeroexp([self.B, 1], self.model.stats.VIP);
-            %self.model.stats.VIP_f = cell({});
+            self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);            
             
             % Storage for each block
             for b = 1:self.B
@@ -317,6 +309,14 @@ classdef mblvm < handle
                     self.lim{b}.SPE_j = []; 
                     self.lim{b}.T2_j = []; %not used: we monitoring based on final T2 value
                 end
+                if numel(self.super.lim) == 0
+                    % Ordinary model portion
+                    self.super.lim.t = [];
+                    self.super.lim.T2 = [];
+                    self.super.lim.SPE = [];
+                end
+                
+                
 
                 % SPE per block
                 % N x A
@@ -391,6 +391,22 @@ classdef mblvm < handle
             self.super.P = zeroexp([self.B, A], self.super.P);
             self.super.W = zeroexp([self.B, A], self.super.W);
             
+            self.super.stats.R2 = zeroexp([A, 1], self.super.stats.R2);
+            self.super.stats.T2 = zeroexp([A, 1], self.super.stats.R2);
+            self.super.stats.SPE = zeroexp([self.N, A], self.super.stats.SPE);
+            
+            % T2, using all components 1:A, in the superblock
+            self.super.stats.T2 = zeroexp([self.N, A], self.super.stats.T2);
+            
+            % The VIP's for each block, and the VIP calculation factor
+            self.super.stats.VIP = zeroexp([self.B, 1], self.super.stats.VIP);
+            %self.super.stats.VIP_f = cell({});
+            
+            % Limits for superscore entities
+            self.super.lim.t = zeroexp([1, A], self.super.lim.t);
+            self.super.lim.T2 = zeroexp([1, A], self.super.lim.T2);            
+            self.super.lim.SPE = zeroexp([1, A], self.super.lim.SPE);
+                
             
             % Give the subclass the chance to expand storage, if required
             self.expand_storage(A);
@@ -448,9 +464,113 @@ classdef mblvm < handle
         function out = mahalanobis_distance(T)
             % TODO(KGD): calculate this in a smarter way. Can create unnecessarily
             % large matrices
-            N = size(T, 1);
-            out = diag(T * inv((T'*T)/(N-1)) * T'); %#ok<MINV>
+            n = size(T, 1);
+            out = diag(T * inv((T'*T)/(n-1)) * T'); %#ok<MINV>
         end
+        
+        function y = chi2inv(p, nu)
+            % http://www.atmos.washington.edu/~wmtsa/
+            %
+            % Copyright (c) 2003,2004,2005, Charles R. Cornish
+            % All rights reserved.
+            % 
+            % Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+            % 
+            %     * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+            %     * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+            %     * Neither the name of the owner nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+            % 
+            % THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+         
+            p = 1 - p;
+            
+            % computes the  abscissae y for given probability p (upper tail)
+            % for a chi square distribution with nu >=2 degrees
+            % of freedom, NOT NECESSARILY AN INTEGER. Based on
+            % Goldstein, R.B., Collected Algorithms for Computer Machinery,
+            % 16, 483-485.
+            %
+            %  p: real col vector of right-tail probs
+            %  nu: possibly non-integer deg of freedom
+            %  y: real column vector of abscissae
+            %
+            % Author: Andrew Walden
+
+
+            c=[1.565326e-3,1.060438e-3,-6.950356e-3,-1.323293e-2,2.277679e-2,...
+            -8.986007e-3,-1.513904e-2,2.530010e-3,-1.450117e-3,5.169654e-3,...
+            -1.153761e-2,1.128186e-2,2.607083e-2,-0.2237368,9.780499e-5,-8.426812e-4,...
+            3.125580e-3,-8.553069e-3,1.348028e-4,0.4713941,1.0000886];
+
+            a=[1.264616e-2,-1.425296e-2,1.400483e-2,-5.886090e-3,...
+            -1.091214e-2,-2.304527e-2,3.135411e-3,-2.728484e-4,...
+            -9.699681e-3,1.316872e-2,2.618914e-2,-0.2222222,...
+            5.406674e-5,3.483789e-5,-7.274761e-4,3.292181e-3,...
+            -8.729713e-3,0.4714045,1.0];
+
+            %  I HAVE RESTRICTED TO Nu>=2 SO THAT CAN MAKE Nu REAL.
+            if (nu < 2) 
+              error('QChisq ERROR: degrees of freedom < 2') 
+            end 
+            if nu==2
+                y = -2.*log(p);
+            else % nu >2
+                f=nu;
+                f1=1./f;
+                t = sqrt(2).*erfinv(1-2.*p); % upper tail area p
+                f2=sqrt(f1).*t;
+                if nu < 2.+fix(4.*abs(t))
+                    y=(((((((c(1).*f2+c(2)).*f2+c(3)).*f2+c(4)).*f2...
+                    +c(5)).*f2+c(6)).*f2+c(7)).*f1+((((((c(8)+c(9).*f2).*f2...
+                    +c(10)).*f2+c(11)).*f2+c(12)).*f2+c(13)).*f2+c(14))).*f1...
+                    +(((((c(15).*f2+c(16)).*f2+c(17)).*f2+c(18)).*f2...
+                    +c(19)).*f2+c(20)).*f2+c(21);
+                else
+                    y=(((a(1)+a(2).*f2).*f1+(((a(3)+a(4).*f2).*f2...
+                   +a(5)).*f2+a(6))).*f1+(((((a(7)+a(8).*f2).*f2+a(9)).*f2...
+                   +a(10)).*f2+a(11)).*f2+a(12))).*f1+(((((a(13).*f2...
+                   +a(14)).*f2+a(15)).*f2+a(16)).*f2+a(17)).*f2.*f2...
+                   +a(18)).*f2+a(19);
+                end
+                y = (y.^3).*f;
+            end
+        end
+        
+        function limits = spe_limits(values, levels, ncol)
+            % Calculates the SPE limit(s) at the given ``levels`` [0, 1]
+            % where SPE was calculated over ``ncol`` entries.
+            %
+            % NOTE: our SPE values = sqrt( e*e^T / K )
+            %       where e = row vector of residuals from the model
+            %       and K = number of columns (length of vector e)
+            %
+            % The SPE limit is defined for a vector ``e``, so we need to undo
+            % our SPE transformation, calculate the SPE limit, then transform
+            % the SPE limit back.  That's why this function requires ``ncol``,
+            % which is the same as K in the above equation.
+            
+            values = values.^2 .* ncol;            
+            var_SPE = var(values);
+            avg_SPE = mean(values);
+            chi2_mult = var_SPE/(2.0 * avg_SPE);
+            chi2_DOF = (2.0*avg_SPE^2)/var_SPE;
+            limits = chi2_mult * mblvm.chi2inv(levels, chi2_DOF);
+            
+            limits = sqrt(limits ./ ncol);
+
+            % For batch blocks: calculate instantaneous SPE using a window
+            % of width = 2w+1 (default value for w=2).
+            % This allows for (2w+1)*N observations to be used to calculate
+            % the SPE limit, instead of just the usual N observations.
+            %
+            % Also for batch systems:
+            % low values of chi2_DOF: large variability of only a few variables
+            % high values: more stable periods: all k's contribute
+        end
+
+                
+            
+
     end % end: methods (sealed and static)
     
 end % end classdef

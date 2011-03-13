@@ -124,29 +124,28 @@ classdef mbpca < mblvm
                 X_merged = X_merged - t_a * p_a';
                 
                 % Cumulative R2 value for the whole component
-                self.model.stats.R2(a) = ssq_cumul/sum(ssq_before);
+                self.super.stats.R2(a) = ssq_cumul/sum(ssq_before);
                 
                 % Model summary SPE (not the superblock's SPE!), merely the
                 % overall SPE from the merged model
-                self.model.stats.SPE(:,a) = sqrt(ssq(X_merged, 2) ./ sum(self.K));
+                self.super.stats.SPE(:,a) = sqrt(ssq(X_merged, 2) ./ sum(self.K));
                 
                 % Model summary T2 (not the superblock's T2!), merely the
                 % overall T2 from the merged model
-                self.model.stats.T2(:,a) = self.mahalanobis_distance(self.model.T(:,1:a));
+                self.super.stats.T2(:,a) = self.mahalanobis_distance(self.super.T(:,1:a));
                 
-                self.model.stats.VIP_f
-                self.model.stats.VIP
+                self.super.stats.VIP_f
+                self.super.stats.VIP
                 
-                
-                
-                self.calc_statistics_and_limits(X_merged, ssq_before, a);
+                % Calculate the limits                
+                self.calc_statistics_and_limits(a);
                 
                 self.A = a;
                 
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
-        function self = calc_statistics_and_limits(self, dblock, ssq_before, a)
+        function self = calc_statistics_and_limits(self, a)
             % Calculate summary statistics for the model. Given:
             % ``dblock``: the deflated block of data
             %
@@ -163,10 +162,7 @@ classdef mbpca < mblvm
                     'adjust the number of iterations in the options.'];
                 warning('lvm:calculate_statistics', warn_string)
             end
-            self.lim{b}.t
-                
-                
-            
+           
             % Calculate the limits for the latent variable model.
             %
             % References
@@ -175,6 +171,7 @@ classdef mbpca < mblvm
             %      Monitoring Batch Processes. Technometrics, 37, 41-59, 1995.
             %
             % [2]  T2 limits: Johnstone and Wischern.
+            %
             % [3]  Score limits: two methods
             %
             %      A: Assume that scores are from a two-sided t-distribution with N-1
@@ -203,45 +200,27 @@ classdef mbpca < mblvm
             %
             %      From the CLT: we divide by N, not N-1, but stddev is calculated
             %      with the N-1 divisor.
+            
+            siglevel = 0.95;
+            
             for b = 1:self.B
-                block = self.blocks{b};
-                N = block.N;
-                siglevel = 0.95;
-                for a = 1:self.A
-                    
-                    SPE_values = block.stats.SPE(:,a);
-                    var_SPE = var(SPE_values);
-                    avg_SPE = mean(SPE_values);
-                    chi2_mult = var_SPE/(2.0 * avg_SPE);
-                    chi2_DOF = (2.0*avg_SPE^2)/var_SPE;
-                    
-                    %for siglevel_str in block.lim.SPE.keys():
-                    %    siglevel = float(siglevel_str)/100
-                    block.lim.SPE(:,a) = chi2_mult * my_chi2inv(siglevel, chi2_DOF);
-                    
-                    % For batch blocks: calculate instantaneous SPE using a window
-                    % of width = 2w+1 (default value for w=2).
-                    % This allows for (2w+1)*N observations to be used to calculate
-                    % the SPE limit, instead of just the usual N observations.
-                    %
-                    % Also for batch systems:
-                    % low values of chi2_DOF: large variability of only a few variables
-                    % high values: more stable periods: all k's contribute
-                    
-                    %for siglevel_str in block.lim.T2.keys():
-                    %siglevel = float(siglevel_str)/100
-                    mult = a*(N-1)*(N+1)/(N*(N-a));
-                    limit = my_finv(siglevel, a, N-(a));
-                    block.lim.T2(:,a) = mult * limit;
-                    %end
-                    
-                    %for siglevel_str in block.lim.t.keys():
-                    alpha = (1-siglevel)/2.0;
-                    n_ppf = my_norminv(1-alpha);
-                    block.lim.t(:,a) = n_ppf * block.S(a);
-                    %end
-                end
-                self.blocks{b} = block;
+                self.lim{1}.SPE = self.spe_limits(self.stats{1}.SPE, siglevel, self.K(b));
+                self.super.lim.SPE = self.spe_limits(self. SPE, siglevel, self.K(b));
+                
+                
+                
+                %for siglevel_str in block.lim.T2.keys():
+                %siglevel = float(siglevel_str)/100
+                mult = a*(self.N-1)*(self.N+1)/(self.N*(self.N-a));
+                limit = my_finv(siglevel, a, self.N-(a));
+                block.lim.T2(:,a) = mult * limit;
+                %end
+
+                %for siglevel_str in block.lim.t.keys():
+                alpha = (1-siglevel)/2.0;
+                n_ppf = my_norminv(1-alpha);
+                block.lim.t(:,a) = n_ppf * block.S(a);
+                %end
             end
             
             
