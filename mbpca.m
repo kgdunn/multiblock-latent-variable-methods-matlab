@@ -15,6 +15,7 @@ classdef mbpca < mblvm
             % Do nothing: super-class methods are good enough
         end % ``expand_storage``
         
+        % Superclass abstract method implementation
         function self = calc_model(self, A)
             % Fits a multiblock PCA model on the data, extracting A components
             % We assume the data are preprocessed already.
@@ -174,6 +175,7 @@ classdef mbpca < mblvm
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
+        % Superclass abstract method implementation
         function state = apply_model(self, new, state, varargin) 
             % Applies a PCA model to the given ``block`` of (new) data.
             % 
@@ -230,6 +232,7 @@ classdef mbpca < mblvm
             
         end % ``apply_model``
         
+        % Superclass abstract method implementation
         function self = calc_statistics_and_limits(self, a)
             % Calculate summary statistics and limits for the model. 
             % TODO
@@ -300,6 +303,73 @@ classdef mbpca < mblvm
             end            
             
         end % ``calc_statistics_and_limits``
+        
+        % Superclass abstract method implementation
+        function summary(self)
+            % Displays more information about ``self``
+            
+            % TODO(KGD): improve this by not displaying block info if B==1
+            
+            fprintf('R2 summary for %s (all as percentages)\n', self.model_type);
+            w_char = zeros(self.B,1);
+            ncols = 2 + self.B;  % A column, overall R2, and then all blocks            
+            line_length = 3 + 8 + ncols;
+            all_lines = '|%3i|%7.2f|';
+            start_line = '|%3s|%7s|';
+            block_names = cell(self.B,1);
+            for b = 1:self.B
+                if strcmp(self.blocks{b}.name_type, 'auto')
+                    % Drop off the "block-" part of the automatic block name
+                    block_names{b} = self.blocks{b}.name(7:end);
+                else
+                    block_names{b} = self.blocks{b}.name;
+                end
+                
+                w_char(b) = max(6, numel(block_names{b}));
+                all_lines = [all_lines, '%', num2str(w_char(b)), '.2f|']; %#ok<AGROW>
+                start_line = [start_line,  '%', num2str(w_char(b)), 's|']; %#ok<AGROW>                
+                line_length = line_length + w_char(b);
+            end
+            all_lines = [all_lines, '\n'];
+            start_line = [start_line, '\n'];
+            
+            disp(repmat('-', 1, line_length))
+            fprintf_args = {' A ', ' Total ', block_names{:}};
+            fprintf(start_line, fprintf_args{:});
+            disp(repmat('-', 1, line_length))
+            
+            
+            for a = 1:self.A
+                fprintf_args = zeros(1, 2+self.B);
+                fprintf_args(1:2) =  [a, self.super.stats.R2(a)*100];
+                for b = 1:self.B
+                    fprintf_args(2+b) = self.stats{b}.R2b_a(a)*100;
+                end
+                fprintf(all_lines, fprintf_args);
+            end
+            
+            disp(repmat('-', 1, line_length))
+            fprintf('Overall R2X(cumul) = %6.2f%%\n', sum(self.super.stats.R2)*100)
+            fprintf('Time to calculate (s): = [');
+            for a= 1:self.A
+                fprintf('%3.2f', self.model.stats.timing(a))
+                if a ~= self.A
+                    fprintf(', ')
+                end
+            end
+            fprintf(']\n');
+            
+            fprintf('Number of iterations: = [');
+            for a= 1:self.A
+                fprintf('%3d', self.model.stats.itern(a))
+                if a ~= self.A
+                    fprintf(', ')
+                end
+            end
+            fprintf(']\n');
+
+        end
+        
     end % end methods (ordinary)
     
     % These methods don't require a class instance

@@ -118,14 +118,20 @@ function Wold_article_PCA_test()
 %   Tests from the PCA paper by Wold, Esbensen and Geladi, 1987
 %   Principal Component Analysis, Chemometrics and Intelligent Laboratory
 %   Systems, v 2, p37-52; http://dx.doi.org/10.1016/0169-7439(87)80084-9
-
+    fprintf('PCA tests from literature: ');
     X_raw = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
     X = block(X_raw);
-    PCA_model_1 = lvm({'X', X}, 1);
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = 1;    
+    PCA_model_1 = lvm({'X', X}, options);
     assertTrue(strcmp(PCA_model_1.blocks{1}.name, 'X'))
 
     X = block(X_raw);
-    PCA_model_2 = lvm({'X', X}, 2);
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = 2;
+    PCA_model_2 = lvm({'X', X}, options);
 
     % The mean centering vector should be [4, 4, 4, 3], page 40
     assertTrue(all(PCA_model_2.PP{1}.mean_center == [4, 4, 4, 3]));
@@ -238,6 +244,7 @@ function Wold_article_PCA_test()
     assertEAE(X_new_1.stats.SPE{1}, ProMV_values', 4)
     assertEAE(X_new_1.stats.super.SPE(:,1), ProMV_values', 4)
     assertEAE(X_new_2.stats.SPE{1}, [0, 0, 0]', 4)
+    fprintf('OK\n');
 return
 
 function basic_PLS_test()
@@ -263,7 +270,10 @@ function PCA_no_missing_data()
     % Build the PCA model with LVM.m
     % ------------------------------
     A = exp_m.A;
-    PCA = lvm({'X', X}, A);
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = A;
+    PCA = lvm({'X', X}, options);
     
     
     % Now test the PCA model
@@ -370,7 +380,10 @@ function PCA_with_missing_data()
     
     % Build the model
     A = 2;
-    PCA = lvm({'X', X}, A);
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = A;
+    PCA = lvm({'Column', X}, options);
     
     assertEAE(PCA.P{1}' * PCA.P{1} - eye(A), zeros(A), 1);
     
@@ -415,7 +428,7 @@ function PCA_batch_data()
 %                         
     batch_X = block(data.X, 'X', {'batch_tag_names', tagNames}, {'nBatches', 53});
     options = lvm_opt();     
-    options.show_progress = true; 
+    options.show_progress = false; 
     options.min_lv = 2;
     batch_PCA = lvm({'X', batch_X},options);
     
@@ -830,7 +843,11 @@ function MBPCA_tests()
     X_1 = block(X1_raw(:, block_1_vars), 'X1');
     X_2 = block(X1_raw(:, block_2_vars), 'X2');
     
-    mbmodel = lvm({'X1', X_1, 'X2', X_2}, 2);
+    
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = 2;
+    mbmodel = lvm({'X1', X_1, 'X2', X_2}, options);
     
     % Compare block scores and super scores (tolerance levels are different
     % between the models)
@@ -852,9 +869,8 @@ function MBPCA_tests()
     assertEAE(mbmodel.stats{1}.R2b_a,  stats_PCA.R2X{1}, 5)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 5)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_PCA.R2X{2}, 5)
-    
-
 return
+
 % =========================================================================
 % Code from this point onwards is from the MATLAB open-source unit testing 
 % suite: http://www.mathworks.com/matlabcentral/fileexchange/22846

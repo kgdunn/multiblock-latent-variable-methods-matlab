@@ -166,6 +166,11 @@ classdef mblvm < handle
             if self.A == 0
                 return
             end
+            
+            % Call the subclass to provide more information
+            self.summary()
+            
+            
         end % ``disp``
         
     end % end: methods (ordinary)
@@ -534,7 +539,8 @@ classdef mblvm < handle
     methods (Abstract=true)
         calc_model(self, A)      % fit the model to data in ``self``
         apply_model(self, other) % applies the model to ``new`` data
-        expand_storage(self, A)
+        expand_storage(self, A)  % expands the storage to accomodate ``A`` components
+        summary(self)            % show a text-based summary of ``self``
     end % end: methods (abstract)
     
     methods (Sealed=true, Static=true)
