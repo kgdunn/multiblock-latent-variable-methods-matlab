@@ -5,6 +5,7 @@
 
 % Derived from the general class of "multiblock latent variable models", mblvm
 classdef mbpca < mblvm
+    
     methods 
         function self = mbpca(varargin)
             self = self@mblvm(varargin{:});            
@@ -18,25 +19,9 @@ classdef mbpca < mblvm
         % Superclass abstract method implementation
         function self = calc_model(self, A)
             % Fits a multiblock PCA model on the data, extracting A components
-            % We assume the data are preprocessed already.
+            % We assume the data are merged and preprocessed already.
             % 
             % Must also calculate all summary statistics for each block.
-            
-            self.block_scaling = 1 ./ sqrt(self.K);
-            if self.B == 1
-                self.block_scaling = 1;
-            end
-            
-            if isempty(self.data)
-                self.data = ones(self.N, sum(self.K)) .* NaN;
-                self.has_missing = false;            
-                for b = 1:self.B
-                    self.data(:, self.b_iter(b)) = self.blocks{b}.data .* self.block_scaling(b);
-                    if self.blocks{b}.has_missing
-                        self.has_missing = true;
-                    end
-                end
-            end
             
             % Perform ordinary missing data PCA on the merged block of data
             which_components = max(self.A+1, 1) : A;            

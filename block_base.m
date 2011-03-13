@@ -184,6 +184,10 @@ classdef block_base < handle
             y(i) = i + NaN;
             % $Id: nanstd.m,v 1.1 2004/07/15 22:42:15 glaescher Exp glaescher $
         end
+        
+        function y = var(self, varargin)
+            y = self.std(varargin{:}) .^ 2;
+        end
             
         function y = sum(self, dim)
             % FORMAT: Y = NANSUM(X,DIM)

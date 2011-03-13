@@ -173,6 +173,27 @@ classdef mblvm < handle
             
         end % ``disp``
         
+        function self = merge_blocks(self)
+            % Merges all X-blocks together after preprocessing, but applies
+            % the overall block scaling
+            
+            self.block_scaling = 1 ./ sqrt(self.K);
+            if self.B == 1
+                self.block_scaling = 1;
+            end
+            
+            if isempty(self.data)
+                self.data = ones(self.N, sum(self.K)) .* NaN;
+                self.has_missing = false;            
+                for b = 1:self.B
+                    self.data(:, self.b_iter(b)) = self.blocks{b}.data .* self.block_scaling(b);
+                    if self.blocks{b}.has_missing
+                        self.has_missing = true;
+                    end
+                end
+            end
+        end % ``merge_blocks``  
+        
     end % end: methods (ordinary)
     
     % Subclasses may not redefine these methods
@@ -196,6 +217,7 @@ classdef mblvm < handle
             self.initialize_storage(requested_A);
                 
             preprocess_blocks(self);       % superclass method
+            merge_blocks(self);            % method must be subclassed 
             calc_model(self, requested_A); % method must be subclassed
         end % ``build``
         
@@ -504,7 +526,7 @@ classdef mblvm < handle
                 end                
             end
         end % ``preprocess_blocks``
-        
+                
         function self = split_result(self, result, rootfield, subfield)
             % Splits the result from a merged calculation (over all blocks)
             % into the storage elements for each block.  It uses block size,

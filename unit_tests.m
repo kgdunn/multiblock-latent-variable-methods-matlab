@@ -4,17 +4,18 @@ function unit_tests(varargin)
     test_significant_figures()    
     
     
+   
+    
+    basic_PLS_test()
+    PLS_no_missing_data()    
+    PLS_with_missing_data()
+    
     Wold_article_PCA_test()
     MBPCA_tests()    
     PCA_no_missing_data()      
     PCA_with_missing_data()    
     PCA_batch_data()
     PCA_cross_validation_no_missing()
-    
-    basic_PLS_test()
-    PLS_no_missing_data()    
-    PLS_with_missing_data()
-    
     
     
     PLS_randomization_tests()
