@@ -2,6 +2,7 @@ function unit_tests(varargin)
     close all;
     test_significant_figures()
     Wold_article_PCA_test()
+    MBPCA_tests()
     basic_PLS_test()
     PCA_no_missing_data()  
     PLS_no_missing_data()
@@ -191,15 +192,41 @@ function Wold_article_PCA_test()
     assertElementsAlmostEqual(testing_type_A.T{1}, [-0.2705, -2.0511]', 4)
     assertElementsAlmostEqual(testing_type_B.T{1}, [-0.2705, -2.0511]', 4)
     
+    % Extract a second component
+    X_test_raw = [3, 4, 3, 4; 1, 2, 3, 4.0];
+    X_test = block(X_test_raw);
+    assertElementsAlmostEqual(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
+    
     testing_type_C = PCA_model_2.apply({'X', X_test});      % send in a block variable
     testing_type_D = PCA_model_2.apply({'X', X_test_raw});  % send in a raw array 
     assertElementsAlmostEqual(testing_type_C.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     assertElementsAlmostEqual(testing_type_D.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     
-
-    Unit tests based on ``test_mbpca.m`` here still
+        
+    % Applying the model to the training data should give identical results
+    X_new = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
+    X_new_1 = PCA_model_1.apply({'X', X_new});
+    X_new_2 = PCA_model_2.apply({'X', X_new});
     
+    assertElementsAlmostEqual(X_new_1.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertElementsAlmostEqual(X_new_1.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertElementsAlmostEqual(X_new_2.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertElementsAlmostEqual(X_new_2.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertElementsAlmostEqual(X_new_2.T{1}(:,2), [0.6051, -0.9370, 0.3319]', 2)
+    assertElementsAlmostEqual(X_new_2.T_super(:,2), [0.6051, -0.9370, 0.3319]', 2)
     
+    assertElementsAlmostEqual(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertElementsAlmostEqual(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertElementsAlmostEqual(X_new_2.stats.super.T2(:,1), [1.33333, 1.33333, 1.33333]', 4)
+    
+    % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
+    % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
+    ProMV_values = [0.366107, 0.877964, 0.110178];
+    ProMV_values = sqrt(ProMV_values ./ 4);
+    
+    assertElementsAlmostEqual(X_new_1.stats.SPE{1}, ProMV_values', 4)
+    assertElementsAlmostEqual(X_new_1.stats.super.SPE(:,1), ProMV_values', 4)
+    assertElementsAlmostEqual(X_new_2.stats.SPE{1}, [0, 0, 0]', 4)
 return
 
 function basic_PLS_test()
@@ -209,7 +236,6 @@ function basic_PLS_test()
     % http://dx.doi.org/10.1016/0003-2670(86)80028-9
     % http://dx.doi.org/10.1016/0003-2670(86)80029-0
 return
-
 
 function PCA_no_missing_data()
 % Tests a normal PCA model, no missing data.
@@ -526,7 +552,266 @@ function PLS_randomization_tests()
     end
 return
 
+function MBPCA_tests()
 
+    % Does the full multiblock PCA model manually and compares it to the
+    % results from the LVM class.
+
+    LDPE = load('tests/LDPE-PLS.mat');
+    X1_raw = LDPE.data.blocks{1};
+
+    block_1_vars = [1,2,3,6,8,10,12,14];
+    block_2_vars = [4,5,7,9,11,13];
+    X_1 = block(X1_raw(:, block_1_vars));
+    X_2 = block(X1_raw(:, block_2_vars));
+    
+    % Preprocess the data (center and scale)
+    X_raw = {X_1, X_2};    
+
+    % ---------------------------------------------------------------------------
+    % Settings for both approaches
+    A = 2;
+
+    B = numel(X_raw);
+    K_b = zeros(1,B);
+    for b = 1:B
+        K_b(b) = size(X_raw{b}.data, 2);
+    end
+    N = size(X_raw{1}.data, 1);
+
+    % Create cell arrays for each block; preprocess each block
+    X_mb = cell(1, B);
+    for b = 1:B
+        X_raw{b} = X_raw{b}.preprocess();
+        X_mb{b} = X_raw{b}.data;    
+    end
+
+    % ---------------------------------------------------------------------------
+    % Merged PCA approach
+    % 
+    % Afterwards we have to recover the block scores, and block loadings that we 
+    % would have otherwise calculated from the full approach.
+    T_b_recovered = cell(1, B);
+    P_b_recovered = cell(1, B);
+    T_s_recovered = zeros(N, A) .* NaN;   % This is identical to T(:,:) from the above PCA
+    T_sum_recovered = zeros(N, B, A);     % Superscore array
+    P_s_recovered = zeros(B, A) .* NaN;   % Loadings for the superscore array
+    for b = 1:B
+        T_b_recovered{b} = zeros(N, A);
+        P_b_recovered{b} = zeros(K_b(b), A);
+    end
+
+    % Statistics are stored here
+    stats_PCA = struct();
+    stats_PCA.R2X = cell(1, B);
+    stats_PCA.R2X_baseline = cell(1,B);
+    stats_PCA.R2X_overall = zeros(1,A);
+
+    X_merged = ones(N, sum(K_b)) .* NaN;
+    start_col = 1;
+    for b = 1:B
+        last_col = start_col + K_b(b) - 1;
+        X_merged(:, start_col:last_col) = X_mb{b} / sqrt(K_b(b));
+        start_col = start_col + K_b(b);
+
+        stats_PCA.R2X_baseline{b} = ssq(X_mb{b} / sqrt(K_b(b)));
+    end
+    K = size(X_merged, 2);
+    assert(abs(sum(cell2mat(stats_PCA.R2X_baseline))-ssq(X_merged)) <sqrt(eps))
+
+
+
+    T = zeros(N, A);
+    P = zeros(K, A);
+    for a = 1:A
+        t_a = randn(N, 1);
+        t_a_guess = t_a * 2;
+        while norm(t_a_guess - t_a) > eps^(2/3)
+            t_a_guess = t_a;
+            p_a = X_merged' * t_a / (t_a' * t_a);
+            p_a = p_a / norm(p_a);
+            t_a = X_merged * p_a / (p_a'*p_a);
+        end
+        T(:,a) = t_a;
+        P(:,a) = p_a;
+
+        % Recover the information for each block
+        start_col = 1;
+        for b = 1:B
+            last_col = start_col + K_b(b) - 1;
+            % Multiply here by sqrt(K_b(b)) to get the X_portion looking like the
+            % X-block that would have come from full multiblock approach.
+            X_portion = X_merged(:, start_col:last_col) * sqrt(K_b(b));
+            p_b_temp = X_portion' * t_a / (t_a' * t_a);
+            p_b_temp = p_b_temp / norm(p_b_temp);
+            T_b_recovered{b}(:,a) = X_portion * p_b_temp / (p_b_temp' * p_b_temp) / sqrt(K_b(b));
+            T_sum_recovered(:, b, a) = T_b_recovered{b}(:,a);
+
+            P_b_recovered{b}(:,a) = p_b_temp;
+
+
+            stats_PCA.R2X{b}(a) = ssq(t_a * p_a(start_col:last_col)') / stats_PCA.R2X_baseline{b}; 
+
+            start_col = start_col + K_b(b);    
+        end
+        P_s_recovered(:,a) = T_sum_recovered(:, :, a)' * t_a / (t_a' * t_a);
+
+
+        stats_PCA.R2X_overall(a) = ssq(t_a*p_a') / sum(cell2mat(stats_PCA.R2X_baseline));
+
+        % Finally, deflate
+        X_merged = X_merged - t_a*p_a';
+
+
+    end
+
+    % assert R2_a, overall = [26.16, 18.96]
+
+
+    % ---------------------------------------------------------------------------
+    % Full multiblock approach to calculating scores and loadings for each block, 
+    % as well as getting summary scores and loadings (super block).
+
+
+    % Storage for all variables we want to keep afterwards
+    T_sum = zeros(N, B, A); % superblock variables
+    T_s = zeros(N, A);      % superblock's scores
+    P_s = zeros(B, A);      % superblock's loadings
+
+    % Statistics are stored here
+    stats_MB = struct();
+
+    % Block scores and loadings
+    T_b = cell(1, B);
+    P_b = cell(1, B);
+    stats_MB.R2X = cell(1, B);
+    stats_MB.R2X_baseline = cell(1,B);
+    stats_MB.R2X_overall = zeros(1,A);
+    for b = 1:B
+        T_b{b} = zeros(N, A);
+        P_b{b} = zeros(K_b(b), A);
+        stats_MB.R2X{b} = zeros(1, A);
+        stats_MB.R2X_baseline{b} = ssq(X_mb{b});
+    end
+
+    for a = 1:A
+
+        % The overall consensus superscore from the superblock
+        t_a_s = randn(N, 1);
+        t_a_s_guess = t_a_s * 2;
+
+        % Block loadings and block scores
+        p = cell(B,1);
+        t = cell(B,1);    
+
+        while norm(t_a_s_guess - t_a_s) > eps^(9/10)
+            % For later, when coming back through the loop
+            t_a_s_guess = t_a_s;
+
+            for b = 1:B
+
+                % Loadings for each block
+                p{b} = X_mb{b}' * t_a_s / (t_a_s' * t_a_s);
+                p{b} = p{b} / norm(p{b});
+
+                % Scores for each block
+                t{b} = X_mb{b} * p{b} / (p{b}' * p{b}) / sqrt(K_b(b));
+
+                % Assemble the block scores together to create the super block
+                T_sum(:,b,a) = t{b};
+            end
+
+            % Regress columns of the super block scores onto the super score summary
+            % to calculate the superblock loadings (these describe the importance of
+            % each block to the overall concensus score)
+            p_a_s = T_sum(:,:,a)' * t_a_s / (t_a_s' * t_a_s);
+            p_a_s = p_a_s / norm(p_a_s);
+
+            % Finally, calculate the updated superscore, by regressing rows in the
+            % superscore summary block onto the superblock loadings.
+            % We leave the denominator here, to emphasize that it will have to be
+            % handled when we have missing data.
+            t_a_s = T_sum(:,:,a) * p_a_s / (p_a_s' * p_a_s);
+        end
+
+
+        % Deflate each block by using the superscore
+        overall_ssq = 0;
+        for b = 1:B
+            p_deflate = p{b} * p_a_s(b) * sqrt(K_b(b));
+            %p_deflate = X_mb{b}' * t_a_s / (t_a_s' * t_a_s);
+            % I'm bothered by the fact that we don't normalize p{b} here.
+            X_mb{b} = X_mb{b} - t_a_s * p_deflate';
+
+            block_ssq = ssq(t_a_s * p_deflate');
+            overall_ssq = overall_ssq + block_ssq;
+            stats_MB.R2X{b}(a) = block_ssq / stats_MB.R2X_baseline{b};        
+        end
+        stats_MB.R2X_overall(a) = overall_ssq/sum(cell2mat(stats_MB.R2X_baseline));
+
+        % Store results for comparison
+        T_s(:, a) = t_a_s;
+        P_s(:, a) = p_a_s; 
+        for b = 1:B
+            T_b{b}(:,a) = t{b};
+            P_b{b}(:,a) = p{b};
+        end
+
+    end
+
+    norm(abs(T) - abs(T_s))
+    norm(abs(T_sum_recovered(:)) - abs(T_sum(:)))
+    norm(abs(P_s_recovered) - abs(P_s))
+
+    for b = 1:B
+        norm(abs(T_b_recovered{b}) - abs(T_b{b}))
+        norm(abs(P_b_recovered{b}) - abs(P_b{b}))
+    end
+
+
+    % Now predict the scores for each block and the super scores as if were
+    % running from scratch
+
+    T_pred_super = zeros(N, A) .* NaN;
+    T_pred_block = cell(1, B);
+    for b = 1:B
+        T_pred_block{b} = zeros(N, A) .* NaN;
+    end
+
+
+    for n = 1:N
+        X_new = cell(1, B);
+        t_new = cell(1, B);
+        t_new_s = zeros(1, A);
+        for b = 1:B
+            X_new{b} = X_raw{b}.data_raw(n,:);
+            X_new{b} = (X_new{b} - X_raw{b}.PP.mean_center) .* X_raw{b}.PP.scaling;
+        end
+        for a = 1:A
+            for b = 1:B
+                t_new{b} = X_new{b} * P_b_recovered{b}(:,a) / sqrt(K_b(b));
+                T_pred_block{b}(n,a) = t_new{b};
+            end
+            % Assemble block scores into a single row vector, 1 x B
+            T_new_s = cell2mat(t_new);
+            % Calculate estimate of superscore, t_new_s
+            t_new_s(a) = T_new_s * P_s_recovered(:,a);
+
+            % Deflate X-blocks with this superscore and the block loadings
+            % But the block loadings are modified by the superblock's loadings
+            for b = 1:B
+                X_new{b} = X_new{b} - t_new_s(a) * (P_b_recovered{b}(:,a)' * P_s_recovered(b,a)) * sqrt(K_b(b));
+            end
+        end
+        T_pred_super(n,:) = t_new_s;
+    end
+    norm(abs(T_pred_super) - abs(T_s))
+    for b = 1:B
+        norm(abs(T_pred_block{b}) - abs(T_b_recovered{b}))
+    end
+
+
+return
 % =========================================================================
 % Code from this point onwards is from the MATLAB open-source unit testing 
 % suite: http://www.mathworks.com/matlabcentral/fileexchange/22846

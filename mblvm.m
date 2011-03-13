@@ -218,21 +218,29 @@ classdef mblvm < handle
             
             % Initialize the states (this could go in another function later)
             state = struct;
+            state.Nnew = Nnew;
             for b = 1:self.B
                 % Block scores
-                state.T_new{b} = ones(Nnew, self.A) .* NaN;
+                state.T{b} = ones(Nnew, self.A) .* NaN;
             end
-            % Superblock collection of scores
-            state.T_sb_new = ones(Nnew, self.B, self.A) .* NaN;
+            % Superblock collection of scores: N x B x A
+            state.T_sb = ones(Nnew, self.B, self.A) .* NaN;
             
-            % Super scores
-            state.T_super_new = ones(Nnew, self.A) .* NaN;
+            % Super scores: N x A
+            state.T_super = ones(Nnew, self.A) .* NaN;
             
             % Summary statistics
-            state.stats.T2 = ones(Nnew, 1) .* NaN;
-            state.stats.SPE = ones(Nnew, 1) .* NaN;
-            
-            
+            state.stats.T2 = cell(1, self.B);
+            state.stats.SPE = cell(1, self.B);
+            state.stats.R2 = cell(1, self.B);
+            state.stats.initial_ssq = cell(1, self.B);
+            state.stats.super.T2 = ones(Nnew, 1) .* NaN;
+            state.stats.super.SPE = ones(Nnew, 1) .* NaN;
+            state.stats.super.R2 = ones(Nnew, 1) .* NaN;
+            state.stats.initial_ssq_total = ones(Nnew, 1) .* NaN;
+            for b = 1:self.B
+                state.stats.R2{b} = ones(Nnew, 1) .* NaN;
+            end            
             state = apply_model(self, newb, state); % method must be subclassed
         end % ``apply``
         

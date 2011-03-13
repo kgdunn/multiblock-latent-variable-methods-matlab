@@ -1,112 +1,10 @@
 classdef lvm 
-    % Class attributes
-    properties
-        model_type = '';
-        blocks = {};  % a cell array of data blocks
-        superB = [];  % super-block
-        combnd = [];  % combined X-blocks (used to fit multiblock models)
-        
-        A = 0; % number of latent variables
-        B = 0; % number of blocks
-        opt = struct();    % Model options
-        stats = struct('timing', [], 'itern', []);  % Model statistics (time, iterations)
-    end
-    
+
     methods
         
         
         
-        function self = calc_model(self, A)
-            
-           
-            % Single-block X and single-block Y, PLS model
-            elseif strcmp(self.model_type, 'npls') && self.B == 2
-                [self, self.blocks{1}, self.blocks{2}] = fit_PLS(self, self.blocks{1}, self.blocks{2}, A);
-
-            % Single-block X and single-block Y, PLS model
-            elseif strcmp(self.model_type, 'mbpca')
-                error('lvm:mbpca', 'This model type is not available yet')
-                
-            % Multi-block X and single-block Y, MBPLS model
-            elseif strcmp(self.model_type, 'mbpls')
-                
-                % 1. Block scale each of the "X-space" blocks
-                K = cell(self.B-1, 1);
-                K_total = 0;
-                ssq_X_blocks = cell(self.B-1,1);
-                for b = 1:self.B-1
-                    if self.opt.mbpls.block_scale_X
-                        K{b} = self.blocks{b}.K;
-                        K_total = K_total + K{b};
-                        ssq_X_blocks{b} = ssq(self.blocks{b}.data, 1);
-                        self.blocks{b}.data = self.blocks{b}.data ./ sqrt(K{b});
-                    end
-                end
-                
-                % Then combine the X-blocks into a new single X-block:
-                N = self.blocks{end}.N;
-                bigX = zeros(N, K_total);
-                start_col = 1;
-                end_col = 0;
-                for b = 1:self.B-1
-                    end_col = end_col + K{b};
-                    K{b} = start_col:end_col;
-                    bigX(:, K{b}) = self.blocks{b}.data;
-                    start_col = start_col + K{b}(end);                    
-                end
-                self.combnd = block(bigX);
-                self.combnd.is_preprocessed = true;
-                
-                [self, self.combnd, self.blocks{end}] = fit_PLS(self, self.combnd, self.blocks{end}, A);
-                
-                % Now assign weights, scores and so on to each of the blocks.
-                % Also place the R2 and other stats into each block
-                
-                
-                % Calculate block variables:                
-                w_MBPLS = cell(1, self.B-1);
-                p_MBPLS = cell(1, self.B-1);
-                r_MBPLS = cell(1, self.B-1);
-                t_MBPLS = cell(1, self.B-1);
-                X_super_MBPLS = zeros(N, self.B-1, A);
-                w_super_MBPLS = zeros(self.B-1, A);
-                T_super_MBPLS = self.combnd.T;
-                R2_X = cell(1, self.B-1);
-                for b = 1:self.B-1
-                    w_MBPLS{b} = zeros(numel(K{b}), A);                    
-                    p_MBPLS{b} = zeros(numel(K{b}), A);
-                    r_MBPLS{b} = zeros(numel(K{b}), A);
-                    R2_X{b} = zeros(numel(K{b}), A);
-                    t_MBPLS{b} = zeros(N, A);
-                    
-                    self.blocks{b}.stats.start_SS_col = ssq_X_blocks{b};
-                    temp = self.blocks{b}.data .* sqrt(numel(K{b}));
-                    for a = 1:A                        
-                        %w_MBPLS{b}(:,a) = regress_func(temp, self.Y.U(:,a), self.blocks{b}.has_missing);
-                        %w_MBPLS{b}(:,a) = w_MBPLS{b}(:,a)/norm(w_MBPLS{b}(:,a));
-                        %w_MBPLS{b}(:,a) = self.combnd.W(K{b}, a);
-                        %w_MBPLS{b}(:,a) = w_MBPLS{b}(:,a) / norm(w_MBPLS{b}(:,a));
-                        r_MBPLS{b}(:,a) = self.combnd.R(K{b}, a);
-                        r_MBPLS{b}(:,a) = r_MBPLS{b}(:,a) / norm(r_MBPLS{b}(:,a));
-                        t_MBPLS{b}(:,a) = regress_func(temp, r_MBPLS{b}(:,a), self.blocks{b}.has_missing);
-                        t_MBPLS{b}(:,a) = t_MBPLS{b}(:,a) / sqrt(numel(K{b}));
-                        p_MBPLS{b}(:,a) = self.combnd.P(K{b}, a);
-                        temp = temp - T_super_MBPLS(:,a) * p_MBPLS{b}(:,a)';
-                        X_super_MBPLS(:, b, a) = t_MBPLS{b}(:,a);
-                        self.blocks{b}.stats.SS_col(:,a) = ssq(temp,1)';
-                        self.blocks{b}.stats.R2k_cum(:,a) = self.blocks{b}.stats.SS_col(:,a) ./ ssq_X_blocks{b}';
-                        %sum(self.blocks{b}.stats.SS_col(:,a)) / sum(ssq_X_blocks{b})                         
-                    end
-                end
-                for a = 1:A
-                    w_super_MBPLS(:,a) = X_super_MBPLS(:,:,a)' * self.Y.U(:,a) / (self.Y.U(:,a)'*self.Y.U(:,a));
-                    w_super_MBPLS(:,a) = w_super_MBPLS(:,a) / norm(w_super_MBPLS(:,a));
-                end
-                
-                self.superB = block([]);
-                
-            end
-        end % ``calc_model``
+        
         
         function state = apply(self, other, varargin)
             % Apply the existing model to a ``other`` data set.
@@ -306,14 +204,7 @@ classdef lvm
         end
                   
         
-        function self = calc_limits(self)
-            
-        end %``calc_limits``
-        
-        
-        
-        
-        
+               
         function block = apply_PCA(self, block, A, varargin)
             % Applies a PCA model to the given ``block`` of (new) data.
             % TODO(KGD): there is much similarity between this function and

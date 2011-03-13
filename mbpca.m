@@ -51,7 +51,7 @@ classdef mbpca < mblvm
                 end
                 
                 if all(ssq_before < self.opt.tolerance)
-                    warning('lvm:fit_PCA', 'There is no variance left in the data')
+                    warning('mbpca:calc_model', 'There is no variance left in the data')
                 end
                 
                 % Converge onto a single component
@@ -156,68 +156,68 @@ classdef mbpca < mblvm
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
-        function self = apply_model(self, new, state, varargin) 
+        function state = apply_model(self, new, state, varargin) 
             % Applies a PCA model to the given ``block`` of (new) data.
             % 
             % TODO(KGD): allow user to specify ``A``
             
             which_components = 1 : min(self.A);
             for a = which_components
-%                 if a == 1                
-%                     block.stats.start_SS_col = ssq(X, 1);
-%                     initial_ssq = block.stats.start_SS_col;
-%                 else
-%                     initial_ssq = ssq(X, 1);
-%                 end
-%                 % Baseline for all R^2 calculations
-%                 start_SS_col = block.stats.start_SS_col;
-%                 if all(initial_ssq < self.opt.tolerance)
-%                         warning('lvm:apply_PCA', 'There is no variance left in the data')
-%                 end    
-
-                for b = 1:self.B
-                    % Block score
-                    state.T_new{b}(:,a) = regress_func(new{b}.data, self.P{b}(:,a), new{b}.has_missing);
-                    state.T_new{b}(:,a) = state.T_new{b}(:,a) .* self.block_scaling;
-                    % Transfer it to the superscore matrix
-                    state.T_sb_new(:,b,a) = state.T_new{b}(:,a);
+                
+                initial_ssq_total = zeros(state.Nnew, 1);
+                initial_ssq = cell(1, self.B);
+                for b = 1:self.B                    
+                    initial_ssq{b} = ssq(new{b}.data, 2);
+                    initial_ssq_total = initial_ssq_total + initial_ssq{b};
+                    if a==1                        
+                        state.stats.initial_ssq{b} = initial_ssq{b};
+                        state.stats.initial_ssq_total(:,1) = initial_ssq_total;
+                    end
                 end
                 
-                % Calculate the superscore, T_new_s
-                state.T_super_new(:,a) = state.T_sb_new(:,:,a) * self.super.P(:,a);
+                if all(initial_ssq_total < self.opt.tolerance)
+                    warning('mbpca:apply_model', 'There is no variance left in one/some of the new data observations')
+                end
+                
+                for b = 1:self.B
+                    % Block score
+                    state.T{b}(:,a) = regress_func(new{b}.data, self.P{b}(:,a), new{b}.has_missing);
+                    state.T{b}(:,a) = state.T{b}(:,a) .* self.block_scaling;
+                    % Transfer it to the superscore matrix
+                    state.T_sb(:,b,a) = state.T{b}(:,a);
+                end
+                
+                % Calculate the superscore, T_super
+                state.T_super(:,a) = state.T_sb(:,:,a) * self.super.P(:,a);
                 
                 % Deflate each block: using the SUPERSCORE and the block loading
                 for b = 1:self.B
-                    new{b}.data = new{b}.data - state.T_super_new(:,a) * self.P{1}(:,a)';
+                    deflate = state.T_super(:,a) * self.P{1}(:,a)';
+                    state.stats.R2{b}(:,2) = ssq(deflate, 2) ./ state.stats.initial_ssq{b};
+                    new{b}.data = new{b}.data - deflate;
                 end            
             end % looping on ``a`` latent variables
             
             
-            % Do this for each block still
-            variance_left = 0;
+            % Summary statistics for each block and the super level
+            overall_variance = zeros(state.Nnew, 1);
             for b = 1:self.B
-                variance_left = variance_left + ssq(new{b}.data, 2);
-            end
-            state.stats.T2
-            state.stats.SPE = variance_left;
-
-            block.stats.SPE(:,a) = sqrt(row_SSX/K);
-            block.stats.deflated_SS_col(:,a) = col_SSX(:);
-            block.stats.R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
-            
-            
-            block.data = X; % Write the deflated array back to the block
+                block_variance = ssq(new{b}.data, 2);
+                overall_variance = overall_variance + block_variance;
+                state.stats.SPE{b} = sqrt(block_variance ./ self.K(b));
+            end            
+            state.stats.super.SPE(:,1) = sqrt(overall_variance ./ sum(self.K));
+            state.stats.super.T2(:,1) = mblvm.mahalanobis_distance(state.T_super);
+            state.stats.super.R2(:,1) = 1 - overall_variance ./state.stats.initial_ssq_total;
             
         end % ``apply_model``
         
         function self = calc_statistics_and_limits(self, a)
-            % Calculate summary statistics for the model. Given:
-            % ``dblock``: the deflated block of data
-            %
+            % Calculate summary statistics and limits for the model. 
             % TODO
             % ----
             % * Modelling power of each variable
-            % * Eigenvalues (still to come)
+            % * Eigenvalues
             
             % Check on maximum number of iterations
             if any(self.model.stats.itern >= self.opt.max_iter)
@@ -225,7 +225,7 @@ classdef mbpca < mblvm
                     'when calculating the latent variable(s). Please ' ...
                     'check the raw data - is it correct? and also ' ...
                     'adjust the number of iterations in the options.'];
-                warning('lvm:calculate_statistics', warn_string)
+                warning('mbpca:calc_statistics_and_limits', warn_string)
             end
            
             % Calculate the limits for the latent variable model.
@@ -275,12 +275,11 @@ classdef mbpca < mblvm
             self.super.lim.T2(a) = self.T2_limits(self.super.T(:,1:a), siglevel, a);
             self.super.lim.t(a) = self.score_limits(self.super.T(:, a), siglevel);
             
-            for b = 1:self.B                
-                self.lim{b}.SPE(a) = self.spe_limits(self.stats{b}.SPE(:,a), siglevel, self.K(b));                
+            for b = 1:self.B
+                self.lim{b}.SPE(a) = self.spe_limits(self.stats{b}.SPE(:,a), siglevel, self.K(b));
                 self.lim{b}.T2(a) = self.T2_limits(self.T{b}(:, 1:a), siglevel, a);
                 self.lim{b}.t(a) = self.score_limits(self.T{b}(:, a), siglevel);
-            end
-            
+            end            
             
         end % ``calc_statistics_and_limits``
     end % end methods (ordinary)
