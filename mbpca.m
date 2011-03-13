@@ -72,7 +72,6 @@ classdef mbpca < mblvm
                 
                 % Recover block information and store that.
                 t_superblock = zeros(self.N, self.B);
-                ssq_cumul = 0;
                 for b = 1:self.B
                     idx = self.b_iter(b);
                     X_portion  = self.data(:, idx);
@@ -91,31 +90,23 @@ classdef mbpca < mblvm
                     % Store the block scores and loadings
                     self.T{b}(:,a) = t_b;
                     self.P{b}(:,a) = p_b;
-                    
-                    % Store statistics for each block.  The part we explain by
-                    % this component is due to the *superscore*, t_a, not the
-                    % blockscore.
-                    
-                    THIS VERSION GIVES R2 that can be > 1 
-                    
+                   
+                    % Store the SS prior to deflation 
                     X_portion_hat = t_a * p_b';
-                    col_ssq = ssq(X_portion_hat, 1)';
-                    row_ssq = ssq(X_portion_hat, 2);
-                    ssq_cumul = ssq_cumul + sum(row_ssq);
-                    self.stats{b}.R2k_a(:,a) = col_ssq ./ ssq_before(1, idx)';                    
-                    self.stats{b}.R2b_a(1,a) = sum(row_ssq) / sum(self.stats{b}.start_SS_col);
-                    self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
+                    self.stats{b}.col_ssq_prior(:, a) = ssq(X_portion_hat,1);
                     
-                    ssq_after = ssq(X_portion - X_portion_hat, 2);
-                    self.stats{b}.SPE(:,a) = sqrt(ssq_after ./ numel(idx));
+                    % VIP calculations
+                    % -----------------                    
+                    ssq_after = ssq(X_portion - X_portion_hat, 1);
                     VIP_temp = zeros(self.K(b), 1);
                     for a_iter = 1:a
-                        self.stats{b}.VIP_f{a_iter,a} = self.stats{b}.SSQ_exp(1,a_iter) /  sum(self.stats{1}.SSQ_exp);
+                        denom = sum(self.stats{b}.start_SS_col - ssq_after);
+                        self.stats{b}.VIP_f{a_iter,a} = sum(self.stats{b}.col_ssq_prior(:,a_iter)) /  denom;
                         % was dividing by /(sum(self.stats{b}.start_SS_col) - sum(ssq_after));
                         VIP_temp = VIP_temp + self.P{b}(:,a_iter) .^ 2 * self.stats{b}.VIP_f{a_iter,a} * self.K(b);
                     end
                     self.stats{b}.VIP_a(:,a) = sqrt(VIP_temp);
-                    
+                
                     self.stats{b}.T2(:,a) = self.mahalanobis_distance(self.T{b}(:,1:a));
                 end
                 p_super = regress_func(t_superblock, t_a, false);
@@ -126,22 +117,28 @@ classdef mbpca < mblvm
                 
                 % Now deflate the data matrix using the superscore
                 self.data = self.data - t_a * p_a';
+                ssq_cumul = 0;
                 for b = 1:self.B
                     idx = self.b_iter(b);
                     X_portion = self.data(:, idx);
                     col_ssq = ssq(X_portion, 1)';
+                    row_ssq = ssq(X_portion, 2);
+                    ssq_cumul = ssq_cumul + sum(col_ssq);
                     
-                    
-                    THIS VERSION GIVES R2 <= 1
-                    
-                    
-                    self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ ssq_before(1, idx)';
+                    self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ self.stats{b}.start_SS_col';
                     self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
                     self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
+                    if a>1
+                        self.stats{b}.R2k_a(:,a) = self.stats{b}.R2k_a(:,a) - self.stats{b}.R2k_a(:,a-1);
+                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - self.stats{b}.R2b_a(1,a-1);
+                    end
+                    
+                    self.stats{b}.SPE(:,a) = sqrt(row_ssq ./ numel(idx));
                 end
-                    
-                    
                 
+                % TODO(KGD): sort out R2, SPE  and VIP calculations for each
+                % block. Do we use the block loading, or the overall loadings?
+                    
                 % Cumulative R2 value for the whole component
                 self.super.stats.R2(a) = ssq_cumul/sum(ssq_before);
                 

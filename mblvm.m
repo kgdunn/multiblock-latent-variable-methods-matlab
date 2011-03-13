@@ -349,8 +349,8 @@ classdef mblvm < handle
                     self.stats{b}.SPE_j = [];
 
                     self.stats{b}.start_SS_col = [];
-                    self.stats{b}.R2k_a = [];
-                    self.stats{b}.R2k_cum = [];
+                    self.stats{b}.R2k_a = [];  % not cumulative !
+                    self.stats{b}.col_ssq_prior = [];
                     self.stats{b}.R2b_a = [];
                     self.stats{b}.SSQ_exp = [];
                     self.stats{b}.VIP_a = [];
@@ -394,10 +394,15 @@ classdef mblvm < handle
                 % 1 x K(b)
                 self.stats{b}.start_SS_col = zeroexp([1, dblock.K], self.stats{b}.start_SS_col);
                 
-                % R^2 for every variable in the block, per component
+                % R^2 for every variable in the block, per component (not cumulative)
                 % K(b) x A
                 self.stats{b}.R2k_a = zeroexp([dblock.K, A], self.stats{b}.R2k_a);
                 
+                % Sum of squares for each column in the block, prior to the component
+                % being extracted.
+                % K(b) x A
+                self.stats{b}.col_ssq_prior = zeroexp([dblock.K, A], self.stats{b}.col_ssq_prior);                
+                                
                 % R^2 for the block, per component
                 % 1 x A
                 self.stats{b}.R2b_a = zeroexp([1, A], self.stats{b}.R2b_a);

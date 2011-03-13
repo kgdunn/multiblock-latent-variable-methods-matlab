@@ -1,7 +1,7 @@
 function unit_tests(varargin)
     close all;
     test_significant_figures()
-    %Wold_article_PCA_test()
+    Wold_article_PCA_test()
     MBPCA_tests()
     basic_PLS_test()
     PCA_no_missing_data()  
