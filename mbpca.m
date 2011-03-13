@@ -118,12 +118,14 @@ classdef mbpca < mblvm
                 % Now deflate the data matrix using the superscore
                 self.data = self.data - t_a * p_a';
                 ssq_cumul = 0;
+                ssq_before = 0;
                 for b = 1:self.B
                     idx = self.b_iter(b);
                     X_portion = self.data(:, idx);
                     col_ssq = ssq(X_portion, 1)';
                     row_ssq = ssq(X_portion, 2);
                     ssq_cumul = ssq_cumul + sum(col_ssq);
+                    ssq_before = ssq_before + sum(self.stats{b}.start_SS_col);
                     
                     self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ self.stats{b}.start_SS_col';
                     self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
@@ -140,7 +142,10 @@ classdef mbpca < mblvm
                 % block. Do we use the block loading, or the overall loadings?
                     
                 % Cumulative R2 value for the whole component
-                self.super.stats.R2(a) = ssq_cumul/sum(ssq_before);
+                self.super.stats.R2(a) = 1 - ssq_cumul/ssq_before;
+                if a>1
+                    self.super.stats.R2(a) = self.super.stats.R2(a) - self.super.stats.R2(a-1);
+                end
                 
                 % Store explained variance
                 self.super.stats.SSQ_exp(1,a) = ssq_cumul;
