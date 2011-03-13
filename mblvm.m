@@ -220,17 +220,17 @@ classdef mblvm < handle
             state = struct;
             for b = 1:self.B
                 % Block scores
-                state.T_new{b} = ones(Nnew, self.A);                
+                state.T_new{b} = ones(Nnew, self.A) .* NaN;
             end
             % Superblock collection of scores
-            state.T_sb_new = ones(Nnew, self.B, self.A);
+            state.T_sb_new = ones(Nnew, self.B, self.A) .* NaN;
             
             % Super scores
-            state.T_super_new = ones(Nnew, self.A);
+            state.T_super_new = ones(Nnew, self.A) .* NaN;
             
             % Summary statistics
-            state.stats.T2 = ones(Nnew, 1);
-            state.stats.SPE = ones(Nnew, 1);
+            state.stats.T2 = ones(Nnew, 1) .* NaN;
+            state.stats.SPE = ones(Nnew, 1) .* NaN;
             
             
             state = apply_model(self, newb, state); % method must be subclassed

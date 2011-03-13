@@ -186,23 +186,24 @@ classdef mbpca < mblvm
                 % Calculate the superscore, T_new_s
                 state.T_super_new(:,a) = state.T_sb_new(:,:,a) * self.super.P(:,a);
                 
-                
                 % Deflate each block: using the SUPERSCORE and the block loading
                 for b = 1:self.B
                     new{b}.data = new{b}.data - state.T_super_new(:,a) * self.P{1}(:,a)';
                 end            
-                new.A = a;
             end % looping on ``a`` latent variables
             
+            
+            % Do this for each block still
+            variance_left = 0;
+            for b = 1:self.B
+                variance_left = variance_left + ssq(new{b}.data, 2);
+            end
             state.stats.T2
-            state.stats.SPE
-            % These are the Residual Sums of Squares (RSS); i.e X-X_hat
-                row_SSX = ssq(X, 2);
-                col_SSX = ssq(X, 1);
+            state.stats.SPE = variance_left;
 
-                block.stats.SPE(:,a) = sqrt(row_SSX/K);
-                block.stats.deflated_SS_col(:,a) = col_SSX(:);
-                block.stats.R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
+            block.stats.SPE(:,a) = sqrt(row_SSX/K);
+            block.stats.deflated_SS_col(:,a) = col_SSX(:);
+            block.stats.R2k_cum(:,a) = 1 - col_SSX./start_SS_col;
             
             
             block.data = X; % Write the deflated array back to the block
