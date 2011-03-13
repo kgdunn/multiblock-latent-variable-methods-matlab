@@ -542,7 +542,7 @@ classdef mblvm < handle
             % TODO(KGD): calculate this in a smarter way. Can create unnecessarily
             % large matrices
             n = size(T, 1);
-            out = diag(T * inv((T'*T)/(n-1)) * T'); %#ok<MINV>
+            out = diag(T * inv((T'*T)/(n)) * T'); %#ok<MINV>
         end
         
         function x = finv(p,v1,v2)

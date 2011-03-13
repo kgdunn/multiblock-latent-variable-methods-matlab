@@ -1,16 +1,23 @@
 function unit_tests(varargin)
     close all;
+    
     test_significant_figures()
-    Wold_article_PCA_test()
-    MBPCA_tests()
-    basic_PLS_test()
-    PCA_no_missing_data()  
-    PLS_no_missing_data()
+    PCA_batch_data();
+    
     PCA_with_missing_data()
-    PLS_with_missing_data()
+    Wold_article_PCA_test()
+    MBPCA_tests()    
+    PCA_no_missing_data()      
+    
     
     PCA_batch_data()
     PCA_cross_validation_no_missing()
+    
+    basic_PLS_test()
+    PLS_no_missing_data()    
+    PLS_with_missing_data()
+    
+    
     
     PLS_randomization_tests()
     
@@ -163,9 +170,12 @@ function Wold_article_PCA_test()
     assertEAE(PCA_model_2.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
     assertEAE(PCA_model_2.stats{1}.VIP_a(:,2)', [1.0, 1.0, 1.0, 1.0], 4)
 
-    assertEAE(PCA_model_1.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertEAE(PCA_model_2.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertEAE(PCA_model_2.super.T2(:,2), [1.33333, 1.33333, 1.33333]', 4)
+    % Cannot test against ProSensus T2: they divide by n-1 to calculate the
+    % T-scores variance-covariance matrix. We divide by n.
+    %
+    %assertEAE(PCA_model_1.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    %assertEAE(PCA_model_2.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    %assertEAE(PCA_model_2.super.T2(:,2), [1.33333, 1.33333, 1.33333]', 4)
     
     % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
     % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
@@ -215,9 +225,12 @@ function Wold_article_PCA_test()
     assertEAE(X_new_2.T{1}(:,2), [0.6051, -0.9370, 0.3319]', 2)
     assertEAE(X_new_2.T_super(:,2), [0.6051, -0.9370, 0.3319]', 2)
     
-    assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertEAE(X_new_2.stats.super.T2(:,1), [1.33333, 1.33333, 1.33333]', 4)
+    % Cannot test against ProSensus T2: they divide by n-1 to calculate the
+    % T-scores variance-covariance matrix. We divide by n.
+    %
+    %assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    %assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    %assertEAE(X_new_2.stats.super.T2(:,1), [1.33333, 1.33333, 1.33333]', 4)
     
     % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
     % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
@@ -260,28 +273,28 @@ function PCA_no_missing_data()
     % T-scores
     scores_col = 8:9;
     T = exp_m.observations{1}.data(:, scores_col);
-    assertEAE(PCA.blocks{1}.T, T, 2);
+    assertEAE(PCA.T{1}, T, 2);
     
     % T^2
     T2_col = 2;
     T2 = exp_m.observations{1}.data(:, T2_col);
-    assertEAE(PCA.blocks{1}.stats.T2(:,PCA.A), T2, 4);
+    assertEAE(PCA.stats{1}.T2(:,PCA.A), T2, 4);
     
     % X-hat
     X_hat_col = 3:7;
     X_hat = exp_m.observations{1}.data(:, X_hat_col);
-    X_hat_calc = PCA.blocks{1}.T * PCA.blocks{1}.P';
+    X_hat_calc = PCA.T{1} * PCA.P{1}';
     assertEAE(X_hat_calc, X_hat, 2);
     
       % Loadings
     loadings_col = 1:2;
     P = exp_m.variables{1}.data(:, loadings_col);
-    assertEAE(PCA.blocks{1}.P, P, 4);
+    assertEAE(PCA.P{1}, P, 4);
     
     % R2-per variable(k)-per component(a)
     R2_col = 4:5;
     R2k_a = exp_m.variables{1}.data(:, R2_col);
-    assertEAE(PCA.blocks{1}.stats.R2k_a, R2k_a, 4);  
+    assertEAE(PCA.stats{1}.R2k_a, R2k_a, 4);  
     
 return
 
@@ -360,6 +373,8 @@ function PCA_with_missing_data()
     % Build the model
     A = 2;
     PCA = lvm({'X', X}, A);
+    
+    assertEAE(PCA.P{1}' * PCA.P{1} - eye(A), zeros(A), 1);
     
     % TODO(KGD): complete tests: check limits also.    
 return
