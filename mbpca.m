@@ -156,6 +156,9 @@ classdef mbpca < mblvm
             end % looping on ``a`` latent variables
         end % ``calc_model``
     
+        function self = apply_model(self, new) 
+        end % ``apply_model``
+        
         function self = calc_statistics_and_limits(self, a)
             % Calculate summary statistics for the model. Given:
             % ``dblock``: the deflated block of data
