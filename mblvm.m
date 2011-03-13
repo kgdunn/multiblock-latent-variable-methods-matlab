@@ -171,6 +171,39 @@ classdef mblvm < handle
     
     % Subclasses may not redefine these methods
     methods (Sealed=true)
+                
+        function self = build(self, varargin)
+            % Build the multiblock latent variable model.
+            % * preprocess the data if it has not been already
+          
+            if nargin==2 && isa(varargin{1}, 'numeric')
+                given_A = varargin{1};
+            else
+                given_A = 0;
+            end
+
+            requested_A = max([self.opt.min_lv, 0, given_A]);
+            
+            % TODO: handle the case where the model is shrunk or grown to 
+            %       a different A value.
+            % Resize the storage for ``A`` components
+            self.initialize_storage(requested_A);
+                
+            preprocess_blocks(self);       % superclass method
+            calc_model(self, requested_A); % method must be subclassed
+        end % ``build``
+        
+        function self = apply(self, varargin)
+            % Apply the multiblock latent variable model to new data.
+            % * preprocess the data if it has not been already
+            
+            new = {};
+            for b = 1:self.B
+                new{b} = self.blocks{b}.preprocess(new{b}, self.blocks{b}.PP);
+            end
+            apply_model(self, new); % method must be subclassed
+        end % ``build``
+        
         function self = create_storage(self)
             % Creates only the subfields required for each block.
             % NOTE: this function does not depend on ``A``.  That storage is
@@ -225,30 +258,7 @@ classdef mblvm < handle
            
             % Limits for various parameters in the overall model
             self.super.lim = cell({});
-            
-            
         end
-        
-        function self = build(self, varargin)
-            % Build the multiblock latent variable model.
-            % * preprocess the data if it has not been already
-          
-            if nargin==2 && isa(varargin{1}, 'numeric')
-                given_A = varargin{1};
-            else
-                given_A = 0;
-            end
-
-            requested_A = max([self.opt.min_lv, 0, given_A]);
-            
-            % TODO: handle the case where the model is shrunk or grown to 
-            %       a different A value.
-            % Resize the storage for ``A`` components
-            self.initialize_storage(requested_A);                
-                
-            preprocess_blocks(self);               % superclass method
-            calc_model(self, requested_A);         % must be subclassed
-        end % ``build``
         
         function self = initialize_storage(self, A)
             % Initializes storage matrices with the correct dimensions.
@@ -419,6 +429,9 @@ classdef mblvm < handle
             self.expand_storage(A);
         end % ``initialize_storage``
         
+        % TODO(KGD): preprocessing should be moved to its own class
+        %            where it can handle "self" preprocessing and on 
+        %            "other" blocks; and more general preprocessing options.
         function self = preprocess_blocks(self)
             % Preprocesses each block.            
             for b = 1:self.B
@@ -463,7 +476,8 @@ classdef mblvm < handle
     
     % Subclasses must redefine these methods
     methods (Abstract=true)
-        calc_model(self, A)
+        calc_model(self, A)      % fit the model to data in ``self``
+        apply_model(self, other) % applies the model to ``new`` data
         expand_storage(self, A)
     end % end: methods (abstract)
     
