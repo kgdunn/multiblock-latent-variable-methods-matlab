@@ -98,12 +98,12 @@ return
 function test_significant_figures()
 % Ensures that the tests for significant figures are correct.
 % TODO(KGD): come back to this test still.
-    assertElementsAlmostEqual(0.5412, 0.5414, 3)
-    assertExceptionThrown('assertElementsAlmostEqual:tolExceeded', ...
-                            @assertElementsAlmostEqual, 0.5412, 0.5414, 4)
-    assertElementsAlmostEqual(1.5412E-5, 1.5414E-5, 4)
-    assertExceptionThrown('assertElementsAlmostEqual:tolExceeded', ...
-                @assertElementsAlmostEqual, 1.5412E-5, 1.5414E-5, 5)
+    assertEAE(0.5412, 0.5414, 3)
+    assertExceptionThrown('assertEAE:tolExceeded', ...
+                            @assertEAE, 0.5412, 0.5414, 4)
+    assertEAE(1.5412E-5, 1.5414E-5, 4)
+    assertExceptionThrown('assertEAE:tolExceeded', ...
+                @assertEAE, 1.5412E-5, 1.5414E-5, 5)
     %1.5412 == 1.5414       is True if sig_figs = 4, but False if sig_figs = 5
     %1.5412E-5 == 1.5414E-5 is True if sig_figs = 4, but False if sig_figs = 5
     %1.5412E+5 == 1.5414E+5 is True if sig_figs = 4, but False if sig_figs = 5
@@ -132,75 +132,75 @@ function Wold_article_PCA_test()
     %  P.T = [ 0.5410, 0.3493,  0.5410,  0.5410],
     %        [-0.2017, 0.9370, -0.2017, -0.2017]])
     P = PCA_model_2.P{1};
-    assertElementsAlmostEqual(P(:,1), [0.5410, 0.3493, 0.5410, 0.5410]', 2);
-    assertElementsAlmostEqual(P(:,2), [-0.2017, 0.9370, -0.2017, -0.2017]', 2);
+    assertEAE(P(:,1), [0.5410, 0.3493, 0.5410, 0.5410]', 2);
+    assertEAE(P(:,2), [-0.2017, 0.9370, -0.2017, -0.2017]', 2);
 
     T = PCA_model_2.T{1};
-    assertElementsAlmostEqual(T(:,1), [-1.6229, -0.3493, 1.9723]', 2)
-    assertElementsAlmostEqual(T(:,2), [0.6051, -0.9370, 0.3319]', 2)
+    assertEAE(T(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertEAE(T(:,2), [0.6051, -0.9370, 0.3319]', 2)
     
     
     % R2 values, given on page 43
     R2b_a = PCA_model_2.stats{1}.R2b_a;
-    assertElementsAlmostEqual(R2b_a, [0.831, 0.169], 2)
+    assertEAE(R2b_a, [0.831, 0.169], 2)
 
     % SS values, on page 43
     SS_X = ssq(PCA_model_2.data, 1);
-    assertElementsAlmostEqual(SS_X, [0.0, 0.0, 0.0, 0.0], 3)
+    assertEAE(SS_X, [0.0, 0.0, 0.0, 0.0], 3)
 
     % The remaining sum of squares, on page 43
     SS_X = ssq(PCA_model_1.data, 1);
-    assertElementsAlmostEqual(SS_X, [0.0551, 1.189, 0.0551, 0.0551], 3)
+    assertEAE(SS_X, [0.0551, 1.189, 0.0551, 0.0551], 3)
     
     
     % Superblock VIP's for single-block models = 1.0
-    assertElementsAlmostEqual(PCA_model_1.super.stats.VIP(1), 1.0, 8);
-    assertElementsAlmostEqual(PCA_model_2.super.stats.VIP(1), 1.0, 8);
-    assertElementsAlmostEqual(PCA_model_2.super.stats.VIP(2), 1.0, 8);
+    assertEAE(PCA_model_1.super.stats.VIP(1), 1.0, 8);
+    assertEAE(PCA_model_2.super.stats.VIP(1), 1.0, 8);
+    assertEAE(PCA_model_2.super.stats.VIP(2), 1.0, 8);
     
     % These are relative to ProSensus Multivariate Trial version, 2010, Revision 302
-    assertElementsAlmostEqual(PCA_model_1.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
-    assertElementsAlmostEqual(PCA_model_2.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
-    assertElementsAlmostEqual(PCA_model_2.stats{1}.VIP_a(:,2)', [1.0, 1.0, 1.0, 1.0], 4)
+    assertEAE(PCA_model_1.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
+    assertEAE(PCA_model_2.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
+    assertEAE(PCA_model_2.stats{1}.VIP_a(:,2)', [1.0, 1.0, 1.0, 1.0], 4)
 
-    assertElementsAlmostEqual(PCA_model_1.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertElementsAlmostEqual(PCA_model_2.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertElementsAlmostEqual(PCA_model_2.super.T2(:,2), [1.33333, 1.33333, 1.33333]', 4)
+    assertEAE(PCA_model_1.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertEAE(PCA_model_2.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertEAE(PCA_model_2.super.T2(:,2), [1.33333, 1.33333, 1.33333]', 4)
     
     % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
     % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
     ProMV_values = [0.366107, 0.877964, 0.110178];
     ProMV_values = sqrt(ProMV_values ./ 4);
-    assertElementsAlmostEqual(PCA_model_1.super.SPE(:,1), ProMV_values', 4)
-    assertElementsAlmostEqual(PCA_model_2.super.SPE(:,1), ProMV_values', 4)    
-    assertElementsAlmostEqual(PCA_model_2.super.SPE(:,2), [0, 0, 0]', 4)
+    assertEAE(PCA_model_1.super.SPE(:,1), ProMV_values', 4)
+    assertEAE(PCA_model_2.super.SPE(:,1), ProMV_values', 4)    
+    assertEAE(PCA_model_2.super.SPE(:,2), [0, 0, 0]', 4)
     
     % Statistical limits
-    assertElementsAlmostEqual(PCA_model_1.super.lim.T2, 24.684, 3)
-    assertElementsAlmostEqual(PCA_model_1.super.lim.SPE, sqrt(1.2236/4), 4)
-    assertElementsAlmostEqual(PCA_model_1.super.lim.t, 7.8432, 4)
+    assertEAE(PCA_model_1.super.lim.T2, 24.684, 3)
+    assertEAE(PCA_model_1.super.lim.SPE, sqrt(1.2236/4), 4)
+    assertEAE(PCA_model_1.super.lim.t, 7.8432, 4)
     
     
     % Testing data.  2 rows of new observations.
     X_test_raw = [3, 4, 3, 4; 1, 2, 3, 4.0];
     X_test = block(X_test_raw);
-    assertElementsAlmostEqual(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
+    assertEAE(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
     
     % Apply the new data to an existing model
     testing_type_A = PCA_model_1.apply({'X', X_test});      % send in a block variable
     testing_type_B = PCA_model_1.apply({'X', X_test_raw});  % send in a raw array 
-    assertElementsAlmostEqual(testing_type_A.T{1}, [-0.2705, -2.0511]', 4)
-    assertElementsAlmostEqual(testing_type_B.T{1}, [-0.2705, -2.0511]', 4)
+    assertEAE(testing_type_A.T{1}, [-0.2705, -2.0511]', 4)
+    assertEAE(testing_type_B.T{1}, [-0.2705, -2.0511]', 4)
     
     % Extract a second component
     X_test_raw = [3, 4, 3, 4; 1, 2, 3, 4.0];
     X_test = block(X_test_raw);
-    assertElementsAlmostEqual(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
+    assertEAE(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
     
     testing_type_C = PCA_model_2.apply({'X', X_test});      % send in a block variable
     testing_type_D = PCA_model_2.apply({'X', X_test_raw});  % send in a raw array 
-    assertElementsAlmostEqual(testing_type_C.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
-    assertElementsAlmostEqual(testing_type_D.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
+    assertEAE(testing_type_C.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
+    assertEAE(testing_type_D.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     
         
     % Applying the model to the training data should give identical results
@@ -208,25 +208,25 @@ function Wold_article_PCA_test()
     X_new_1 = PCA_model_1.apply({'X', X_new});
     X_new_2 = PCA_model_2.apply({'X', X_new});
     
-    assertElementsAlmostEqual(X_new_1.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
-    assertElementsAlmostEqual(X_new_1.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
-    assertElementsAlmostEqual(X_new_2.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
-    assertElementsAlmostEqual(X_new_2.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
-    assertElementsAlmostEqual(X_new_2.T{1}(:,2), [0.6051, -0.9370, 0.3319]', 2)
-    assertElementsAlmostEqual(X_new_2.T_super(:,2), [0.6051, -0.9370, 0.3319]', 2)
+    assertEAE(X_new_1.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertEAE(X_new_1.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertEAE(X_new_2.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertEAE(X_new_2.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
+    assertEAE(X_new_2.T{1}(:,2), [0.6051, -0.9370, 0.3319]', 2)
+    assertEAE(X_new_2.T_super(:,2), [0.6051, -0.9370, 0.3319]', 2)
     
-    assertElementsAlmostEqual(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertElementsAlmostEqual(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
-    assertElementsAlmostEqual(X_new_2.stats.super.T2(:,1), [1.33333, 1.33333, 1.33333]', 4)
+    assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertEAE(X_new_2.stats.super.T2(:,1), [1.33333, 1.33333, 1.33333]', 4)
     
     % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
     % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
     ProMV_values = [0.366107, 0.877964, 0.110178];
     ProMV_values = sqrt(ProMV_values ./ 4);
     
-    assertElementsAlmostEqual(X_new_1.stats.SPE{1}, ProMV_values', 4)
-    assertElementsAlmostEqual(X_new_1.stats.super.SPE(:,1), ProMV_values', 4)
-    assertElementsAlmostEqual(X_new_2.stats.SPE{1}, [0, 0, 0]', 4)
+    assertEAE(X_new_1.stats.SPE{1}, ProMV_values', 4)
+    assertEAE(X_new_1.stats.super.SPE(:,1), ProMV_values', 4)
+    assertEAE(X_new_2.stats.SPE{1}, [0, 0, 0]', 4)
 return
 
 function basic_PLS_test()
@@ -247,7 +247,7 @@ function PCA_no_missing_data()
     % Test that mean centering and scaling are correct
     X = block(raw_data.blocks{1});
     X = X.preprocess();
-    assertElementsAlmostEqual(X.data, raw_data.scaled_blocks{1}, 4)
+    assertEAE(X.data, raw_data.scaled_blocks{1}, 4)
     
     % Build the PCA model with LVM.m
     % ------------------------------
@@ -260,28 +260,28 @@ function PCA_no_missing_data()
     % T-scores
     scores_col = 8:9;
     T = exp_m.observations{1}.data(:, scores_col);
-    assertElementsAlmostEqual(PCA.blocks{1}.T, T, 2);
+    assertEAE(PCA.blocks{1}.T, T, 2);
     
     % T^2
     T2_col = 2;
     T2 = exp_m.observations{1}.data(:, T2_col);
-    assertElementsAlmostEqual(PCA.blocks{1}.stats.T2(:,PCA.A), T2, 4);
+    assertEAE(PCA.blocks{1}.stats.T2(:,PCA.A), T2, 4);
     
     % X-hat
     X_hat_col = 3:7;
     X_hat = exp_m.observations{1}.data(:, X_hat_col);
     X_hat_calc = PCA.blocks{1}.T * PCA.blocks{1}.P';
-    assertElementsAlmostEqual(X_hat_calc, X_hat, 2);
+    assertEAE(X_hat_calc, X_hat, 2);
     
       % Loadings
     loadings_col = 1:2;
     P = exp_m.variables{1}.data(:, loadings_col);
-    assertElementsAlmostEqual(PCA.blocks{1}.P, P, 4);
+    assertEAE(PCA.blocks{1}.P, P, 4);
     
     % R2-per variable(k)-per component(a)
     R2_col = 4:5;
     R2k_a = exp_m.variables{1}.data(:, R2_col);
-    assertElementsAlmostEqual(PCA.blocks{1}.stats.R2k_a, R2k_a, 4);  
+    assertEAE(PCA.blocks{1}.stats.R2k_a, R2k_a, 4);  
     
 return
 
@@ -295,11 +295,11 @@ function PLS_no_missing_data()
     % Test that mean centering and scaling are correct
     X = block(raw_data.blocks{1});
     X = X.preprocess();
-    assertElementsAlmostEqual(X.data, raw_data.scaled_blocks{1}, 2)
+    assertEAE(X.data, raw_data.scaled_blocks{1}, 2)
     
     Y = block(raw_data.blocks{2});
     Y = Y.preprocess();
-    assertElementsAlmostEqual(Y.data, raw_data.scaled_blocks{2}, 4)
+    assertEAE(Y.data, raw_data.scaled_blocks{2}, 4)
     
     % Build the PCA model with LVM.m
     % ------------------------------
@@ -312,34 +312,34 @@ function PLS_no_missing_data()
     % T-scores
     scores_col = 3:8;
     T = exp_m.observations{1}.data(:, scores_col);
-    assertElementsAlmostEqual(PLS.blocks{1}.T, T, 2, true);
+    assertEAE(PLS.blocks{1}.T, T, 2, true);
     
     % T^2
     T2_col = 2;
     T2 = exp_m.observations{1}.data(:, T2_col);
-    assertElementsAlmostEqual(PLS.blocks{1}.stats.T2(:,PLS.A), T2, 4);
+    assertEAE(PLS.blocks{1}.stats.T2(:,PLS.A), T2, 4);
     
     % Y-hat
     Y_hat_col = 7:11;
     Y_hat = exp_m.observations{2}.data(:, Y_hat_col);
     Y_hat_calc = PLS.blocks{2}.data_pred;
     Y_hat_PP = PLS.blocks{2}.preprocess(block(Y_hat_calc));
-    assertElementsAlmostEqual(Y_hat_PP.data, Y_hat, 2);
+    assertEAE(Y_hat_PP.data, Y_hat, 2);
     
     % W-Loadings
     loadings_col = 1:6;
     W = exp_m.variables{1}.data(:, loadings_col);
-    assertElementsAlmostEqual(PLS.blocks{1}.W, W, 3, true);
+    assertEAE(PLS.blocks{1}.W, W, 3, true);
     
     % R2-per variable(k)-cumulative: X-space
     R2X_col = 24;
     R2kX_cum = exp_m.variables{1}.data(:, R2X_col);
-    assertElementsAlmostEqual(PLS.blocks{1}.stats.R2k_cum(:,end), R2kX_cum, 4); 
+    assertEAE(PLS.blocks{1}.stats.R2k_cum(:,end), R2kX_cum, 4); 
     
     % R2-per variable(k)-per component(a): Y-space
     R2Y_col = 8;
     R2kY_cum = exp_m.variables{2}.data(:, R2Y_col);
-    assertElementsAlmostEqual(PLS.blocks{2}.stats.R2k_cum(:,end), R2kY_cum, 4); 
+    assertEAE(PLS.blocks{2}.stats.R2k_cum(:,end), R2kY_cum, 4); 
     
     % TODO(KGD): Coefficients
 
@@ -407,9 +407,9 @@ function PCA_batch_data()
     
     batchspc_data = load('tests/SBR-batchspc.mat');
     
-    assertElementsAlmostEqual([.17085, .100531]', batch_PCA.X.stats.R2_a, 5)
-    assertElementsAlmostEqual(batchspc_data.t, batch_PCA.X.T, 2, true)
-    assertElementsAlmostEqual(batchspc_data.p, batch_PCA.X.P, 2, true)
+    assertEAE([.17085, .100531]', batch_PCA.X.stats.R2_a, 5)
+    assertEAE(batchspc_data.t, batch_PCA.X.T, 2, true)
+    assertEAE(batchspc_data.p, batch_PCA.X.P, 2, true)
     
     fprintf('OK\n');
     
@@ -565,7 +565,6 @@ function MBPCA_tests()
     X_1 = block(X1_raw(:, block_1_vars));
     X_2 = block(X1_raw(:, block_2_vars));
     
-    % Preprocess the data (center and scale)
     X_raw = {X_1, X_2};    
 
     % ---------------------------------------------------------------------------
@@ -665,9 +664,6 @@ function MBPCA_tests()
 
     end
 
-    % assert R2_a, overall = [26.16, 18.96]
-
-
     % ---------------------------------------------------------------------------
     % Full multiblock approach to calculating scores and loadings for each block, 
     % as well as getting summary scores and loadings (super block).
@@ -759,13 +755,13 @@ function MBPCA_tests()
 
     end
 
-    norm(abs(T) - abs(T_s))
-    norm(abs(T_sum_recovered(:)) - abs(T_sum(:)))
-    norm(abs(P_s_recovered) - abs(P_s))
+    assertTrue(norm(abs(T) - abs(T_s)) < sqrt(eps))
+    assertTrue(norm(abs(T_sum_recovered(:)) - abs(T_sum(:))) < sqrt(eps))
+    assertTrue(norm(abs(P_s_recovered) - abs(P_s)) < sqrt(eps))
 
     for b = 1:B
-        norm(abs(T_b_recovered{b}) - abs(T_b{b}))
-        norm(abs(P_b_recovered{b}) - abs(P_b{b}))
+        assertTrue(norm(abs(T_b_recovered{b}) - abs(T_b{b})) < sqrt(eps))
+        assertTrue(norm(abs(P_b_recovered{b}) - abs(P_b{b})) < sqrt(eps))
     end
 
 
@@ -783,9 +779,11 @@ function MBPCA_tests()
         X_new = cell(1, B);
         t_new = cell(1, B);
         t_new_s = zeros(1, A);
+        
         for b = 1:B
-            X_new{b} = X_raw{b}.data_raw(n,:);
-            X_new{b} = (X_new{b} - X_raw{b}.PP.mean_center) .* X_raw{b}.PP.scaling;
+            X_new{b} = X_raw{b}.data(n,:);
+            % Data are already preprocessed
+            % X_new{b} = (X_new{b} - X_raw{b}.PP.mean_center) .* X_raw{b}.PP.scaling;
         end
         for a = 1:A
             for b = 1:B
@@ -805,11 +803,26 @@ function MBPCA_tests()
         end
         T_pred_super(n,:) = t_new_s;
     end
-    norm(abs(T_pred_super) - abs(T_s))
+    assertTrue(norm(abs(T_pred_super) - abs(T_s)) < sqrt(eps))
     for b = 1:B
-        norm(abs(T_pred_block{b}) - abs(T_b_recovered{b}))
+        assertTrue(norm(abs(T_pred_block{b}) - abs(T_b_recovered{b})) < sqrt(eps))
     end
 
+    
+    % The above code was purely the reference version from which "mbpca" was
+    % written.  Now test the mbpca gives the same results
+    X_1 = block(X1_raw(:, block_1_vars), 'X1');
+    X_2 = block(X1_raw(:, block_2_vars), 'X2');
+    
+    mbmodel = lvm({'X1', X_1, 'X2', X_2}, 2);
+    
+    % Compare block scores and super scores (tolerance levels are different
+    % between the models)
+    assertEAE(mbmodel.T{1},            T_b{1}, 5, true)
+    assertEAE(mbmodel.T{2},            T_b{2}, 5, true)    
+    assertEAE(mbmodel.super.T_summary, T_sum,  5, true)
+    assertEAE(mbmodel.super.T,         T_s,    5, true)
+    
 
 return
 % =========================================================================
@@ -887,12 +900,12 @@ if ~condition
    throwAsCaller(MException('assertTrue:falseCondition', '%s', message));
 end
 
-function assertElementsAlmostEqual(A, B, sigfigs, ignore_sign)
+function assertEAE(A, B, sigfigs, ignore_sign)
 % KGD: original code description below.  In this case, sigfigs = number of
 % significant figures.
 
-%assertElementsAlmostEqual Assert floating-point array elements almost equal.
-%   assertElementsAlmostEqual(A, B, tol_type, tol, floor_tol) asserts that all
+%assertEAE Assert floating-point array elements almost equal.
+%   assertEAE(A, B, tol_type, tol, floor_tol) asserts that all
 %   elements of floating-point arrays A and B are equal within some tolerance.
 %   tol_type can be 'relative' or 'absolute'.  tol and floor_tol are scalar
 %   tolerance values.
@@ -916,7 +929,7 @@ function assertElementsAlmostEqual(A, B, sigfigs, ignore_sign)
 %   Corresponding elements in A and B that are both NaN, or are both infinite
 %   with the same sign, are considered to pass the tolerance test.
 %
-%   assertElementsAlmostEqual(A, B, ..., msg) prepends the string msg to the
+%   assertEAE(A, B, ..., msg) prepends the string msg to the
 %   output message if A and B fail the tolerance test.
 
 %   Steven L. Eddins
@@ -928,13 +941,13 @@ end
 
 if ~isequal(size(A), size(B))
     message = 'Inputs are not the same size.';
-    throwAsCaller(MException('assertElementsAlmostEqual:sizeMismatch', ...
+    throwAsCaller(MException('assertEAE:sizeMismatch', ...
         '%s', message));
 end
 
 if ~(isfloat(A) && isfloat(B))
     message = 'Inputs are not both floating-point.';
-    throwAsCaller(MException('assertElementsAlmostEqual:notFloat', ...
+    throwAsCaller(MException('assertEAE:notFloat', ...
         '%s', message));
 end
 
@@ -967,7 +980,7 @@ same = all(delta <= reltol);
 
 if ~same || return_early
     tolerance_message = sprintf('Input elements are not all equal within a relative tolerance of %g', reltol);
-    throwAsCaller(MException('assertElementsAlmostEqual:tolExceeded', ...
+    throwAsCaller(MException('assertEAE:tolExceeded', ...
         '%s', tolerance_message));
 end
 

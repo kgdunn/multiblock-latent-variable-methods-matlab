@@ -71,7 +71,6 @@ classdef mbpca < mblvm
                 self.model.stats.itern(a) = itern;
                 
                 % Recover block information and store that.
-                % TODO(KGD): optimize so we don't repeat this for single block                
                 t_superblock = zeros(self.N, self.B);
                 ssq_cumul = 0;
                 for b = 1:self.B
@@ -118,13 +117,12 @@ classdef mbpca < mblvm
                 end
                 p_super = regress_func(t_superblock, t_a, false);
                      
-                
+                self.super.T_summary(:,:,a) = t_superblock;
                 self.super.T(:,a) = t_a;
                 self.super.P(:,a) = p_super;
                 
-                % Now deflate the data matrix
+                % Now deflate the data matrix using the superscore
                 self.data = self.data - t_a * p_a';
-                
                 
                 % Cumulative R2 value for the whole component
                 self.super.stats.R2(a) = ssq_cumul/sum(ssq_before);

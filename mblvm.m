@@ -277,11 +277,18 @@ classdef mblvm < handle
             
             % Super block parameters
             self.super = struct();
+            
+            % Collected scores from the block into the super level
+            % N x B x A
+            self.super.T_summary = [];
             % Superblock scores
+            % N x A
             self.super.T = [];
             % Superblock's loadings (used in PCA only)
+            % B x A
             self.super.P = [];    
             % Superblocks's weights (used in PLS only)
+            % B x A
             self.super.W = [];   
             % R2 for each component for the overall model
             self.super.stats.R2 = [];
@@ -445,7 +452,12 @@ classdef mblvm < handle
             end
             
             % Superblock storage
-            self.super.T = zeroexp([self.N, self.B, A], self.super.T); 
+            % ------------------
+            
+            % Summary scores from each block: these match self.T{b}, so we
+            % don't really need to store them in the superblock structure.
+            self.super.T_summary = zeroexp([self.N, self.B, A], self.super.T_summary);
+            self.super.T = zeroexp([self.N, A], self.super.T);
             self.super.P = zeroexp([self.B, A], self.super.P);
             self.super.W = zeroexp([self.B, A], self.super.W);
             
@@ -892,6 +904,9 @@ classdef mblvm < handle
             % Calculates the T2 limits from columns of ``scores`` at
             % significance ``levels``.  Uses from 1 to ``A`` columns in
             % scores.
+            
+            % TODO(KGD): take the covariance in ``scores`` into account to
+            % calculate the elliptical confidence interval for T2.
             
             n = size(scores, 1);
             mult = A*(n-1)*(n+1)/(n*(n-A));
