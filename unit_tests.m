@@ -1,4 +1,4 @@
-function tests(varargin)
+function unit_tests(varargin)
     close all;
     test_significant_figures()
     Wold_article_PCA_test()
@@ -124,7 +124,7 @@ function Wold_article_PCA_test()
     assertTrue(all(PCA_model_2.PP{1}.mean_center == [4, 4, 4, 3]));
 
     % The (inverted) scaling vector [1, 1, 0.5, 1], page 40
-    assertTrue(all(PCA_model_2.PP{2}.scaling == [1, 1, 0.5, 1]));
+    assertTrue(all(PCA_model_2.PP{1}.scaling == [1, 1, 0.5, 1]));
     
     % With 2 components, the loadings are, page 40
     %  P.T = [ 0.5410, 0.3493,  0.5410,  0.5410],
@@ -137,20 +137,48 @@ function Wold_article_PCA_test()
     assertElementsAlmostEqual(T(:,1), [-1.6229, -0.3493, 1.9723]', 2)
     assertElementsAlmostEqual(T(:,2), [0.6051, -0.9370, 0.3319]', 2)
     
-    Tests for VIP, T2 and SPE
-
+    
     % R2 values, given on page 43
-    R2_a = PCA_model_2.stats{1}.R2_a;
-    assertElementsAlmostEqual(R2_a, [0.831; 0.169], 2)
+    R2b_a = PCA_model_2.stats{1}.R2b_a;
+    assertElementsAlmostEqual(R2b_a, [0.831, 0.169], 2)
 
     % SS values, on page 43
-    SS_X = ssq(PCA_model_2.blocks{1}.data, 1);
+    SS_X = ssq(PCA_model_2.data, 1);
     assertElementsAlmostEqual(SS_X, [0.0, 0.0, 0.0, 0.0], 3)
 
     % The remaining sum of squares, on page 43
-    SS_X = ssq(PCA_model_1.blocks{1}.data, 1);
+    SS_X = ssq(PCA_model_1.data, 1);
     assertElementsAlmostEqual(SS_X, [0.0551, 1.189, 0.0551, 0.0551], 3)
+    
+    
+    % Superblock VIP's for single-block models = 1.0
+    assertElementsAlmostEqual(PCA_model_1.super.stats.VIP(1), 1.0, 8);
+    assertElementsAlmostEqual(PCA_model_2.super.stats.VIP(1), 1.0, 8);
+    assertElementsAlmostEqual(PCA_model_2.super.stats.VIP(2), 1.0, 8);
+    
+    % These are relative to ProSensus Multivariate Trial version, 2010, Revision 302
+    assertElementsAlmostEqual(PCA_model_1.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
+    assertElementsAlmostEqual(PCA_model_2.stats{1}.VIP_a(:,1)', [1.082, 0.6987, 1.082, 1.082], 4)
+    assertElementsAlmostEqual(PCA_model_2.stats{1}.VIP_a(:,2)', [1.0, 1.0, 1.0, 1.0], 4)
 
+    assertElementsAlmostEqual(PCA_model_1.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertElementsAlmostEqual(PCA_model_2.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
+    assertElementsAlmostEqual(PCA_model_2.super.T2(:,2), [1.33333, 1.33333, 1.33333]', 4)
+    
+    % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
+    % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
+    ProMV_values = [0.366107, 0.877964, 0.110178];
+    ProMV_values = sqrt(ProMV_values ./ 4);
+    assertElementsAlmostEqual(PCA_model_1.super.SPE(:,1), ProMV_values', 4)
+    assertElementsAlmostEqual(PCA_model_2.super.SPE(:,1), ProMV_values', 4)    
+    assertElementsAlmostEqual(PCA_model_2.super.SPE(:,2), [0.792655, 0.036726, 1.1706]', 4)
+    
+    % Statistical limits
+    assertElementsAlmostEqual(PCA_model_1.super.lim.T2, 24.684, 3)
+    assertElementsAlmostEqual(PCA_model_1.super.lim.SPE, sqrt(1.2236/4), 4)
+    assertElementsAlmostEqual(PCA_model_1.super.lim.t, 7.8432, 4)
+    
+    
     % Testing data.  2 rows of new observations.
     X_test_raw = [3, 4, 3, 4; 1, 2, 3, 4.0];
     X_test = block(X_test_raw);
@@ -164,6 +192,10 @@ function Wold_article_PCA_test()
     testing_type_D = PCA_model_2.apply({'X', X_test_raw});  % send in a raw array 
     assertElementsAlmostEqual(testing_type_C.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     assertElementsAlmostEqual(testing_type_D.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
+    
+    
+    
+
 return
 
 function basic_PLS_test()

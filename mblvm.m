@@ -37,8 +37,12 @@ classdef mblvm < handle
         % Specific to batch models
         T_j = [];    % Instantaneous scores
         error_j = [];% Instantaneous errors
-        
-        
+    end 
+    
+    % Only set by this class and subclasses
+    properties (SetAccess = protected)
+        data = [];
+        has_missing = false;
     end
     
     % Subclasses may choose to redefine these methods
@@ -79,7 +83,7 @@ classdef mblvm < handle
             end
             
             % Create storage structures
-            self = self.create_storage();
+            self.create_storage();
              
         end % ``lvm``
         
@@ -209,13 +213,16 @@ classdef mblvm < handle
             self.super.W = [];   
             % R2 for each component for the overall model
             self.super.stats.R2 = [];
-            % SPE, after each component, for the overall model
-            self.super.stats.SPE = [];            
-            % T2, using all components 1:A, for the overall model
-            self.super.stats.T2 = [];            
+            self.super.stats.SSQ_exp = [];
             % The VIP for each block, and the VIP calculation factor
             self.super.stats.VIP = [];
             self.super.stats.VIP_f = cell({});
+            
+            % SPE, after each component, for the overall model
+            self.super.SPE = [];            
+            % T2, using all components 1:A, for the overall model
+            self.super.T2 = [];            
+           
             % Limits for various parameters in the overall model
             self.super.lim = cell({});
             
@@ -237,10 +244,10 @@ classdef mblvm < handle
             % TODO: handle the case where the model is shrunk or grown to 
             %       a different A value.
             % Resize the storage for ``A`` components
-            self = self.initialize_storage(requested_A);                
+            self.initialize_storage(requested_A);                
                 
-            self = preprocess_blocks(self);               % superclass method
-            self = calc_model(self, requested_A);         % must be subclassed
+            preprocess_blocks(self);               % superclass method
+            calc_model(self, requested_A);         % must be subclassed
         end % ``build``
         
         function self = initialize_storage(self, A)
@@ -256,7 +263,7 @@ classdef mblvm < handle
             % then wipe out all storage, and resize to match the number of
             % blocks.
             if numel(self.P) ~= self.B
-                self = create_storage(self);
+                create_storage(self);
             end
             
             self.model.stats.timing = zeroexp([A, 1], self.model.stats.timing);
@@ -289,7 +296,7 @@ classdef mblvm < handle
                     self.stats{b}.R2k_a = [];
                     self.stats{b}.R2k_cum = [];
                     self.stats{b}.R2b_a = [];
-                    self.stats{b}.R2 = [];
+                    self.stats{b}.SSQ_exp = [];
                     self.stats{b}.VIP_a = [];
                     %self.stats{b}.VIP_f = cell({});
 
@@ -316,8 +323,6 @@ classdef mblvm < handle
                     self.super.lim.SPE = [];
                 end
                 
-                
-
                 % SPE per block
                 % N x A
                 self.stats{b}.SPE = zeroexp([dblock.N, A], self.stats{b}.SPE);
@@ -340,6 +345,10 @@ classdef mblvm < handle
                 % R^2 for the block, per component
                 % 1 x A
                 self.stats{b}.R2b_a = zeroexp([1, A], self.stats{b}.R2b_a);
+                
+                % Sum of squares explained for this component
+                % 1 x A
+                self.stats{b}.SSQ_exp = zeroexp([1, A], self.stats{b}.SSQ_exp);
 
                 % VIP value using all 1:A components (only last column is useful though)
                 % K(b) x A
@@ -391,22 +400,20 @@ classdef mblvm < handle
             self.super.P = zeroexp([self.B, A], self.super.P);
             self.super.W = zeroexp([self.B, A], self.super.W);
             
-            self.super.stats.R2 = zeroexp([A, 1], self.super.stats.R2);
-            self.super.stats.T2 = zeroexp([A, 1], self.super.stats.R2);
-            self.super.stats.SPE = zeroexp([self.N, A], self.super.stats.SPE);
-            
             % T2, using all components 1:A, in the superblock
-            self.super.stats.T2 = zeroexp([self.N, A], self.super.stats.T2);
-            
-            % The VIP's for each block, and the VIP calculation factor
-            self.super.stats.VIP = zeroexp([self.B, 1], self.super.stats.VIP);
-            %self.super.stats.VIP_f = cell({});
+            self.super.T2 = zeroexp([self.N, A], self.super.T2);
             
             % Limits for superscore entities
             self.super.lim.t = zeroexp([1, A], self.super.lim.t);
             self.super.lim.T2 = zeroexp([1, A], self.super.lim.T2);            
             self.super.lim.SPE = zeroexp([1, A], self.super.lim.SPE);
-                
+            
+            % Statistics in the superblock
+            self.super.stats.R2 = zeroexp([1, A], self.super.stats.R2);
+            self.super.stats.SSQ_exp = zeroexp([1, A], self.super.stats.R2);
+            % The VIP's for each block, and the VIP calculation factor
+            self.super.stats.VIP = zeroexp([self.B, 1], self.super.stats.VIP);
+            %self.super.stats.VIP_f = cell({});
             
             % Give the subclass the chance to expand storage, if required
             self.expand_storage(A);
@@ -456,8 +463,8 @@ classdef mblvm < handle
     
     % Subclasses must redefine these methods
     methods (Abstract=true)
-        self = calc_model(self, A)
-        self = expand_storage(self, A)
+        calc_model(self, A)
+        expand_storage(self, A)
     end % end: methods (abstract)
     
     methods (Sealed=true, Static=true)
@@ -468,6 +475,132 @@ classdef mblvm < handle
             out = diag(T * inv((T'*T)/(n-1)) * T'); %#ok<MINV>
         end
         
+        function x = finv(p,v1,v2)
+            %FINV   Inverse of the F cumulative distribution function.
+            %   X=FINV(P,V1,V2) returns the inverse of the F distribution 
+            %   function with V1 and V2 degrees of freedom, at the values in P.
+            %   Copyright 1993-2004 The MathWorks, Inc.
+            %   $Revision: 2.12.2.5 $  $Date: 2004/12/06 16:37:23 $
+
+            % NOTE: This function is a pure copy and paste of the relevant parts of the Matlab statistical toolbox function "finv.m"
+            % Please use the Statistical Toolbox function, if you have the toolbox
+
+            % Guarantees:  0 < p < 1    :    The original stats toolbox function handles the case of p=0 and p=1
+            %              v1 > 0
+            %              v2 > 0
+            z = mblvm.betainv(1 - p,v2/2,v1/2);
+            x = (v2 ./ z - v2) ./ v1;
+        end
+
+        function x = betainv(p,a,b)
+            %BETAINV Inverse of the beta cumulative distribution function (cdf).
+            %   X = BETAINV(P,A,B) returns the inverse of the beta cdf with 
+            %   parameters A and B at the values in P.
+            %   Copyright 1993-2004 The MathWorks, Inc. 
+            %   $Revision: 2.11.2.5 $  $Date: 2004/12/06 16:37:01 $
+
+            %x = zeros(size(p));
+            seps = sqrt(eps);
+
+            % Newton's Method: permit no more than count_limit interations.
+            count_limit = 100;
+            count = 0;
+
+            %   Use the mean as a starting guess. 
+            xk = a ./ (a + b);
+
+            % Move starting values away from the boundaries.
+            xk(xk==0) = seps;
+            xk(xk==1) = 1 - seps;
+            h = ones(size(p));
+            crit = seps;
+
+            % Break out of the iteration loop for the following:
+            %  1) The last update is very small (compared to x).
+            %  2) The last update is very small (compared to 100*eps).
+            %  3) There are more than 100 iterations. This should NEVER happen. 
+            while(any(abs(h) > crit * abs(xk)) && max(abs(h)) > crit && count < count_limit), 
+                count = count+1;    
+                h = (mblvm.betacdf(xk,a,b) - p) ./ mblvm.betapdf(xk,a,b);
+                xnew = xk - h;
+
+            % Make sure that the values stay inside the bounds.
+            % Initially, Newton's Method may take big steps.
+                ksmall = find(xnew <= 0);
+                klarge = find(xnew >= 1);
+                if any(ksmall) || any(klarge)
+                    xnew(ksmall) = xk(ksmall) /10;
+                    xnew(klarge) = 1 - (1 - xk(klarge))/10;
+                end
+                xk = xnew;  
+            end
+
+            % Return the converged value(s).
+            x = xk;
+
+            if count==count_limit, 
+                fprintf('\nWarning: BETAINV did not converge.\n');
+                str = 'The last step was:  ';
+                outstr = sprintf([str,'%13.8f\n'],max(h(:)));
+                fprintf(outstr);
+            end
+        end
+
+        function p = betacdf(x,a,b)
+            %BETACDF Beta cumulative distribution function.
+            %   P = BETACDF(X,A,B) returns the beta cumulative distribution
+            %   function with parameters A and B at the values in X.
+            %   Copyright 1993-2004 The MathWorks, Inc. 
+            %   $Revision: 2.9.2.6 $  $Date: 2004/12/24 20:46:45 $
+
+            % Initialize P to 0.
+            p = zeros(size(x));
+            p(a<=0 | b<=0) = NaN;
+
+            % If is X >= 1 the cdf of X is 1. 
+            p(x >= 1) = 1;
+
+            k = find(x > 0 & x < 1 & a > 0 & b > 0);
+            if any(k)
+               p(k) = betainc(x(k),a(k),b(k));
+            end
+            % Make sure that round-off errors never make P greater than 1.
+            p(p > 1) = 1;
+        end
+
+        function y = betapdf(x,a,b)
+            %BETAPDF Beta probability density function.
+            %   Y = BETAPDF(X,A,B) returns the beta probability density
+            %   function with parameters A and B at the values in X.
+            %   Copyright 1993-2004 The MathWorks, Inc.
+            %   $Revision: 2.11.2.7 $  $Date: 2004/12/24 20:46:46 $
+
+            % Return NaN for out of range parameters.
+            a(a<=0) = NaN;
+            b(b<=0) = NaN;
+
+            % Out of range x could create a spurious NaN*i part to y, prevent that.
+            % These entries will get set to zero later.
+            xOutOfRange = (x<0) | (x>1);
+            x(xOutOfRange) = .5;
+
+            try
+                % When a==1, the density has a limit of beta(a,b) at x==0, and
+                % similarly when b==1 at x==1.  Force that, instead of 0*log(0) = NaN.
+                warn = warning('off','MATLAB:log:logOfZero');
+                logkerna = (a-1).*log(x);   logkerna(a==1 & x==0) = 0;
+                logkernb = (b-1).*log(1-x); logkernb(b==1 & x==1) = 0;
+                warning(warn);
+                y = exp(logkerna+logkernb - betaln(a,b));
+            catch %#ok<CTCH>
+                warning(warn);
+                error('stats:betapdf:InputSizeMismatch',...
+                      'Non-scalar arguments must match in size.');
+            end
+            % Fill in for the out of range x values, but don't overwrite NaNs from nonpositive params.
+            y(xOutOfRange & ~isnan(a) & ~isnan(b)) = 0;
+        end
+            
         function y = chi2inv(p, nu)
             % http://www.atmos.washington.edu/~wmtsa/
             %
@@ -536,6 +669,136 @@ classdef mblvm < handle
             end
         end
         
+        function x = tinv(p,v)
+            %TINV   Inverse of Student's T cumulative distribution function (cdf).
+            %   X=TINV(P,V) returns the inverse of Student's T cdf with V degrees 
+            %   of freedom, at the values in P.
+            %
+            %   The size of X is the common size of P and V. A scalar input   
+            %   functions as a constant matrix of the same size as the other input.    
+
+            % NOTE: This function is a pure copy and paste of the relevant parts of the Matlab statistical toolbox function "finv.m"
+            % Please use the Statistical Toolbox function, if you have the toolbox
+
+            %   References:
+            %      [1]  M. Abramowitz and I. A. Stegun, "Handbook of Mathematical
+            %      Functions", Government Printing Office, 1964, 26.6.2
+
+            % Initialize Y to zero, or NaN for invalid d.f.
+            if isa(p,'single') || isa(v,'single')
+                x = NaN(size(p),'single');
+            else
+                x = NaN(size(p));
+            end
+
+            % The inverse cdf of 0 is -Inf, and the inverse cdf of 1 is Inf.
+            x(p==0 & v > 0) = -Inf;
+            x(p==1 & v > 0) = Inf;
+
+            k0 = (0<p & p<1) & (v > 0);
+
+            % Invert the Cauchy distribution explicitly
+            k = find(k0 & (v == 1));
+            if any(k)
+              x(k) = tan(pi * (p(k) - 0.5));
+            end
+
+            % For small d.f., call betainv which uses Newton's method
+            k = find(k0 & (v < 1000));
+            if any(k)
+                q = p(k) - .5;
+                df = v(k);
+                t = (abs(q) < .25);
+                z = zeros(size(q),class(x));
+                oneminusz = zeros(size(q),class(x));
+                if any(t)
+                    % for z close to 1, compute 1-z directly to avoid roundoff
+                    oneminusz(t) = betainv(2.*abs(q(t)),0.5,df(t)/2);
+                    z(t) = 1 - oneminusz(t);
+                end
+                if any(~t)
+                    z(~t) = mblvm.betainv(1-2.*abs(q(~t)),df(~t)/2,0.5);
+                    oneminusz(~t) = 1 - z(~t);
+                end
+                x(k) = sign(q) .* sqrt(df .* (oneminusz./z));
+            end
+
+            % For large d.f., use Abramowitz & Stegun formula 26.7.5
+            % k = find(p>0 & p<1 & ~isnan(x) & v >= 1000);
+            k = find(k0 & (v >= 1000));
+            if any(k)
+               xn = my_norminv(p(k));
+               df = v(k);
+               x(k) = xn + (xn.^3+xn)./(4*df) + ...
+                       (5*xn.^5+16.*xn.^3+3*xn)./(96*df.^2) + ...
+                       (3*xn.^7+19*xn.^5+17*xn.^3-15*xn)./(384*df.^3) +...
+                       (79*xn.^9+776*xn.^7+1482*xn.^5-1920*xn.^3-945*xn)./(92160*df.^4);
+            end
+        end
+        
+        function [x,xlo,xup] = norminv(p,mu,sigma,pcov,alpha)
+            %NORMINV Inverse of the normal cumulative distribution function (cdf).
+            %   X = NORMINV(P,MU,SIGMA) returns the inverse cdf for the normal
+            %   distribution with mean MU and standard deviation SIGMA, evaluated at
+            %   the values in P.  The size of X is the common size of the input
+            %   arguments.  A scalar input functions as a constant matrix of the same
+            %   size as the other inputs.
+            %
+            %   Default values for MU and SIGMA are 0 and 1, respectively.
+            %
+            %   [X,XLO,XUP] = NORMINV(P,MU,SIGMA,PCOV,ALPHA) produces confidence bounds
+            %   for X when the input parameters MU and SIGMA are estimates.  PCOV is a
+            %   2-by-2 matrix containing the covariance matrix of the estimated parameters.
+            %   ALPHA has a default value of 0.05, and specifies 100*(1-ALPHA)% confidence
+            %   bounds.  XLO and XUP are arrays of the same size as X containing the lower
+            %   and upper confidence bounds.
+            %
+            %   See also ERFINV, ERFCINV, NORMCDF, NORMFIT, NORMLIKE, NORMPDF,
+            %            NORMRND, NORMSTAT.
+
+            %   References:
+            %      [1] Abramowitz, M. and Stegun, I.A. (1964) Handbook of Mathematical
+            %          Functions, Dover, New York, 1046pp., sections 7.1, 26.2.
+            %      [2] Evans, M., Hastings, N., and Peacock, B. (1993) Statistical
+            %          Distributions, 2nd ed., Wiley, 170pp.
+
+            %   Copyright 1993-2004 The MathWorks, Inc. 
+            %   $Revision: 2.16.4.2 $  $Date: 2004/08/20 20:06:03 $
+
+            if nargin < 2
+                mu = 0;
+            end
+            if nargin < 3
+                sigma = 1;
+            end
+
+            % More checking if we need to compute confidence bounds.
+            if nargout>2
+               if nargin<5
+                  alpha = 0.05;
+               end
+            end
+
+            % Return NaN for out of range parameters or probabilities.
+            sigma(sigma <= 0) = NaN;
+            p(p < 0 | 1 < p) = NaN;
+
+            x0 = -sqrt(2).*erfcinv(2*p);
+            try
+                x = sigma.*x0 + mu;
+            end
+
+            % Compute confidence bounds if requested.
+            if nargout>=2
+               xvar = pcov(1,1) + 2*pcov(1,2)*x0 + pcov(2,2)*x0.^2;
+               normz = -norminv(alpha/2);
+               halfwidth = normz * sqrt(xvar);
+               xlo = x - halfwidth;
+               xup = x + halfwidth;
+            end
+
+        end
+        
         function limits = spe_limits(values, levels, ncol)
             % Calculates the SPE limit(s) at the given ``levels`` [0, 1]
             % where SPE was calculated over ``ncol`` entries.
@@ -568,8 +831,30 @@ classdef mblvm < handle
             % high values: more stable periods: all k's contribute
         end
 
-                
+        function limits = T2_limits(scores, levels, A)
+            % Calculates the T2 limits from columns of ``scores`` at
+            % significance ``levels``.  Uses from 1 to ``A`` columns in
+            % scores.
             
+            n = size(scores, 1);
+            mult = A*(n-1)*(n+1)/(n*(n-A));
+            f_limit = mblvm.finv(levels, A, n - A);
+            limits = mult * f_limit;
+        end
+         
+        function limits = score_limits(score_column, levels)
+            % Assume that scores are from a two-sided t-distribution with N-1
+            % degrees of freedom.  Based on the central limit theorem.
+            n = numel(score_column);
+            alpha = (1-levels) ./ 2.0;
+            n_ppf = mblvm.tinv(1-alpha, n-1);            
+
+            % NORMAL DISTRIBUTION ASSUMPTION
+            % 
+            % n_ppf = mblvm.norminv(1-alpha);
+            
+            limits = n_ppf * std(score_column);
+        end
 
     end % end: methods (sealed and static)
     

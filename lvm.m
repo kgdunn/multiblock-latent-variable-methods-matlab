@@ -75,7 +75,7 @@ function self = lvm(blocks, varargin)
     end    
 
     if self.opt.build_now
-       self = build(self);
+       build(self);
     end            
 
         
