@@ -28,6 +28,7 @@ classdef mblvm < handle
         R = cell({});       % Block weights (W-star matrix, for PLS only) 
         C = cell({});       % Block loadings (for PLS only)
         U = cell({});       % Block scores (for PLS only) 
+        S = cell({});       % Variance-covariance matrix for the scores
         beta = cell({});    % Beta-regression coeffients 
         super = struct();   % Superblock parameters (weights, scores)
         PP = cell({});      % Preprocess model parameters 
@@ -303,7 +304,7 @@ classdef mblvm < handle
             
             batch_blocks = false(1, self.B);
             for b = 1:self.B
-                if find(ismember(properties(self), 'batch_raw')) == 1
+                if any(ismember(properties(self.blocks{b}), 'batch_raw'))
                     batch_blocks(b) = true;
                 end
             end
@@ -312,22 +313,36 @@ classdef mblvm < handle
             if isempty(batch_blocks)
                 return
             end
+            if numel(batch_blocks) > 1
+                error('Currently only supports a single batch block.')
+            end                
+            
             batchstat = cell(self.B, 1);
             for b = 1:batch_blocks
                 batchstat{b} = struct;
-                batchstat{b}.T_j = zeros(self.N, self.A, self.blocks{b}.J);
-                batchstat{b}.SPE_j_temp = zeros(self.N, self.blocks{b}.J);
+                self.stats{b}.T_j = zeros(self.N, self.A, self.blocks{b}.J);
+                %batchstat{b}.SPE_j_temp = zeros(self.N, self.blocks{b}.J);
                 batchstat{b}.error_j = zeros(self.N, self.K);
+                J_time = self.blocks{b}.J;
             end
+            superstat = struct;
+            superstat.SPE = zeros(self.N, J_time);
+            superstat.T2 = zeros(self.N, J_time);
             
-            show_progress = self.opt.show_progress;
+            show_progress = true; %%self.opt.show_progress;
             if show_progress
                 h = awaitbar(0, sprintf('Calculating monitoring limits for model'));
             end
             stop_early = false;
             
                 
-            % Iterate over every observation in the data set (row)
+            % Iterate over every observation in the data set (row)            
+            apply_opt = struct;
+            apply_opt.quick = true;
+            apply_opt.preprocess = false;
+            apply_opt.data = [];
+            
+            % TODO(KGD): make it more general: allow multiple batch blocks
             for n = 1:self.N                
                 if show_progress
                     perc = floor(n/self.N*100);
@@ -338,139 +353,173 @@ classdef mblvm < handle
                 end
                 
                 % Assemble the raw data for all blocks
+                
+                raw_n = cell(1, self.B);
                 for b = 1:self.B
+                    
+                    % Short cut name
+                    blk = self.blocks{b};
                     
                     % If this is a batch block, then we also start to unfold
                     % with time
                     if any(b==batch_blocks)
                         
-                        % Reset the vector for the current batch
-                        batch.lim.x_pp = block(ones(1, batch.nTags * batch.J) .* NaN);
-
-                        % Extract data from the cell array, one cell per batch
-                        test_data = batch.data_raw{n};
-
-                        for j = 1:batch.J
-                            idx_beg = batch.nTags*(j-1)+1;
-                            idx_end = batch.nTags*j;
-
-
-                            % Preprocess the new data (center and scale it)
-                            % We rely on MATLAB's ability to handle NaN's: entries that were NaN
-                            % in "test_data" and still NaN's in "x_pp"
-                            x_pp = test_data(j,:) - batch.PP.mean_center(1,idx_beg:idx_end);
-                            x_pp = x_pp .* batch.PP.scaling(1,idx_beg:idx_end);
+                        trajectory_n = blk.data(n,:);
+                        
+                        % Let the trajectory just contain missing values
+                        raw_n{b} = ones(size(trajectory_n)) .* NaN;
+                        for j = 1:blk.J
+                            idx_beg = blk.nTags*(j-1)+1;
+                            idx_end = blk.nTags*j;
 
                             % Store the preprocessed vector back in the array
-                            batch.lim.x_pp.data(idx_beg:idx_end) = x_pp;
+                            raw_n{b}(1, idx_beg:idx_end) = trajectory_n(1, idx_beg:idx_end);
+                            
+                            out = self.apply(raw_n, apply_opt);
+                            superstat.SPE(n,j) = out.stats.super.SPE;
+                            superstat.T2(n,j) = out.stats.super.T2;
+                            self.stats{b}.T_j(n, :, j) = out.T{b};
+                            batch.error_j(n, idx_beg:idx_end) = out.newb{b}.data(1, idx_beg:idx_end);
+                            %SPE_j_temp(n,j) = ssq(out.data(1, idx_beg:idx_end));
+                            %batch.stats.SPE_j(n, j) = out.stats.SPE(1, end); % use only the last component
+                             
                         end % ``j=1, 2, ... J``
-                    end % ``if this is a batch block
+                    else
+                        raw_n{b} = blk.data(n, :);
+                    end % ``if-else: a batch block ?
                     
                 end % ``b = 1, 2, ... self.B``
                 
                 % Apply the model to these new data
-                out = self.apply_PCA(batch.lim.x_pp, self.A, 'quick');
+                
+                
+               
+                
+                %out = self.apply_PCA(batch.lim.x_pp, self.A, 'quick');
                 %out = self.apply_PLS(batch.lim.x_pp, [], self.A, 'quick');
                 %    batch.data_pred_pp = out.T * batch.C';
                 %    batch.data_pred = batch.data_pred_pp / batch.PP.scaling + batch.PP.mean_center;
                 
-                batch.T_j(n, :, j) = out.T;
-                batch.error_j(n, idx_beg:idx_end) = out.data(1, idx_beg:idx_end);
-                SPE_j_temp(n,j) = ssq(out.data(1, idx_beg:idx_end));
-                %batch.stats.SPE_j(n, j) = out.stats.SPE(1, end); % use only the last component
+                
             end % ``n=1, 2, ... N`` 
 
             
             % Next, calculate time-varying limits for each block
             % ---------------------------------------------------
             if not(stop_early)
-                alpha = 0.95;
-
-
-                std_t_j = squeeze(std(batch.T_j,0, 1))';  % J by A matrix
-                t_crit = abs(my_tinv((1-alpha)/2, batch.N-1));
-                % From the central limit theorem, assuming each batch is 
-                % independent from the next (because we are calculating
-                % out std_t_j over the batch dimension, not the time
-                % dimension).  Clearly each time step is not independent.
-                % We inflate the limits slightly: see Nomikos and
-                % MacGregor's article in Technometrics
-                batch.lim.t_j = t_crit * std_t_j * (1 + 1/batch.N);
-
-                % Variance/covariance of the score matrix over time.
-                % The scores, especially at the start of the batch are
-                % actually correlated; only at the very end of the
-                % batch do they become uncorrelated
-                for j = 1:batch.J
-                    scores = batch.T_j(:,:,j);
-                    sigma_T = inv(scores'*scores/(batch.N-1));
-                    for n = 1:batch.N
-                        batch.stats.T2_j(n, j) = batch.T_j(n,:,j) * sigma_T * batch.T_j(n,:,j)';
-                    end
-
-                end
-                % Calculate the T2 limit
-                % Strange that you can calculate it without reference to
-                % any of the batch data.  Also, I would have expected it
-                % to vary during the batch, because t1 and t2 limits are
-                % large initially.
-                N = batch.N;
-                for a = 1:self.A
-                    mult = a*(N-1)*(N+1)/(N*(N-a));
-                    limit = my_finv(alpha, a, N-(self.A));
-                    batch.lim.T2_j(:,a) = mult * limit;
-                    % This value should agree with batch.lim.T2(:,a)
-                    % TODO(KGD): slight discrepancy in batch SBR dataset
-                end
-
-                % Calculate SPE time-varying limits
-                % Our SPE definition = sqrt(e'e / K), where K = number of
-                % entries in vector ``e``.  In the SPE_j case that is the
-                % number of tags.
-                % Apply smoothing window here: see Nomikos thesis, p 66.
-                % ``w`` should be a function of how "jumpy" the SPE plot
-                % looks.  Right now, I'm going to set ``w`` proportional
-                % to the number of time samples in a batch
-                w = max(1, ceil(0.012/2 * batch.J));
-                for j = 1:batch.J
-                    start_idx = max(1, j-w);
-                    end_idx = min(batch.J, j+w);
-                    SPE_values = SPE_j_temp(:, start_idx:end_idx);
-                    batch.lim.SPE_j(j) = sqrt(calculate_SPE_limit(SPE_values, alpha)/batch.nTags);
-                end
-                SPE_j_temp = SPE_j_temp ./ batch.nTags;
-                batch.stats.SPE_j = sqrt(SPE_j_temp);
+                siglevel = 0.95;
                 
+                % Similar code exists in ``calc_statistics_and_limits``
+                
+                for b = 1:self.B
+                    if any(b==batch_blocks)
+                        
+                        % J by A matrix
+                        std_t_j = squeeze(self.score_limits(self.stats{b}.T_j, siglevel))';
+                        % From the central limit theorem, assuming each batch is 
+                        % independent from the next (because we are calculating
+                        % out std_t_j over the batch dimension, not the time
+                        % dimension).  Clearly each time step is not independent.
+                        % We inflate the limits slightly: see Nomikos and
+                        % MacGregor's article in Technometrics
+                        self.lim{b}.t_j = std_t_j .* (1 + 1/self.blocks{b}.N);
+                        
+
+                        % Variance/covariance of the score matrix over time.
+                        % The scores, especially at the start of the batch are
+                        % actually correlated; only at the very end of the
+                        % batch do they become uncorrelated
+                        for j = 1:self.blocks{b}.J
+                            scores = self.stats{b}.T_j(:,:,j);
+                            sigma_T = inv(scores'*scores/(self.blocks{b}.N-1));
+                            for n = 1:self.blocks{b}.N
+                                self.stats{b}.T2_j(n, j) = self.stats{b}.T_j(n,:,j) * sigma_T * self.stats{b}.T_j(n,:,j)';
+                            end
+
+                        end
+                        % Calculate the T2 limit
+                        % Strange that you can calculate it without reference to
+                        % any of the batch data.  Also, I would have expected it
+                        % to vary during the batch, because t1 and t2 limits are
+                        % large initially.
+                        
+                        
+                        %N_lim = self.blocks{b}.N;
+                        for a = 1:self.A
+                            self.lim{1}.T2_j = T2_limits(self.stats{b}.T_j, siglevel, a);
+                            
+                            
+                            %mult = a*(N_lim-1)*(N_lim+1)/(N_lim*(N-a));
+                            %limit = my_finv(alpha, a, N-(self.A));
+                            %batch.lim.T2_j(:,a) = mult * limit;
+                            % This value should agree with batch.lim.T2(:,a)
+                            % TODO(KGD): slight discrepancy in batch SBR dataset
+                        end
+
+                        % Calculate SPE time-varying limits
+                        % Our SPE definition = sqrt(e'e / K), where K = number of
+                        % entries in vector ``e``.  In the SPE_j case that is the
+                        % number of tags.
+                        % Apply smoothing window here: see Nomikos thesis, p 66.
+                        % ``w`` should be a function of how "jumpy" the SPE plot
+                        % looks.  Right now, I'm going to set ``w`` proportional
+                        % to the number of time samples in a batch
+                        w = max(1, ceil(0.012/2 * batch.J));
+                        for j = 1:batch.J
+                            start_idx = max(1, j-w);
+                            end_idx = min(batch.J, j+w);
+                            SPE_values = SPE_j_temp(:, start_idx:end_idx);
+                            batch.lim.SPE_j(j) = sqrt(calculate_SPE_limit(SPE_values, alpha)/batch.nTags);
+                        end
+                        SPE_j_temp = SPE_j_temp ./ batch.nTags;
+                        batch.stats.SPE_j = sqrt(SPE_j_temp);
+                        
+                    end % ``if: a batch block ?
+                end % ``b = 1, 2, ... self.B``
             end %``not stop_early``
             
             limits_subclass(self)
             
         end % ``limit_calculations``
          
-        function state = apply(self, new)
+        function state = apply(self, new, varargin)
             % Apply the multiblock latent variable model to new data.
             % * preprocess the data if it has not been already
             
-            newb = cell(1, numel(new)/2);
-            Nnew = 0;
-            for b = 1:numel(new)
-                if mod(b, 2) ~= 0
-                    block_name = new{b};
-                    if not(strcmpi(block_name, self.blocks{b}.name))
-                        error('lvm:lvm', 'Block names on the new data do not agree with training data.') 
-                    end                    
-                else 
-                    newb{b/2} = block(new{b});                    
-                    Nnew = max(Nnew, newb{b/2}.N);
+            % Default options
+            apply_opt = struct;
+            apply_opt.complete = false;
+            apply_opt.preprocess = true;
+            apply_opt.data = [];
+                
+            if nargin == 3
+                options = varargin{1};
+                names = fieldnames(options);
+                for k = 1:numel(names)
+                    apply_opt.(names{k}) = options.(names{k});
                 end
-            end        
+            end
             
-            for b = 1:self.B
-                newb{b} = self.blocks{b}.preprocess(newb{b}, self.PP{b});
+            if not(isempty(apply_opt.data))
+                newb = apply_opt.data;
+            else                
+                Nnew = 0;
+                newb = cell(self.B, 1);
+                for b = 1:numel(new)
+                    newb{b} = block(new{b});                    
+                    Nnew = max(Nnew, newb{b}.N);
+                end
+            end
+
+            if apply_opt.preprocess
+                for b = 1:self.B
+                    newb{b} = self.blocks{b}.preprocess(newb{b}, self.PP{b});
+                end
             end
             
             % Initialize the states (this could go in another function later)
             state = struct;
+            state.opt = apply_opt;
             state.Nnew = Nnew;
             for b = 1:self.B
                 % Block scores
@@ -485,16 +534,18 @@ classdef mblvm < handle
             % Summary statistics
             state.stats.T2 = cell(1, self.B);
             state.stats.SPE = cell(1, self.B);
-            state.stats.R2 = cell(1, self.B);
-            state.stats.initial_ssq = cell(1, self.B);
             state.stats.super.T2 = ones(Nnew, 1) .* NaN;
-            state.stats.super.SPE = ones(Nnew, 1) .* NaN;
+            state.stats.super.SPE = ones(Nnew, 1) .* NaN;                        
             state.stats.super.R2 = ones(Nnew, 1) .* NaN;
             state.stats.initial_ssq_total = ones(Nnew, 1) .* NaN;
             for b = 1:self.B
                 state.stats.R2{b} = ones(Nnew, 1) .* NaN;
             end            
+            state.stats.R2 = cell(1, self.B);
+            state.stats.initial_ssq = cell(1, self.B);
+
             state = apply_model(self, newb, state); % method must be subclassed
+            state.newb = newb;
         end % ``apply``
         
         function self = create_storage(self)
@@ -519,7 +570,7 @@ classdef mblvm < handle
             self.R = cell(1,nb);
             self.C = cell(1,nb);
             self.U = cell(1,nb);
-            %self.S = cell(1,nb);
+            self.S = cell(1,nb);
 
             % Block preprocessing 
             self.PP = cell(1,nb);
@@ -537,6 +588,9 @@ classdef mblvm < handle
             % Superblock scores
             % N x A
             self.super.T = [];
+            % Superblock scores variance-covariance matrix
+            % A x A
+            self.super.S = [];
             % Superblock's loadings (used in PCA only)
             % B x A
             self.super.P = [];    
@@ -594,7 +648,7 @@ classdef mblvm < handle
                 self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores
                 self.W{b} = zeroexp([dblock.K, A], self.W{b});  % PLS block weights
                %self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS block weights
-               %self.S{b} = zeroexp([1, A], self.S{b});         % score scaling factors
+                self.S{b} = zeroexp([A, A], self.S{b});         % score scaling factors
                 
                 % Block preprocessing options: resets them
                 if numel(self.PP{b}) == 0
@@ -922,11 +976,22 @@ classdef mblvm < handle
     end % end: methods (abstract)
     
     methods (Sealed=true, Static=true)
-        function out = mahalanobis_distance(T)
+        function [T2, varargout] = mahalanobis_distance(T, varargin)
+            % If given ``S``, an estimate of the variance-covariance matrix,
+            % then it will use that, instead of an estimated var-cov matrix.
+            
             % TODO(KGD): calculate this in a smarter way. Can create unnecessarily
             % large matrices
             n = size(T, 1);
-            out = diag(T * inv((T'*T)/(n)) * T'); %#ok<MINV>
+            if nargin == 2
+                T2 = diag(T * varargin{1} * T');
+            else
+                estimated_S = inv((T'*T)/(n));
+                T2 = diag(T * estimated_S * T'); %#ok<MINV>
+                if nargout > 1
+                    varargout{1} = estimated_S;
+                end
+            end
         end
         
         function x = finv(p,v1,v2)
@@ -1356,7 +1421,9 @@ classdef mblvm < handle
         function limits = score_limits(score_column, levels)
             % Assume that scores are from a two-sided t-distribution with N-1
             % degrees of freedom.  Based on the central limit theorem.
-            n = numel(score_column);
+            % ``score_limits`` can be a matrix, in which case ``limits`` are
+            % the confidence limits for each column.
+            n = size(score_column, 1);
             alpha = (1-levels) ./ 2.0;
             n_ppf = mblvm.tinv(1-alpha, n-1);            
 
@@ -1364,7 +1431,7 @@ classdef mblvm < handle
             % 
             % n_ppf = mblvm.norminv(1-alpha);
             
-            limits = n_ppf * std(score_column);
+            limits = n_ppf .* std(score_column, 0, 1);
         end
 
     end % end: methods (sealed and static)

@@ -210,8 +210,8 @@ function Wold_article_PCA_test()
     assertEAE(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
     
     % Apply the new data to an existing model
-    testing_type_A = PCA_model_1.apply({'X', X_test});      % send in a block variable
-    testing_type_B = PCA_model_1.apply({'X', X_test_raw});  % send in a raw array 
+    testing_type_A = PCA_model_1.apply({X_test});      % send in a block variable
+    testing_type_B = PCA_model_1.apply({X_test_raw});  % send in a raw array 
     assertEAE(testing_type_A.T{1}, [-0.2705, -2.0511]', 4)
     assertEAE(testing_type_B.T{1}, [-0.2705, -2.0511]', 4)
     
@@ -220,16 +220,16 @@ function Wold_article_PCA_test()
     X_test = block(X_test_raw);
     assertEAE(X_test.data, [3, 4, 3, 4; 1, 2, 3, 4.0],5);
     
-    testing_type_C = PCA_model_2.apply({'X', X_test});      % send in a block variable
-    testing_type_D = PCA_model_2.apply({'X', X_test_raw});  % send in a raw array 
+    testing_type_C = PCA_model_2.apply({X_test});      % send in a block variable
+    testing_type_D = PCA_model_2.apply({X_test_raw});  % send in a raw array 
     assertEAE(testing_type_C.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     assertEAE(testing_type_D.T{1}, [-0.2705, -2.0511; 0.1009, -1.3698]', 3)
     
         
     % Applying the model to the training data should give identical results
     X_new = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
-    X_new_1 = PCA_model_1.apply({'X', X_new});
-    X_new_2 = PCA_model_2.apply({'X', X_new});
+    X_new_1 = PCA_model_1.apply({X_new});
+    X_new_2 = PCA_model_2.apply({X_new});
     
     assertEAE(X_new_1.T{1}(:,1), [-1.6229, -0.3493, 1.9723]', 2)
     assertEAE(X_new_1.T_super(:,1), [-1.6229, -0.3493, 1.9723]', 2)
