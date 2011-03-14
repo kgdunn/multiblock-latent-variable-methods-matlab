@@ -64,7 +64,8 @@ classdef mbpls < mblvm
             % Must also calculate all summary statistics for each block.
             
             % Perform ordinary missing data PLS on the merged block of data
-            if numel(self.Y.mmap) > 1 && any(sum(self.Y.mmap, 2) == 0)
+            mmap = ~isnan(given_data);
+            if numel(mmap) > 1 && any(sum(mmap, 2) == 0)
                 warning('mbpls:calc_model', ...
                         ['Cannot handle the case yet where the entire '...
                          'observation in Y-matrix is missing.  Please '...

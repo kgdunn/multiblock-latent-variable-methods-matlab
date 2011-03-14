@@ -230,9 +230,9 @@ classdef mbpca < mblvm
             fprintf('R2 summary for %s (all as percentages)\n', self.model_type);
             w_char = zeros(self.B,1);
             ncols = 2 + self.B;  % A column, overall R2, and then all blocks            
-            line_length = 3 + 8 + ncols;
-            all_lines = '|%3i|%7.2f|';
-            start_line = '|%3s|%7s|';
+            line_length = 4 + 8 + ncols;
+            all_lines = '|%3i|%7.2f||';
+            start_line = '|%3s|%7s||';
             block_names = cell(self.B,1);
             for b = 1:self.B
                 if strcmp(self.blocks{b}.name_type, 'auto')

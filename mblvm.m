@@ -59,7 +59,11 @@ classdef mblvm < handle
 
             % Build the model if ``A``, is specified as a
             % numeric value.  If it is a structure of 
-            % options, then override any default settings with those.            
+            % options, then override any default settings with those. 
+            
+            if nargin == 1
+                varargin{1} = 0;
+            end
 
             % Merge options: only up to 2 levels deep
             if isa(varargin{1}, 'struct')
@@ -172,8 +176,6 @@ classdef mblvm < handle
             
             % Call the subclass to provide more information
             self.summary()
-            
-            
         end % ``disp``
         
         function self = merge_blocks(self)

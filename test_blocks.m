@@ -19,6 +19,7 @@ function test_basic_syntax()
     assertTrue(b.K == 1)
     assertTrue(strcmpi(b.name, 'block-1-1'))
     assertTrue(b.has_missing == true);
+    assertTrue(b.mmap == 0);
     
     
     X = randn(10, 5);
@@ -29,6 +30,7 @@ function test_basic_syntax()
     assertTrue(b.has_missing == false);
     assertTrue(strcmpi(b.name_type, 'auto'))
     assertTrue(strcmpi(b.name, 'block-10-5'))
+    assertTrue(isempty(b.mmap));
     
     assertTrue(all(shape(b) == [10, 5]))
     assertTrue(shape(b, 1) == 10)
@@ -40,12 +42,21 @@ function test_basic_syntax()
     assertTrue(b.K == 0)
     assertTrue(strcmpi(b.name, 'block-0-0'))
     assertTrue(isempty(b))
+    assertTrue(isempty(b.mmap));
     
     b = block(24);
     assertTrue(b.N == 1)
     assertTrue(b.K == 1)
     assertTrue(strcmpi(b.name, 'block-1-1'))
     assertTrue(b.has_missing == false);
+    assertTrue(isempty(b.mmap));
+    
+    b = block([24, NaN]);
+    assertTrue(b.N == 1)
+    assertTrue(b.K == 2)
+    assertTrue(strcmpi(b.name, 'block-1-2'))
+    assertTrue(all(b.mmap == [1, 0]));
+    assertTrue(b.has_missing == true);
     
     
 end

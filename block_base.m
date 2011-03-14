@@ -10,7 +10,7 @@ classdef block_base < handle
     properties
         data = false;           % Block's data
         has_missing = false;    % {true, false}
-        mmap = false;           % Missing data map
+        mmap = [];              % Missing data map
         name = '';              % Name of the block
         name_type = 'auto';     % {'auto', 'given'}
         labels = {};            % Cell array: rows are the modes; columns are sets of labels
@@ -33,7 +33,7 @@ classdef block_base < handle
             self.labels = cell(ndims(given_data), 0);    % 0-columns of labels
             
             % Missing data handling
-            self.mmap = false;             
+            self.mmap = [];             
             missing_map = ~isnan(given_data);   % 0=missing, 1=present
             if not(all(missing_map(:)))
                 self.mmap = missing_map;
@@ -81,27 +81,10 @@ classdef block_base < handle
         end
         
         function out = get.has_missing(self)
-            out = true;
-           
-            % 0=missing, 1=present in the self.mmap
-            if all(self.mmap(:))
-                % Array with all values present
+            out = true;           
+            if isempty(self.mmap)
                 out = false;
-                return
-            end
-            
-            if numel(self) > 1
-                out = false;
-                return
-            end
-            
-            % Special case: 1x1 non-NaN block
-            if numel(self) == 1 && not(isnan(self.data))
-                out = false;
-                return
-            end
-                
-                
+            end            
         end
         
         function out = get.name(self)
@@ -128,7 +111,7 @@ classdef block_base < handle
             end
         end
         
-        function out = size(self)
+        function size(self)
             error('block_base:size', 'Use the ``shape(...)`` function to obtain the shape of a block object.');
         end
         
