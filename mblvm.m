@@ -26,8 +26,8 @@ classdef mblvm < handle
         T = cell({});       % Block scores, T        
         W = cell({});       % Block weights (for PLS only)
         R = cell({});       % Block weights (W-star matrix, for PLS only) 
-        C = cell({});       % Block loadings (for PLS only)
-        U = cell({});       % Block scores (for PLS only) 
+        %C = cell({});       % Block loadings (for PLS only)
+        %U = cell({});       % Block scores (for PLS only) 
         S = cell({});       % Variance-covariance matrix for the scores
         beta = cell({});    % Beta-regression coeffients 
         super = struct();   % Superblock parameters (weights, scores)
@@ -317,16 +317,16 @@ classdef mblvm < handle
                 error('Currently only supports a single batch block.')
             end                
             
-            
-            for b = 1:batch_blocks
-                self.stats{b}.T_j = zeros(self.N, self.A, self.blocks{b}.J);
-                J_time = self.blocks{b}.J;                
+            for b = 1:numel(batch_blocks)
+                b_id = batch_blocks(b);
+                self.stats{b}.T_j = zeros(self.N, self.A, self.blocks{b_id}.J);
+                J_time = self.blocks{b_id}.J;                
             end
             self.super.T2_j = zeros(self.N, J_time);
             self.super.SPE_j = zeros(self.N, J_time);
             SPE_j_temp = zeros(self.N, J_time);
             
-            show_progress = true; %%self.opt.show_progress;
+            show_progress = self.opt.show_progress;
             if show_progress
                 h = awaitbar(0, sprintf('Calculating monitoring limits for model'));
             end
@@ -340,7 +340,8 @@ classdef mblvm < handle
             apply_opt.data = [];
             
             % TODO(KGD): make it more general: allow multiple batch blocks
-            for n = 1:self.N                
+            for n = 1:self.N 
+                fprintf('.')
                 if show_progress
                     perc = floor(n/self.N*100);
                     stop_early = awaitbar(perc/100,h,sprintf('Processing batches for limits %d. [%d%%]',n, perc));
@@ -523,6 +524,7 @@ classdef mblvm < handle
             
             % Super scores: N x A
             state.T_super = ones(Nnew, self.A) .* NaN;
+            state.Y_pred = ones(Nnew, self.M) .* NaN;
             
             % Summary statistics
             state.stats.T2 = cell(1, self.B);
@@ -561,8 +563,8 @@ classdef mblvm < handle
             self.T = cell(1,nb);            
             self.W = cell(1,nb);
             self.R = cell(1,nb);
-            self.C = cell(1,nb);
-            self.U = cell(1,nb);
+            %self.C = cell(1,nb);
+            %self.U = cell(1,nb);
             self.S = cell(1,nb);
 
             % Block preprocessing 

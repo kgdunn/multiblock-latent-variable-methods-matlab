@@ -256,6 +256,61 @@ classdef mbpls < mblvm
         
         % Superclass abstract method implementation
         function state = apply_model(self, new, state, varargin) 
+            % Applies a PCA model to the given ``block`` of (new) data.
+            % 
+            % TODO(KGD): allow user to specify ``A``
+            
+            which_components = 1 : min(self.A);
+            for a = which_components
+                
+                initial_ssq_total = zeros(state.Nnew, 1);
+                initial_ssq = cell(1, self.B);
+                for b = 1:self.B                    
+                    initial_ssq{b} = ssq(new{b}.data, 2);
+                    initial_ssq_total = initial_ssq_total + initial_ssq{b};
+                    if a==1                        
+                        state.stats.initial_ssq{b} = initial_ssq{b};
+                        state.stats.initial_ssq_total(:,1) = initial_ssq_total;
+                    end
+                end
+
+                if all(initial_ssq_total < self.opt.tolerance)
+                    warning('mbpca:apply_model', 'There is no variance left in one/some of the new data observations')
+                end
+
+                for b = 1:self.B
+                    % Block score
+                    state.T{b}(:,a) = regress_func(new{b}.data, self.W{b}(:,a), new{b}.has_missing);
+                    state.T{b}(:,a) = state.T{b}(:,a) .* self.block_scaling(b);
+                    % Transfer it to the superscore matrix
+                    state.T_sb(:,b,a) = state.T{b}(:,a);
+                end
+                
+                % Calculate the superscore, T_super
+                state.T_super(:,a) = state.T_sb(:,:,a) * self.super.W(:,a);
+                
+                % Deflate each block: using the SUPERSCORE and the block loading
+                for b = 1:self.B
+                    deflate = state.T_super(:,a) * self.P{b}(:,a)';
+                    state.stats.R2{b}(:,1) = ssq(deflate, 2) ./ state.stats.initial_ssq{b};
+                    new{b}.data = new{b}.data - deflate;
+                end
+            end % looping on ``a`` latent variables
+            state.Y_pred = state.T_super * self.super.C(:,1:a)';
+            
+            % Summary statistics for each block and the super level
+            overall_variance = zeros(state.Nnew, 1);
+            for b = 1:self.B
+                block_variance = ssq(new{b}.data, 2);
+                overall_variance = overall_variance + block_variance;
+                state.stats.SPE{b} = sqrt(block_variance ./ self.K(b));
+            end
+            state.stats.super.R2(:,1) = 1 - overall_variance ./state.stats.initial_ssq_total;
+            
+            state.stats.super.SPE(:,1) = sqrt(overall_variance ./ sum(self.K));
+            state.stats.super.T2(:,1) = mblvm.mahalanobis_distance(state.T_super, self.super.S);
+            
+            
             
         end % ``apply_model``
         

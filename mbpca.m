@@ -200,7 +200,7 @@ classdef mbpca < mblvm
                 for b = 1:self.B
                     % Block score
                     state.T{b}(:,a) = regress_func(new{b}.data, self.P{b}(:,a), new{b}.has_missing);
-                    state.T{b}(:,a) = state.T{b}(:,a) .* self.block_scaling;
+                    state.T{b}(:,a) = state.T{b}(:,a) .* self.block_scaling(b);
                     % Transfer it to the superscore matrix
                     state.T_sb(:,b,a) = state.T{b}(:,a);
                 end
@@ -210,7 +210,7 @@ classdef mbpca < mblvm
                 
                 % Deflate each block: using the SUPERSCORE and the block loading
                 for b = 1:self.B
-                    deflate = state.T_super(:,a) * self.P{1}(:,a)';
+                    deflate = state.T_super(:,a) * self.P{b}(:,a)';
                     state.stats.R2{b}(:,1) = ssq(deflate, 2) ./ state.stats.initial_ssq{b};
                     new{b}.data = new{b}.data - deflate;
                 end            

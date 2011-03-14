@@ -3,14 +3,14 @@ function unit_tests(varargin)
     
     test_significant_figures()
     
+    
+    
+    
     % PCA tests
     Wold_article_PCA_test()
     PCA_no_missing_data()
     PCA_with_missing_data()
     PCA_batch_data()
-    
-    
-    
     
     PCA_cross_validation_no_missing()
     MBPCA_tests()
@@ -18,7 +18,9 @@ function unit_tests(varargin)
     % PLS tests
     basic_PLS_test()
     PLS_no_missing_data()
-    PLS_with_missing_data()    
+    PLS_with_missing_data() 
+    
+    PLS_batch_data();
     MBPLS_tests();
     %PLS_randomization_tests()
     
@@ -459,6 +461,34 @@ function PCA_batch_data()
     % tags, 100 time steps). As on page 45, 46, 47, 48 (table)
 return
 
+function PLS_batch_data()    
+    fprintf('Batch PLS test (FMC data set): ');
+
+    FMC = load('datasets/FMC.mat');
+
+    % Initial conditions block
+    Z = block(FMC.Z);
+    Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
+    
+    % Batch data block (pre-aligned)
+    tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
+                 'J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
+
+    X = block(FMC.batchSPCData, 'X block',...                       % name of the block
+                                {'batch_tag_names', tag_names}, ... % tag names
+                                {'batch_names', FMC.Xnames}); 
+
+    % Final quality attributes (FQAs)
+    Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
+    
+    model = lvm({'Z', Z, 'X', X, 'y', Y}, 2);
+    
+    fprintf('OK\n');
+    
+    % TODO(KGD): compare values with the Technometrics paper (55 batches, 10
+    % tags, 100 time steps). As on page 45, 46, 47, 48 (table)
+return
+
 function PCA_cross_validation_no_missing()
     % Generates several cases of loadings matrices and scores matrices and
     % verifies whether the cross-validation algorithm can calculate the
@@ -884,6 +914,9 @@ function MBPCA_tests()
     assertEAE(mbmodel.stats{1}.R2b_a,  stats_PCA.R2X{1}, 5)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 5)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_PCA.R2X{2}, 5)
+    
+    
+    % TODO(KGD): test on new/same data and ensure the apply() function works
 return
 
 function MBPLS_tests()
@@ -1243,7 +1276,7 @@ function MBPLS_tests()
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_PLS.R2X{2},8)
 
     % TODO(KGD): compare block loadings, SPE and T2 value, variable-based R2
-    
+    % TODO(KGD): test on new/same data and ensure the apply() function works
 return
 
 % =========================================================================
