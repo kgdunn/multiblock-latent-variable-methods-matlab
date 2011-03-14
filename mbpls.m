@@ -156,7 +156,9 @@ classdef mbpls < mblvm
                     self.stats{b}.VIP_a(:,a) = sqrt(VIP_temp);
                 
                     % Block T2 using the number of components calculated so far
-                    self.stats{b}.T2(:,a) = self.mahalanobis_distance(self.T{b}(:,1:a));
+                    [self.stats{b}.T2(:,a), S] = self.mahalanobis_distance(self.T{b}(:,1:a));
+                    self.stats{b}.S = S;
+                    
                 end
                 w_super = regress_func(t_superblock, u_a, false);
                 w_super = w_super / norm(w_super);
@@ -228,7 +230,8 @@ classdef mbpls < mblvm
                 
                 % Model summary T2 (not the superblock's T2!), merely the
                 % overall T2 from the merged model
-                self.super.T2(:,a) = self.mahalanobis_distance(self.super.T(:,1:a));
+                [self.super.T2(:,a), S] = self.mahalanobis_distance(self.super.T(:,1:a));
+                self.super.S = S;
                 
                 VIP_temp = zeros(sum(self.B), 1);
                 for a_iter = 1:a
@@ -305,13 +308,9 @@ classdef mbpls < mblvm
                 overall_variance = overall_variance + block_variance;
                 state.stats.SPE{b} = sqrt(block_variance ./ self.K(b));
             end
-            state.stats.super.R2(:,1) = 1 - overall_variance ./state.stats.initial_ssq_total;
-            
+            state.stats.super.R2(:,1) = 1 - overall_variance ./state.stats.initial_ssq_total;            
             state.stats.super.SPE(:,1) = sqrt(overall_variance ./ sum(self.K));
             state.stats.super.T2(:,1) = mblvm.mahalanobis_distance(state.T_super, self.super.S);
-            
-            
-            
         end % ``apply_model``
         
         % Superclass abstract method implementation

@@ -5,6 +5,8 @@ function unit_tests(varargin)
     
     
     
+    PLS_batch_data();
+    
     
     % PCA tests
     Wold_article_PCA_test()
@@ -20,7 +22,7 @@ function unit_tests(varargin)
     PLS_no_missing_data()
     PLS_with_missing_data() 
     
-    PLS_batch_data();
+    
     MBPLS_tests();
     %PLS_randomization_tests()
     
