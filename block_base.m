@@ -11,7 +11,7 @@ classdef block_base < handle
         data = false;           % Block's data
         has_missing = false;    % {true, false}
         mmap = false;           % Missing data map
-        name = '';
+        name = '';              % Name of the block
         name_type = 'auto';     % {'auto', 'given'}
         labels = {};            % Cell array: rows are the modes; columns are sets of labels
                                 % 2 x 3: row labels and columns labels, with
@@ -30,24 +30,17 @@ classdef block_base < handle
             % Store whatever data was given us
             self.data = given_data;
             
-            [self.N, self.K] = size(given_data);
             self.labels = cell(ndims(given_data), 0);    % 0-columns of labels
             
             % Missing data handling
-            self.mmap = false;            
+            self.mmap = false;             
             missing_map = ~isnan(given_data);   % 0=missing, 1=present
-            if all(missing_map)
-                self.has_missing = false;
-            else
-                self.has_missing = true;
+            if not(all(missing_map(:)))
                 self.mmap = missing_map;
             end
             
             % Second argument: block name
-            if isempty(block_name)
-                self.name = ['block-', num2str(self.N), '-', num2str(self.K)];
-                self.name_type = 'auto';
-            else
+            if not(isempty(block_name))
                 self.name = block_name;
                 self.name_type = 'given';
             end
@@ -79,6 +72,50 @@ classdef block_base < handle
             end
         end
         
+        function out = get.N(self)
+            out = size(self.data, 1);
+        end
+        
+        function out = get.K(self)
+            out = size(self.data, 2);
+        end
+        
+        function out = get.has_missing(self)
+            out = true;
+           
+            % 0=missing, 1=present in the self.mmap
+            if all(self.mmap(:))
+                % Array with all values present
+                out = false;
+                return
+            end
+            
+            if numel(self) > 1
+                out = false;
+                return
+            end
+            
+            % Special case: 1x1 non-NaN block
+            if numel(self) == 1 && not(isnan(self.data))
+                out = false;
+                return
+            end
+                
+                
+        end
+        
+        function out = get.name(self)
+            if strcmp(self.name_type, 'auto')
+                out = get_auto_name(self);
+            else
+                out = self.name;
+            end
+        end
+        
+        function out = get_auto_name(self)
+            out = ['block-', num2str(self.N), '-', num2str(self.K)];
+        end
+        
         function out = get_data(self)
             % Returns the data array stored in self.
             out = self.data;
@@ -93,6 +130,10 @@ classdef block_base < handle
         
         function out = size(self)
             error('block_base:size', 'Use the ``shape(...)`` function to obtain the shape of a block object.');
+        end
+        
+        function out = numel(self)
+            out = numel(self.data);
         end
         
         function out = copy(self)
@@ -245,6 +286,11 @@ classdef block_base < handle
         
         function add_labels(self, dim, to_add)
             added = false;
+            try
+                to_add = cellstr(to_add);
+            catch ME
+                to_add = cellstr(num2str(cell2mat(to_add(:))));
+            end
             for k = 1:numel(self.labels(dim, :))
                 if isempty(self.labels{dim, k})
                     self.labels{dim, k} = to_add;
@@ -499,56 +545,74 @@ classdef block_base < handle
 %                 self.is_preprocessed = true;
 %             end
 %         end
+
+    function exclude_post(self, dim, which)
+        %a = self;
+    end
          
     function [self, other] = exclude(self, dim, which)
         % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
         % given by entries in the vector ``which``.
         %
         % The excluded entries are returned as a new block in ``other``.
-        % Note that ``self`` is actually returned as a new block also,
-        % to accomodate the fact that modelling elements might have been 
-        % removed.  E.g. if user excluded rows, then the scores are not
-        % valid anymore.
+        % ``other`` will retain all properties originally in ``self``.
         %
         % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
         %
         % NOTE: at this time, you cannot exclude a variable from a batch
         % block.  To do that, exclude the variable in the raw data, before
         % creating the block.
+        
 
-        self.exclude_post(dim, which);
-
-        s_ordinary = struct; 
-        s_ordinary.type = '()';
-        s_ordinary_remain = struct; 
-        s_ordinary_remain.type = '()';
-        self_tagnames = self.tagnames;
+        exc_s = struct; 
+        exc_s.type = '()';
+        
+        rem_s = struct; 
+        rem_s.type = '()';
+        
         if dim == 1 
             if any(which>self.N)
                 error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')
             end
-            s_ordinary.subs = {which, ':'};
-            remain = 1:self.N;
-            remain(which) = [];
-            s_ordinary_remain.subs = {remain, ':'};
-            other_tagnames = self.tagnames;
+            exc_s.subs = {which, ':'};
+            remain_idx = 1:self.N;
+            remain_idx(which) = [];
+            rem_s.subs = {remain_idx, ':'};
         end
         if dim == 2 
             if any(which>self.K)
                 error('block:exclude', 'Entries to exclude exceed the size (columns) of the block.')
-            end
-            if strcmp(self.block_type, 'batch')
-                error('block:exclude', 'Excluding tags from batch blocks is not currently supported.')
-            end
-            s_ordinary.subs = {':', which};
-
-            other_tagnames = self.tagnames(which);
-            self_tagnames(which) = [];
-            remain = 1:self.K;
-            remain(which) = [];
-            s_ordinary_remain.subs = {':', remain};
+            end            
+            exc_s.subs = {':', which};
+            remain_idx = 1:self.K;
+            remain_idx(which) = [];
+            rem_s.subs = {':', remain_idx};
         end
-
+        
+        other = self.copy();
+        
+        self.data = subsref(self.data, rem_s);
+        other.data = subsref(other.data, exc_s);
+        if numel(self.mmap) > 1
+            self.mmap = subsref(self.mmap, rem_s);
+            other.mmap = subsref(other.mmap, exc_s);
+        end
+        
+        tagnames = self.labels(dim,:);
+        exc_tag = struct;
+        exc_tag.type = '()';
+        exc_tag.subs = {which};
+        rem_tag = struct;
+        rem_tag.type = '()';
+        rem_tag.subs = {remain_idx};
+        for entry = 1:numel(tagnames)
+            tags = tagnames{entry};
+            if not(isempty(tags))
+                self.labels{dim, entry} = subsref(tags, rem_tag);
+                other.labels{dim, entry} = subsref(tags, exc_tag);
+            end
+        end
+        self.exclude_post(dim, which);
         
     end
 
@@ -654,10 +718,10 @@ classdef block_base < handle
         
     end % end methods (static)
 
-    % Subclass must redefine these methods
-    methods (Abstract=true)
-        exclude_post(self);
-    end % end methods (abstract)
+%     % Subclass must redefine these methods
+%     methods (Abstract=true)
+%         exclude_post(self);
+%     end % end methods (abstract)
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.
@@ -679,11 +743,16 @@ function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_siz
     end
     if numel(self.labels)
         tagnames = self.labels{2,1};
+    else
+        tagnames = cell(1, self.K);
+        for k = 1:self.K
+            tagnames{k} = ['Tag ', num2str(k)];
+        end
     end
             
     for k = 1:K
         plot(hA(k), self.data(:,tags(k)), 'k')
-        title(hA(k), tagnames{k}, 'FontSize',14)
+        title(hA(k), char(tagnames{k}), 'FontSize',14)
         set(hA(k), 'FontSize',14)
         axis tight
         grid(hA(k),'on')

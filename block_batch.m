@@ -12,7 +12,6 @@ classdef block_batch < block_base
         nTags = 0;      % Number of batch tags        
         J = 0;          % Number of batch time steps
         batch_raw = {}; % Raw data from the batch
-        
     end
     
     methods
@@ -63,17 +62,16 @@ classdef block_batch < block_base
                       ' {"nbatches", 12} '])
             end
             
-            self.N = size(given_data, 1);
-            self.K = size(given_data, 2);
-            
-                   
+            N_init = size(given_data, 1);
+            K_init = size(given_data, 2);
+                               
             % Reshape the data
-            self.J = self.N / nBatches;
-            self.nTags = self.K;
+            self.J = N_init / nBatches;
+            self.nTags = K_init;
             if self.J ~= floor(self.J)
                 error('block_batch:inconsistent_data_specification',['There are %d rows and you ', ...
                     'specified %d batches.  This is not consistent with the data provided.'], ...
-                    self.N, nBatches)
+                    N_init, nBatches)
             end
 
             % Unfold the data:
@@ -90,30 +88,28 @@ classdef block_batch < block_base
                 temp = self.batch_raw{n}';
                 self.data(n, :) = temp(:)';
             end
-            self.N = nBatches;                
-            self.K = self.nTags * self.J;
+            %self.N = nBatches;                
+            %self.K = self.nTags * self.J;
             
             % Missing data handling
             self.mmap = false;            
             missing_map = ~isnan(self.data);   % 0=missing, 1=present
-            if all(missing_map)
-                self.has_missing = false;
-            else
-                self.has_missing = true;
+            if not(all(missing_map))
                 self.mmap = missing_map;
             end
             
             % Block name
-            if isempty(block_name)
-                self.name = ['batch-', num2str(self.N), '-', num2str(self.K), '-', num2str(self.J)];
-                self.name_type = 'auto';
-            else
+            if not(isempty(block_name))
                 self.name = block_name;
                 self.name_type = 'given';
             end
             
         end
         
+        function out = get_auto_name(self)
+            out = ['batch-', num2str(self.N), '-', num2str(self.K), '-', num2str(self.J)];
+        end
+                
         function out = get_data(self)
             % Returns the data array stored in self.
             out = self.data;
@@ -136,6 +132,11 @@ classdef block_batch < block_base
         end
         
         function self = exclude_post(self, dim, which)
+            
+            if strcmp(self.block_type, 'batch')
+                error('block:exclude', 'Excluding tags from batch blocks is not currently supported.')
+            end
+            
             other = block(subsref(self.data, s_ordinary), self.name);
             other.block_type = 'batch';
             other.nTags = self.nTags;

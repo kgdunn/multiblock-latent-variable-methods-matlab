@@ -1,9 +1,10 @@
 function test_blocks(varargin)
     close all;
     
+    test_basic_syntax();
     test_exclude();
     
-    test_basic_syntax();
+    
     test_batch_blocks();
     test_labels();
     test_preprocessing();
@@ -13,6 +14,13 @@ end
 
 function test_basic_syntax()    
     % 1-D and 2-D tests
+    b = block(NaN);
+    assertTrue(b.N == 1)
+    assertTrue(b.K == 1)
+    assertTrue(strcmpi(b.name, 'block-1-1'))
+    assertTrue(b.has_missing == true);
+    
+    
     X = randn(10, 5);
     b = block(X);
     assertTrue(b.N == 10)
@@ -39,30 +47,37 @@ function test_basic_syntax()
     assertTrue(strcmpi(b.name, 'block-1-1'))
     assertTrue(b.has_missing == false);
     
-    b = block(NaN);
-    assertTrue(b.N == 1)
-    assertTrue(b.K == 1)
-    assertTrue(strcmpi(b.name, 'block-1-1'))
-    assertTrue(b.has_missing == true);
+    
 end
 
 function test_exclude()
 % Excluding rows from the block
 
-    % Batch blocks
-    X = randn(50,4);
-    batch_names = {'A', 'B', 'C', 'Four', 'E', 'F', 'G', 'H', 'I', 'Ten'};
-    time_names = {'1', '2', '3', '4', '5'};
-    tag_names = {'Temp', 'Pres', 'Flow', 'Heat input', 'Flow2'};
-    b = block(X, 'X block', {'batch_names', batch_names}, ...
-                            {'batch_tag_names', tag_names}, ....
-                            {'time_names', time_names});
-                        
-    b.exclude(1, 4);
-    b.exclude(1, 'A');
+    % Array blocks
+    FMC = load('datasets/FMC.mat');
+    Z = block(FMC.Z);
+    Z.add_labels(2, FMC.Znames)
     
-    b.exclude(1, {'A'});
-    b.exclude(1, {'A', 'H'});
+    [Z, other] = Z.exclude(1, 12:15)
+    assertTrue(all(shape(Z) == [55, 20]))
+    
+    [Z, other] = Z.exclude(2, [9:14 16])
+    assertTrue(all(shape(Z) == [55, 13]))
+
+    % Batch blocks
+    
+%     batch_names = {'A', 'B', 'C', 'Four', 'E', 'F', 'G', 'H', 'I', 'Ten'};
+%     time_names = {'1', '2', '3', '4', '5'};
+%     tag_names = {'Temp', 'Pres', 'Flow', 'Heat input', 'Flow2'};
+%     b = block(X, 'X block', {'batch_names', batch_names}, ...
+%                             {'batch_tag_names', tag_names}, ....
+%                             {'time_names', time_names});
+%                         
+%     b.exclude(1, 4);
+%     b.exclude(1, 'A');
+%     
+%     b.exclude(1, {'A'});
+%     b.exclude(1, {'A', 'H'});
 end
 
 function test_batch_blocks()
@@ -103,7 +118,8 @@ function test_batch_blocks()
     assertTrue(b.K == 50)
     assertTrue(b.nTags == 5)
     assertTrue(b.J == 10)
-    assertTrue(all(cell2mat(b.labels{3}) == cell2mat(time_names)))
+    internal_rep = cellstr(num2str(cell2mat(time_names(:))));
+    assertTrue(all(all(char(b.labels{3}) == char(internal_rep))))
     
 
     batch_names = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'};
