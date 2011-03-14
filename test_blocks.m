@@ -58,11 +58,13 @@ function test_exclude()
     Z = block(FMC.Z);
     Z.add_labels(2, FMC.Znames)
     
-    [Z, other] = Z.exclude(1, 12:15)
+    [Z, other] = Z.exclude(1, 12:15);
     assertTrue(all(shape(Z) == [55, 20]))
+    assertTrue(all(shape(other) == [4, 20]))
     
-    [Z, other] = Z.exclude(2, [9:14 16])
+    [Z, other] = Z.exclude(2, [9:14 16]);
     assertTrue(all(shape(Z) == [55, 13]))
+    assertTrue(all(shape(other) == [55, 7]))
 
     % Batch blocks
     
