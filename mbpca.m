@@ -163,6 +163,13 @@ classdef mbpca < mblvm
                 
             end % looping on ``a`` latent variables
         end % ``calc_model``
+        
+        % Superclass abstract method implementation
+        function limits_subclass(self)
+            % Calculates the monitoring limits for a batch blocks in the model
+
+        end % ``calc_model_post``
+        
     
         % Superclass abstract method implementation
         function state = apply_model(self, new, state, varargin) 

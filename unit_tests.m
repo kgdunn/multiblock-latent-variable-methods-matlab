@@ -8,6 +8,10 @@ function unit_tests(varargin)
     PCA_no_missing_data()
     PCA_with_missing_data()
     PCA_batch_data()
+    
+    
+    
+    
     PCA_cross_validation_no_missing()
     MBPCA_tests()
     
