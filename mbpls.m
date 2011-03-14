@@ -95,7 +95,7 @@ classdef mbpls < mblvm
                 end 
                                  
                 % Converge onto a single component
-                [t_a, p_a, w_a, c_a, u_a, itern] = mbpls.single_block_PLS(self.data, self.Y.data, self, a, self.has_missing); 
+                [t_a, p_a, c_a, u_a, w_a, itern] = mbpls.single_block_PLS(self.data, self.Y.data, self, a, self.has_missing); 
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
@@ -105,7 +105,6 @@ classdef mbpls < mblvm
                 if sign(w_a(max_el_idx)) < 1
                     p_a = -1.0 * p_a;
                     t_a = -1.0 * t_a;
-                    w_a = -1.0 * w_a;
                     c_a = -1.0 * c_a;
                     u_a = -1.0 * u_a;
                 end                    
@@ -184,8 +183,6 @@ classdef mbpls < mblvm
                     self.super.stats.R2Yk_a(:,a) = self.super.stats.R2Yk_a(:,a) - sum(self.super.stats.R2Yk_a(:,1:a-1), 2);
                 end
                 
-                
-                
                 ssq_cumul = 0;
                 ssq_before = 0;
                 for b = 1:self.B
@@ -240,10 +237,6 @@ classdef mbpls < mblvm
                 end
                 self.super.stats.VIP(1:self.B,a) = sqrt(VIP_temp);
                 
-                
-                
-                
-               
                 % Calculate the limits                
                 self.calc_statistics_and_limits(a);
                 
@@ -259,12 +252,79 @@ classdef mbpls < mblvm
         end % ``apply_model``
         
         % Superclass abstract method implementation
-        function self = calc_statistics_and_limits(self, a)
-           
-        end % ``calc_statistics_and_limits``
-        
-        % Superclass abstract method implementation
         function summary(self)
+            % Displays more information about ``self``
+            
+            % TODO(KGD): improve this by not displaying block info if B==1
+            
+            fprintf('R2 summary for %s (all as percentages)\n', self.model_type);
+            w_char = zeros(self.B + 1,1);
+            ncols = 2 + self.B + 1;  % A column, overall R2, and then all blocks + Y-block
+            line_length = 3 + 8 + ncols;
+            all_lines = '|%3i|%7.2f|';
+            start_line = '|%3s|%7s|';
+            block_names = cell(self.B + 1,1);
+            for b = 1:self.B   % for the Y-block
+                if strcmp(self.blocks{b}.name_type, 'auto')
+                    % Drop off the "block-" part of the automatic block name
+                    block_names{b} = self.blocks{b}.name(7:end);
+                else
+                    block_names{b} = self.blocks{b}.name;
+                end
+                
+                w_char(b) = max(6, numel(block_names{b}));
+                all_lines = [all_lines, '%', num2str(w_char(b)), '.2f|']; %#ok<AGROW>
+                start_line = [start_line,  '%', num2str(w_char(b)), 's|']; %#ok<AGROW>                
+                line_length = line_length + w_char(b);
+            end
+            if strcmp(self.Y.name_type, 'auto')
+                % Drop off the "block-" part of the automatic block name
+                block_names{b+1} = self.Y.name(7:end);
+            else
+                block_names{b+1} = self.Y.name;
+            end
+            
+            w_char(b+1) = max(6, numel(block_names{b+1}));
+            all_lines = [all_lines, '%', num2str(w_char(b+1)), '.2f|\n']; 
+            start_line = [start_line,  '%', num2str(w_char(b+1)), 's|\n']; 
+            line_length = line_length + w_char(b+1);
+            
+            disp(repmat('-', 1, line_length))
+            fprintf_args = {' A ', ' All X ', block_names{:}};
+            fprintf(start_line, fprintf_args{:});
+            disp(repmat('-', 1, line_length))
+            
+            
+            for a = 1:self.A
+                fprintf_args = zeros(1, 2+self.B);
+                fprintf_args(1:2) =  [a, self.super.stats.R2X(a)*100];
+                for b = 1:self.B
+                    fprintf_args(2+b) = self.stats{b}.R2b_a(a)*100;
+                end
+                fprintf_args(2+b+1) = self.super.stats.R2Y(a)*100;
+                fprintf(all_lines, fprintf_args);
+            end
+            
+            disp(repmat('-', 1, line_length))
+            fprintf('Overall R2X(cumul) = %6.2f%%\n', sum(self.super.stats.R2X)*100)
+            fprintf('Overall R2Y(cumul) = %6.2f%%\n', sum(self.super.stats.R2Y)*100)
+            fprintf('Time to calculate (s): = [');
+            for a= 1:self.A
+                fprintf('%3.2f', self.model.stats.timing(a))
+                if a ~= self.A
+                    fprintf(', ')
+                end
+            end
+            fprintf(']\n');
+            
+            fprintf('Number of iterations: = [');
+            for a= 1:self.A
+                fprintf('%3d', self.model.stats.itern(a))
+                if a ~= self.A
+                    fprintf(', ')
+                end
+            end
+            fprintf(']\n');
             
         end
         
@@ -272,7 +332,7 @@ classdef mbpls < mblvm
     
     % These methods don't require a class instance
     methods(Static)
-        function [t_a, p_a, w_a, c_a, u_a, itern] = single_block_PLS(X, Y, self, a, has_missing)
+        function [t_a, p_a, c_a, u_a, w_a, itern] = single_block_PLS(X, Y, self, a, has_missing)
             % Extracts a PCA component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
             % The ``a`` entry is merely used to show which component is being

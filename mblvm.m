@@ -197,6 +197,77 @@ classdef mblvm < handle
             end
         end % ``merge_blocks``  
         
+        function self = calc_statistics_and_limits(self, a)
+            % Calculate summary statistics and limits for the model. 
+            % TODO
+            % ----
+            % * Modelling power of each variable
+            % * Eigenvalues
+            
+            % Check on maximum number of iterations
+            if any(self.model.stats.itern >= self.opt.max_iter)
+                warn_string = ['The maximum number of iterations was reached ' ...
+                    'when calculating the latent variable(s). Please ' ...
+                    'check the raw data - is it correct? and also ' ...
+                    'adjust the number of iterations in the options.'];
+                warning('mbpca:calc_statistics_and_limits', warn_string)
+            end
+           
+            % Calculate the limits for the latent variable model.
+            %
+            % References
+            % ----------
+            % [1]  SPE limits: Nomikos and MacGregor, Multivariate SPC Charts for
+            %      Monitoring Batch Processes. Technometrics, 37, 41-59, 1995.
+            %
+            % [2]  T2 limits: Johnstone and Wischern.
+            %
+            % [3]  Score limits: two methods
+            %
+            %      A: Assume that scores are from a two-sided t-distribution with N-1
+            %         degrees of freedom.  Based on the central limit theorem.
+            %
+            %      B: (t_a/s_a)^2 ~ F_alpha(1, N-1) distribution if scores are
+            %         assumed to be normally distributed, and s_a is chi-squared
+            %         variable with N-1 DOF.
+            %
+            %         critical F = scipy.stats.f.ppf(0.95, 1, N-1)
+            %         which happens to be equal to (scipy.stats.t.ppf(0.975, N-1))^2,
+            %         as expected.  Therefore the alpha limit for t_a is equal to
+            %         sqrt(scipy.stats.f.ppf(0.95, 1, N-1)) * S[:,a]
+            %
+            %      Both methods give the same limits. In fact, some previous code was:
+            %         t_ppf_95 = scipy.stats.t.ppf(0.975, N-1)
+            %         S[:,a] = std(this_lv, ddof=0, axis=0)
+            %         lim.t['95.0'][a, :] = t_ppf_95 * S[:,a]
+            %
+            %      which assumes the scores were t-distributed.  In fact, the scores
+            %      are not t-distributed, only the (score_a/s_a) is t-distributed, and
+            %      the scores are NORMALLY distributed.
+            %      S[:,a] = std(this_lv, ddof=0, axis=0)
+            %      lim.t['95.0'][a, :] = n_ppf_95 * S[:,a]
+            %      lim.t['99.0'][a, :] = n_ppf_99 * [:,a]
+            %
+            %      From the CLT: we divide by N, not N-1, but stddev is calculated
+            %      with the N-1 divisor.
+            
+            siglevel = 0.95;
+            
+            % Super-level statistics. NOTE: the superlevel statistics will
+            % agree with the block level statistics and limits if there is
+            % only a single block.
+            self.super.lim.SPE(a) = self.spe_limits(self.super.SPE(:,a), siglevel, sum(self.K));
+            self.super.lim.T2(a) = self.T2_limits(self.super.T(:,1:a), siglevel, a);
+            self.super.lim.t(a) = self.score_limits(self.super.T(:, a), siglevel);
+            
+            for b = 1:self.B
+                self.lim{b}.SPE(a) = self.spe_limits(self.stats{b}.SPE(:,a), siglevel, self.K(b));
+                self.lim{b}.T2(a) = self.T2_limits(self.T{b}(:, 1:a), siglevel, a);
+                self.lim{b}.t(a) = self.score_limits(self.T{b}(:, a), siglevel);
+            end            
+            
+        end % ``calc_statistics_and_limits``
+        
     end % end: methods (ordinary)
     
     % Subclasses may not redefine these methods
@@ -223,7 +294,7 @@ classdef mblvm < handle
             merge_blocks(self);            % method may be subclassed 
             calc_model(self, requested_A); % method must be subclassed
         end % ``build``
-        
+         
         function state = apply(self, new)
             % Apply the multiblock latent variable model to new data.
             % * preprocess the data if it has not been already
@@ -545,7 +616,7 @@ classdef mblvm < handle
                     self.PP{b}.scaling = PP_block.scaling;                    
                 end                
             end
-            self.preprocess_extra()         % method must be subclassed 
+            self.preprocess_extra();         % method must be subclassed 
         end % ``preprocess_blocks``
                 
         function self = split_result(self, result, rootfield, subfield)

@@ -1,11 +1,11 @@
 function unit_tests(varargin)
     close all;
     
-    MBPLS_tests();
+    
     
     test_significant_figures()
     
-    Wold_article_PCA_test()
+    Wold_article_PCA_test() 
     MBPCA_tests()    
     PCA_no_missing_data()      
     PCA_with_missing_data()    
@@ -16,11 +16,13 @@ function unit_tests(varargin)
     PLS_no_missing_data()    
     PLS_with_missing_data()
     
+    MBPLS_tests();
+    
     % External testing file
     test_blocks()
     
     
-    PLS_randomization_tests()
+    %PLS_randomization_tests()
     
     
     % TODO(KGD):
@@ -369,7 +371,7 @@ function PLS_no_missing_data()
     % R2-per variable(k)-per component(a): Y-space
     R2Y_col = 8;
     R2kY_cum = exp_m.variables{2}.data(:, R2Y_col);
-    assertEAE(PLS.super.stats.R2Yk_a(:,end), R2kY_cum, 4); 
+    assertEAE(sum(PLS.super.stats.R2Yk_a, 2), R2kY_cum, 4); 
     
     % TODO(KGD): Coefficients
 
