@@ -18,6 +18,9 @@ function unit_tests(varargin)
     MBPLS_tests();
     %PLS_randomization_tests()
     
+    % Basic plots
+    test_plots()
+    
     % External testing file
     test_blocks()
         
