@@ -317,17 +317,14 @@ classdef mblvm < handle
                 error('Currently only supports a single batch block.')
             end                
             
-            batchstat = cell(self.B, 1);
+            
             for b = 1:batch_blocks
-                batchstat{b} = struct;
                 self.stats{b}.T_j = zeros(self.N, self.A, self.blocks{b}.J);
-                %batchstat{b}.SPE_j_temp = zeros(self.N, self.blocks{b}.J);
-                batchstat{b}.error_j = zeros(self.N, self.K);
-                J_time = self.blocks{b}.J;
+                J_time = self.blocks{b}.J;                
             end
-            superstat = struct;
-            superstat.SPE = zeros(self.N, J_time);
-            superstat.T2 = zeros(self.N, J_time);
+            self.super.T2_j = zeros(self.N, J_time);
+            self.super.SPE_j = zeros(self.N, J_time);
+            SPE_j_temp = zeros(self.N, J_time);
             
             show_progress = true; %%self.opt.show_progress;
             if show_progress
@@ -376,13 +373,11 @@ classdef mblvm < handle
                             raw_n{b}(1, idx_beg:idx_end) = trajectory_n(1, idx_beg:idx_end);
                             
                             out = self.apply(raw_n, apply_opt);
-                            superstat.SPE(n,j) = out.stats.super.SPE;
-                            superstat.T2(n,j) = out.stats.super.T2;
+                            
+                            self.super.T2_j(n,j) = out.stats.super.T2;
+                            self.super.SPE_j(n,j) = out.stats.super.SPE;  % out.stats.SPE(1, end); % use only the last component
                             self.stats{b}.T_j(n, :, j) = out.T{b};
-                            batch.error_j(n, idx_beg:idx_end) = out.newb{b}.data(1, idx_beg:idx_end);
-                            %SPE_j_temp(n,j) = ssq(out.data(1, idx_beg:idx_end));
-                            %batch.stats.SPE_j(n, j) = out.stats.SPE(1, end); % use only the last component
-                             
+                            SPE_j_temp(n,j) = ssq(out.newb{b}.data(1, idx_beg:idx_end));
                         end % ``j=1, 2, ... J``
                     else
                         raw_n{b} = blk.data(n, :);
@@ -444,14 +439,11 @@ classdef mblvm < handle
                         % large initially.
                         
                         
-                        %N_lim = self.blocks{b}.N;
+                        N_lim = self.blocks{b}.N;
                         for a = 1:self.A
-                            self.lim{1}.T2_j = T2_limits(self.stats{b}.T_j, siglevel, a);
-                            
-                            
-                            %mult = a*(N_lim-1)*(N_lim+1)/(N_lim*(N-a));
-                            %limit = my_finv(alpha, a, N-(self.A));
-                            %batch.lim.T2_j(:,a) = mult * limit;
+                            mult = a*(N_lim-1)*(N_lim+1)/(N_lim*(N_lim-a));
+                            limit = self.finv(siglevel, a, N_lim-(self.A));
+                            self.lim{b}.T2_j(:,a) = mult * limit;
                             % This value should agree with batch.lim.T2(:,a)
                             % TODO(KGD): slight discrepancy in batch SBR dataset
                         end
@@ -462,17 +454,18 @@ classdef mblvm < handle
                         % number of tags.
                         % Apply smoothing window here: see Nomikos thesis, p 66.
                         % ``w`` should be a function of how "jumpy" the SPE plot
-                        % looks.  Right now, I'm going to set ``w`` proportional
+                        % looks.  Right now, we set ``w`` proportional
                         % to the number of time samples in a batch
-                        w = max(1, ceil(0.012/2 * batch.J));
-                        for j = 1:batch.J
+                        w = max(1, ceil(0.012/2 * self.blocks{b}.J));
+                        for j = 1:self.blocks{b}.J
                             start_idx = max(1, j-w);
-                            end_idx = min(batch.J, j+w);
+                            end_idx = min(self.blocks{b}.J, j+w);
                             SPE_values = SPE_j_temp(:, start_idx:end_idx);
-                            batch.lim.SPE_j(j) = sqrt(calculate_SPE_limit(SPE_values, alpha)/batch.nTags);
-                        end
-                        SPE_j_temp = SPE_j_temp ./ batch.nTags;
-                        batch.stats.SPE_j = sqrt(SPE_j_temp);
+                            self.lim{b}.SPE_j(j) = self.spe_limits(SPE_values, siglevel, self.blocks{b}.nTags, true);
+                        end   
+                        % N x J matrix assigned
+                        self.stats{b}.SPE_j = sqrt(SPE_j_temp ./ self.blocks{b}.nTags);
+                        %self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
                         
                     end % ``if: a batch block ?
                 end % ``b = 1, 2, ... self.B``
@@ -1368,7 +1361,7 @@ classdef mblvm < handle
 
         end
         
-        function limits = spe_limits(values, levels, ncol)
+        function limits = spe_limits(values, levels, ncol, pure_error)
             % Calculates the SPE limit(s) at the given ``levels`` [0, 1]
             % where SPE was calculated over ``ncol`` entries.
             %
@@ -1381,7 +1374,12 @@ classdef mblvm < handle
             % the SPE limit back.  That's why this function requires ``ncol``,
             % which is the same as K in the above equation.
             
-            values = values.^2 .* ncol;
+            % Then inputs were e'e (not sqrt(e'e/K))
+            if nargin == 4 && pure_error == true
+                values = values(:);
+            else            
+                values = values(:).^2 .* ncol;
+            end
             if all(values) < sqrt(eps)
                 limits = 0.0;
                 return
