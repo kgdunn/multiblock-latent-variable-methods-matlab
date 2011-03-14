@@ -289,7 +289,11 @@ classdef block_base < handle
             try
                 to_add = cellstr(to_add);
             catch ME
-                to_add = cellstr(num2str(cell2mat(to_add(:))));
+                if iscell(to_add)
+                    to_add = cellstr(num2str(cell2mat(to_add(:))));
+                else
+                    to_add = cellstr(num2str(to_add(:)));
+                end
             end
             for k = 1:numel(self.labels(dim, :))
                 if isempty(self.labels{dim, k})
@@ -334,7 +338,13 @@ classdef block_base < handle
                     if strcmp(name_j, ax_labels(k))
                         idx(end+1) = k;
                         idx_names(end+1) = ax_labels(k);
+                        
+                    % Deal with strings of numbers
+                    elseif str2double(ax_labels(k)) == name_j
+                        idx(end+1) = k;
+                        idx_names(end+1) = ax_labels(k);
                     end
+                        
                 end
                 
             end
@@ -354,16 +364,16 @@ classdef block_base < handle
             
         end
         
-        function h = plot(self, varargin)
+        function varargout = plot(self, varargin)
             % SYNTAX
             %
-            % plot(block)                   % plots all the data in 2 x 4 subplots, or fewer
-            % plot(block, {'sub', [2, 5]})  % plots all the data in 2 x 5 subplots
+            % plot(block)                      % plots all the data in 2 x 5 subplots, or fewer
+            % plot(block, {'layout', [2, 3]})  % plots all the data in 2 x 3 subplots
             % plot(block, {'one', <column name or number>})
             % plot(block, {'mark', <row name(s) or number(s)>})
             
             % Set the defaults
-            default_layout = [2, 4];
+            default_layout = [2, 5];
             subplot_size = block_base.optimal_layout(self.K, default_layout);
             tags = 1:self.K;
             mark = NaN;
@@ -372,7 +382,7 @@ classdef block_base < handle
             for i = 1:numel(varargin)
                 key = varargin{i}{1};
                 value = varargin{i}{2};
-                if strcmpi(key, 'sub')
+                if strcmpi(key, 'layout')
                     subplot_size = value;
                 elseif strcmpi(key, 'one')
                     subplot_size = [1, 1];
@@ -385,6 +395,9 @@ classdef block_base < handle
             [h, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_size, mark);
             self.add_plot_footers(hFooters, footer_string);
             self.add_plot_window_title(hHeaders, title_str)
+            for i=1:nargout
+                varargout{i} = hA;
+            end
         end
                
         function add_plot_footers(self, hFooters, footer_string)
@@ -395,7 +408,7 @@ classdef block_base < handle
             end
             
             % Append the source file to the figure
-            footer_string = [foot, ' (source: ', self.source, ')'];
+            footer_string = [foot, ' [source: ', self.source, ']'];
             for k = 1:numel(hFooters)
                 set(hFooters(k), 'String', footer_string)
             end
@@ -545,10 +558,6 @@ classdef block_base < handle
 %                 self.is_preprocessed = true;
 %             end
 %         end
-
-    function exclude_post(self, dim, which)
-        %a = self;
-    end
          
     function [self, other] = exclude(self, dim, which)
         % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
@@ -611,9 +620,7 @@ classdef block_base < handle
                 self.labels{dim, entry} = subsref(tags, rem_tag);
                 other.labels{dim, entry} = subsref(tags, exc_tag);
             end
-        end
-        self.exclude_post(dim, which);
-        
+        end        
     end
 
  
@@ -754,7 +761,7 @@ function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_siz
         plot(hA(k), self.data(:,tags(k)), 'k')
         title(hA(k), char(tagnames{k}), 'FontSize',14)
         set(hA(k), 'FontSize',14)
-        axis tight
+        axis(hA(k), 'tight')
         grid(hA(k),'on')
     end
     title_str = 'Plots of raw data';

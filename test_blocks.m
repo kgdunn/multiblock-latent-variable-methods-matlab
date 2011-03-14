@@ -68,14 +68,12 @@ function test_exclude()
 
     % Batch blocks
     
-%     batch_names = {'A', 'B', 'C', 'Four', 'E', 'F', 'G', 'H', 'I', 'Ten'};
-%     time_names = {'1', '2', '3', '4', '5'};
-%     tag_names = {'Temp', 'Pres', 'Flow', 'Heat input', 'Flow2'};
-%     b = block(X, 'X block', {'batch_names', batch_names}, ...
-%                             {'batch_tag_names', tag_names}, ....
-%                             {'time_names', time_names});
-%                         
-%     b.exclude(1, 4);
+    
+    tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator','J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
+    b = block(FMC.batchSPCData, 'X block', {'batch_names', FMC.Xnames}, ...
+                                 {'batch_tag_names', tag_names});
+                        
+    b.exclude(1, 4);
 %     b.exclude(1, 'A');
 %     
 %     b.exclude(1, {'A'});

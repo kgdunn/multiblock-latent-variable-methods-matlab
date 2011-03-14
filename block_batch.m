@@ -131,33 +131,75 @@ classdef block_batch < block_base
             end
         end
         
-        function self = exclude_post(self, dim, which)
+        function self = exclude(self, dim, which)
             
-            if strcmp(self.block_type, 'batch')
-                error('block:exclude', 'Excluding tags from batch blocks is not currently supported.')
-            end
+            %if dim == 2
+            error('block_batch:exclude', 'Excluding from batch blocks is not currently supported.')
+            %end
             
-            other = block(subsref(self.data, s_ordinary), self.name);
-            other.block_type = 'batch';
-            other.nTags = self.nTags;
-            other.J = self.J;
-            other.tagnames = self.tagnames;
-            other.raw_data = cell(numel(which), 1);
-            for n = 1:numel(which)
-                other.raw_data{n} = self.raw_data{which(n)};
-            end
+%             exc_s = struct; 
+%             exc_s.type = '()';
+% 
+%             rem_s = struct; 
+%             rem_s.type = '()';
+% 
+%             if dim == 1 
+%                 if any(which>self.N)
+%                     error('block_batch:exclude', 'Entries to exclude exceed the size (row size) of the block.')
+%                 end
+%                 exc_s.subs = {which, ':'};
+%                 remain_idx = 1:self.N;
+%                 remain_idx(which) = [];
+%                 rem_s.subs = {remain_idx, ':'};
+%             end
+%             
+%             other = self.copy();
+% 
+%             self.data = subsref(self.data, rem_s);
+%             other.data = subsref(other.data, exc_s);
+%             if numel(self.mmap) > 1
+%                 self.mmap = subsref(self.mmap, rem_s);
+%                 other.mmap = subsref(other.mmap, exc_s);
+%             end
+% 
+%             tagnames = self.labels(dim,:);
+%             exc_tag = struct;
+%             exc_tag.type = '()';
+%             exc_tag.subs = {which};
+%             rem_tag = struct;
+%             rem_tag.type = '()';
+%             rem_tag.subs = {remain_idx};
+%             for entry = 1:numel(tagnames)
+%                 tags = tagnames{entry};
+%                 if not(isempty(tags))
+%                     self.labels{dim, entry} = subsref(tags, rem_tag);
+%                     other.labels{dim, entry} = subsref(tags, exc_tag);
+%                 end
+%             end
+% 
 
-            self_raw_data = self.raw_data;
-            self_data = subsref(self.data, s_ordinary_remain);
-            self = block(self_data, self.name);
-            self.block_type = 'batch';
-            self.J = other.J;
-            self.nTags = other.nTags;
-            self.tagnames = other.tagnames;
-            self.raw_data = cell(numel(remain), 1);
-            for n = 1:numel(remain)
-                self.raw_data{n} = self_raw_data{remain(n)};
-            end
+%             
+%             other = block(subsref(self.data, s_ordinary), self.name);
+%             other.block_type = 'batch';
+%             other.nTags = self.nTags;
+%             other.J = self.J;
+%             other.tagnames = self.tagnames;
+%             other.raw_data = cell(numel(which), 1);
+%             for n = 1:numel(which)
+%                 other.raw_data{n} = self.raw_data{which(n)};
+%             end
+% 
+%             self_raw_data = self.raw_data;
+%             self_data = subsref(self.data, s_ordinary_remain);
+%             self = block(self_data, self.name);
+%             self.block_type = 'batch';
+%             self.J = other.J;
+%             self.nTags = other.nTags;
+%             self.tagnames = other.tagnames;
+%             self.raw_data = cell(numel(remain), 1);
+%             for n = 1:numel(remain)
+%                 self.raw_data{n} = self_raw_data{remain(n)};
+%             end
         end
         
         function varargout = plot(self, varargin)
@@ -211,7 +253,11 @@ classdef block_batch < block_base
                         for n = 2:numel(mark_names)
                             footer_names = [footer_names, ', ', mark_names{n}];
                         end
-                        footer_string{end+1} = ['; marked batches: ', footer_names]; %#ok<*AGROW>
+                        if numel(mark) > 1                            
+                            footer_string{end+1} = ['; marked batches: ', footer_names]; %#ok<*AGROW>
+                        elseif numel(mark) == 1
+                            footer_string{end+1} = ['; marked batch: ', footer_names]; %#ok<*AGROW>
+                        end
                     end
                 elseif strcmpi(key, 'some')
                     which_tags = self.index_by_name(1, value);
