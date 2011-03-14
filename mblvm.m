@@ -219,8 +219,8 @@ classdef mblvm < handle
             % Resize the storage for ``A`` components
             self.initialize_storage(requested_A);
                 
-            preprocess_blocks(self);       % superclass method
-            merge_blocks(self);            % method must be subclassed 
+            preprocess_blocks(self);       % superclass method            
+            merge_blocks(self);            % method may be subclassed 
             calc_model(self, requested_A); % method must be subclassed
         end % ``build``
         
@@ -540,11 +540,12 @@ classdef mblvm < handle
             for b = 1:self.B
                 if ~self.PP{b}.is_preprocessed
                     [self.blocks{b}, PP_block] = self.blocks{b}.preprocess();
-                    self.PP{1}.is_preprocessed = true;
-                    self.PP{1}.mean_center = PP_block.mean_center;
-                    self.PP{1}.scaling = PP_block.scaling;                    
+                    self.PP{b}.is_preprocessed = true;
+                    self.PP{b}.mean_center = PP_block.mean_center;
+                    self.PP{b}.scaling = PP_block.scaling;                    
                 end                
             end
+            self.preprocess_extra()         % method must be subclassed 
         end % ``preprocess_blocks``
                 
         function self = split_result(self, result, rootfield, subfield)
@@ -579,6 +580,7 @@ classdef mblvm < handle
     
     % Subclasses must redefine these methods
     methods (Abstract=true)
+        preprocess_extra(self)   % extra preprocessing steps that subclass does
         calc_model(self, A)      % fit the model to data in ``self``
         apply_model(self, other) % applies the model to ``new`` data
         expand_storage(self, A)  % expands the storage to accomodate ``A`` components

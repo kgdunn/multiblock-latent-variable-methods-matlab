@@ -17,6 +17,10 @@ classdef mbpca < mblvm
         end % ``expand_storage``
         
         % Superclass abstract method implementation
+        function self = preprocess_extra(self)
+        end
+        
+        % Superclass abstract method implementation
         function self = calc_model(self, A)
             % Fits a multiblock PCA model on the data, extracting A components
             % We assume the data are merged and preprocessed already.

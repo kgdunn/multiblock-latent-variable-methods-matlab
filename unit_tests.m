@@ -1,6 +1,8 @@
 function unit_tests(varargin)
     close all;
     
+    MBPLS_tests();
+    
     test_significant_figures()
     
     Wold_article_PCA_test()
@@ -876,6 +878,366 @@ function MBPCA_tests()
     assertEAE(mbmodel.stats{1}.R2b_a,  stats_PCA.R2X{1}, 5)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 5)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_PCA.R2X{2}, 5)
+return
+
+function MBPLS_tests()
+
+    LDPE = load('tests/LDPE-PLS.mat');
+    X_raw = LDPE.data.blocks{1};
+    Y = block(LDPE.data.blocks{2});
+
+    block_1_vars = [1,2,3,6,8,10,12,14];
+    block_2_vars = [4,5,7,9,11,13];
+    X1 = block(X_raw(:, block_1_vars));
+    X2 = block(X_raw(:, block_2_vars));
+
+    
+    X_raw = {X1, X2};
+
+    % Number of components
+    A = 3;
+
+    B = numel(X_raw);
+    K_b = zeros(1,B);
+    for b = 1:B
+        K_b(b) = size(X_raw{b}.data, 2);
+    end
+    N = size(X_raw{1}.data,1);
+
+
+    % -----------------------------------------------------------------------
+    %
+    % Merged PLS approach: merge the X-space blocks together and create model 
+    % using the single block PLS mechanism
+
+    % Reset Y-back to the raw data
+    Y_data = Y.data;
+    level_Y = mean(Y_data);
+    spread_Y = std(Y_data);
+    Y_data = (Y_data - repmat(level_Y, N, 1)) ./ repmat(spread_Y, N, 1);
+
+    % Create cell arrays for each block; preprocess each block
+    X_mb = cell(1, B);
+    for b = 1:B
+        X_raw{b} = X_raw{b}.preprocess();
+        X_mb{b} = X_raw{b}.data;
+    end
+
+    % Statistics are stored here
+    stats_PLS = struct();
+    stats_PLS.R2X = cell(1, B);
+    stats_PLS.R2X_baseline = cell(1,B);
+    stats_PLS.R2X_overall = zeros(1,A);
+    stats_PLS.R2Y_baseline = ssq(Y_data);
+    stats_PLS.R2Y_overall = zeros(1,A);
+    stats_PLS.SPE = cell(1,B);
+    stats_PLS.SPE_overall = zeros(N, A);
+    stats_PLS.T2 = cell(1,B);
+
+
+    X_merged = ones(N, sum(K_b)) .* NaN;
+    start_col = 1;
+    for b = 1:B
+        last_col = start_col + K_b(b) - 1;
+        X_merged(:, start_col:last_col) = X_mb{b} / sqrt(K_b(b));
+        start_col = start_col + K_b(b);
+
+        stats_PLS.R2X_baseline{b} = ssq(X_mb{b} / sqrt(K_b(b)));
+        stats_PLS.SPE{b} = zeros(N, A);
+        stats_PLS.T2{b} = zeros(N, A);
+    end
+    assert(abs(sum(cell2mat(stats_PLS.R2X_baseline))-ssq(X_merged)) <sqrt(eps))
+    K = size(X_merged, 2);
+    M = size(Y_data, 2);
+
+    T = zeros(N, A);
+    U = zeros(N, A);
+    P = zeros(K, A);
+    W = zeros(K, A);
+    C = zeros(M, A);
+
+    % Afterwards we have to recover the block scores, block weights and block 
+    % loadings that we would have otherwise calculated from the full approach.
+    W_b_recovered = cell(1, B);
+    T_b_recovered = cell(1, B);
+    P_b_recovered = cell(1, B);
+    T_s_recovered = zeros(N, A) .* NaN;
+    T_sum_recovered = zeros(N, B, A);
+    W_s_recovered = zeros(B, A) .* NaN;
+    for b = 1:B
+        W_b_recovered{b} = zeros(K_b(b), A);
+        T_b_recovered{b} = zeros(N, A);
+        P_b_recovered{b} = zeros(K_b(b), A);
+    end
+
+    for a = 1:A
+        u_a = randn(N, 1);
+        u_a_guess = u_a * 2;
+        while norm(u_a_guess - u_a) > eps^(2/3)
+            u_a_guess = u_a;
+            w_a = X_merged' * u_a / (u_a' * u_a);
+            w_a = w_a / norm(w_a);
+            t_a = X_merged * w_a / (w_a'*w_a);
+            c_a = Y_data' * t_a / (t_a' * t_a);
+            u_a = Y_data * c_a;%/ (c_a'*c_a);     % <------- divide (optional)     
+        end    
+        p_a = X_merged' * t_a / (t_a' * t_a);
+
+        T(:,a) = t_a;
+        U(:,a) = u_a;
+        P(:,a) = p_a;
+        W(:,a) = w_a;
+        C(:,a) = c_a;
+        start_col = 1;
+        for b = 1:B
+            last_col = start_col + K_b(b) - 1;
+            % Multiply here by sqrt(K_b(b)) to get the X_portion looking like the
+            % X-block that would have come from full multiblock approach (which
+            % only preprocesses each block, but doesn't downweight it).
+            X_portion = X_merged(:, start_col:last_col) * sqrt(K_b(b));
+            w_b_recovered_temp = X_portion' * u_a / (u_a' * u_a);
+            W_b_recovered{b}(:,a) = w_b_recovered_temp / norm(w_b_recovered_temp);
+            T_b_recovered{b}(:,a) = X_portion * W_b_recovered{b}(:,a) / (W_b_recovered{b}(:,a)' * W_b_recovered{b}(:,a)) / sqrt(K_b(b));
+
+
+            T_sum_recovered(:, b, a) = T_b_recovered{b}(:,a);
+
+            % Extract the block loadings now: these are the same block loadings that
+            % would have been calculated to deflate each block
+            P_b_recovered{b}(:,a) = X_portion' * t_a / (t_a' * t_a);
+
+            stats_PLS.R2X{b}(a) = ssq(t_a * p_a(start_col:last_col)') / stats_PLS.R2X_baseline{b}; 
+            start_col = start_col + K_b(b);
+        end
+        W_s_recovered(:, a) = T_sum_recovered(:, :, a)' * u_a / (u_a' * u_a);
+        W_s_recovered(:, a) = W_s_recovered(:, a) / norm(W_s_recovered(:, a));
+
+        % Finally, deflate
+        X_merged = X_merged - t_a * p_a';
+        Y_data = Y_data - t_a * c_a';
+
+        start_col = 1;
+
+        for b = 1:B
+            last_col = start_col + K_b(b) - 1;
+
+            stats_PLS.SPE{b}(:,a) = ssq(X_merged(:,start_col:last_col), 2);
+            start_col = start_col + K_b(b);
+        end
+
+        stats_PLS.R2X_overall(a) = ssq(t_a * p_a') / sum(cell2mat(stats_PLS.R2X_baseline));
+        stats_PLS.R2Y_overall(a) = ssq(t_a * c_a') / stats_PLS.R2Y_baseline;
+        stats_PLS.SPE_overall(:,a) = ssq(X_merged, 2);
+
+    end
+    Y_hat_pls = T*C';
+
+    %-----------------------------------------------------------------------------
+    % Full multiblock implementation to calculate scores and loadings for each 
+    % block, as well as getting summary scores and loadings (super block).
+
+    % Reset Y back to its raw version
+    Y_data = Y.data;
+    level_Y = mean(Y_data);
+    spread_Y = std(Y_data);
+    Y_data = (Y_data - repmat(level_Y, N, 1)) ./ repmat(spread_Y, N, 1);
+
+    stats_MB = struct();
+    stats_MB.R2X = cell(1, B);
+    stats_MB.R2X_baseline = cell(1,B);
+    stats_MB.R2X_overall = zeros(1,A);
+    stats_MB.R2Y_baseline = ssq(Y_data);
+    stats_MB.R2Y_overall = zeros(1,A);
+    stats_MB.SPE = cell(1,B);
+
+    % Storage for all variables we want to keep afterwards
+    T_sum = zeros(N, B, A);
+    T_s = zeros(N, A);
+    U_s = zeros(N, A);
+    W_s = zeros(B, A);
+    C_s = zeros(M, A);
+    % Block weights, scores and loadings
+    W_b = cell(1, B);
+    T_b = cell(1, B);
+    P_b = cell(1, B);
+    for b = 1:B
+        W_b{b} = zeros(K_b(b), A);
+        T_b{b} = zeros(N, A);
+        P_b{b} = zeros(K_b(b), A);
+        stats_MB.R2X{b} = zeros(1, A);
+        stats_MB.R2X_baseline{b} = ssq(X_mb{b});
+        stats_MB.SPE{b} = zeros(N, A);
+    end
+
+    for a = 1:A
+
+        % Block loadings and block scores
+        w = cell(B,1);
+        t = cell(B,1);
+        p = cell(B,1);
+
+        % The superscore from the superblock
+        u_a = randn(N, 1);
+        u_a_guess = u_a * 2;
+        while norm(u_a - u_a_guess) > eps^(2/3)
+            u_a_guess = u_a;
+
+            % Iterate over all blocks
+            for b = 1:B
+
+                % Weights for each block
+                w{b} = X_mb{b}' * u_a / (u_a' * u_a);
+                w{b} = w{b} / norm(w{b});
+
+                % Block scores
+                t{b} = X_mb{b} * w{b} / (w{b}'*w{b}) / sqrt(K_b(b));
+
+                % Assemble block scores into a superblock matrix of scores, T_sum
+                T_sum(:,b,a) = t{b};
+            end
+
+            % Regress superblock scores columns onto u_a to get superweights    
+            w_a_s = T_sum(:,:,a)' * u_a / (u_a' * u_a);
+            w_a_s = w_a_s / norm(w_a_s);
+
+            % Regress rows of superscores onto superweights, to get extent of
+            % correlation (slope coefficient) with them
+            t_a_s = T_sum(:,:,a) * w_a_s / (w_a_s' * w_a_s);
+
+            % Regress columns of Y onto t_a_s, the score vector from the superblock
+            c_a_s = Y_data' * t_a_s / (t_a_s' * t_a_s);
+
+            % Finally, calculate the u_a, Y-block score by regressing rows in Y on
+            % the Y-block weights, c_a_s
+            u_a = Y_data * c_a_s / (c_a_s' * c_a_s);
+        end
+
+
+        % Deflate all X-blocks and Y-block using the superblock's score vector
+        overall_X_ssq = 0;
+        for b = 1:B
+            p{b} = X_mb{b}' * t_a_s / (t_a_s' * t_a_s);
+            X_mb{b} = X_mb{b} - t_a_s * p{b}';
+
+            stats_MB.SPE{b}(:,a) = ssq(X_mb{b},2);
+            block_ssq = ssq(t_a_s * p{b}');
+            overall_X_ssq = overall_X_ssq + block_ssq;
+            stats_MB.R2X{b}(a) = block_ssq / stats_MB.R2X_baseline{b};
+        end
+        Y_data = Y_data - t_a_s * c_a_s';
+        stats_MB.R2X_overall(a) = overall_X_ssq / sum(cell2mat(stats_MB.R2X_baseline));
+        stats_MB.R2Y_overall(a) = ssq(t_a_s * c_a_s') / stats_MB.R2Y_baseline;
+
+        % Store results for comparison
+        W_s(:,a) = w_a_s;
+        T_s(:,a) = t_a_s;
+        U_s(:,a) = u_a;    
+        C_s(:,a) = c_a_s;    
+        for b = 1:B
+            W_b{b}(:,a) = w{b};
+            T_b{b}(:,a) = t{b};
+            P_b{b}(:,a) = p{b};
+        end
+
+        % Checks 
+        stacked_weight = [];
+        for b = 1:B
+            stacked_weight = [stacked_weight; w{b} * W_s(b,a)];
+        end
+        assertTrue(norm(abs(stacked_weight) - abs(W(:,a))) < sqrt(eps))
+
+    end
+    Y_hat = T_s * C_s';
+    
+
+    assertTrue(norm(abs(T) - abs(T_s)) < sqrt(eps))
+    assertTrue(norm(abs(C) - abs(C_s)) < sqrt(eps))
+    assertTrue(norm(Y_hat - Y_hat_pls) < sqrt(eps))
+    assertTrue(norm(abs(T_sum_recovered(:)) - abs(T_sum(:))) < sqrt(eps))
+    assertTrue(norm(abs(W_s_recovered) - abs(W_s)) < sqrt(eps))
+    for b = 1:B
+        assertTrue(norm(abs(W_b_recovered{b}) - abs(W_b{b})) < sqrt(eps))
+        assertTrue(norm(abs(T_b_recovered{b}) - abs(T_b{b})) < sqrt(eps))
+        assertTrue(norm(abs(P_b_recovered{b}) - abs(P_b{b})) < sqrt(eps))
+    end
+
+    % for m = 1:min(M, 4)
+    %     subplot(2,2, m)
+    %     % Conclusion: little difference, in this example, of block approach vs
+    %     % ordinary PLS with all X variables in one block, ito predictions.
+    %     %plot(Y_hat_pls_ordinary(:,m)- Y_hat_pls(:,m),'.'), grid
+    %     Y_hat_orig = Y_hat_pls_ordinary .* repmat(spread_Y, N, 1) + repmat(level_Y, N, 1);
+    %     plot(Y_hat_orig(:,m), Y.data_raw(:,m),'.')
+    %     grid on, axis equal
+    % end
+
+    % Now predict the Y-values as if they were new data: from scratch
+    Y_pred_MBPLS = zeros(N, M);
+    for n = 1:N
+        X_new = cell(1, B);
+        t_new = cell(1, B);
+        t_new_s = zeros(1, A);
+        for b = 1:B
+            % Data are already preprocessed
+            X_new{b} = X_raw{b}.data(n,:);
+            %X_new{b} = (X_new{b} - X_raw{b}.PP.mean_center) .* X_raw{b}.PP.scaling;
+        end
+        for a = 1:A
+            for b = 1:B
+                t_new{b} = X_new{b} * W_b{b}(:,a) / sqrt(K_b(b));
+            end
+            % Assemble block scores into a single row vector, 1 x B
+            T_new_s = cell2mat(t_new);
+            % Calculate estimate of superscore, t_new_s
+            t_new_s(a) = T_new_s * W_s(:,a);
+            % Deflate X-blocks with this superscore and the block loadings
+            for b = 1:B
+                X_new{b} = X_new{b} - t_new_s(a) * P_b{b}(:,a)';
+            end
+        end
+        Y_pred_MBPLS(n,:) = t_new_s * C_s';
+    end
+    assertTrue(norm(Y_pred_MBPLS - Y_hat) < sqrt(eps))
+
+    
+    % The above code was purely the reference version from which "mbpls" was
+    % written.  Now test that mbpls gives the same results
+    % ------------------------------------------------------------------------
+    X_raw = LDPE.data.blocks{1};
+    Y = block(LDPE.data.blocks{2});
+    X1 = block(X_raw(:, block_1_vars), 'X1');
+    X2 = block(X_raw(:, block_2_vars), 'X2');
+
+   
+    options = lvm_opt();     
+    options.show_progress = false; 
+    options.min_lv = A;
+    mbmodel = lvm({'X1', X1, 'X2', X2, 'Y', Y}, options);
+    
+    % Compare block scores and super scores (tolerance levels are different
+    % between the models)
+    assertEAE(mbmodel.T{1},            T_b{1}, 7, true)
+    assertEAE(mbmodel.T{2},            T_b{2}, 7, true)
+    assertEAE(mbmodel.super.T_summary, T_sum,  7, true)
+    assertEAE(mbmodel.super.T,         T_s,    6, true)
+    
+    % Compare superblock's loadings
+    assertEAE(mbmodel.super.W,         W_s,    8, true)
+    
+    % Compare overall R2
+    % TODO(KGD): why are these R2 values slightly different?
+    % assertEAE(mbmodel.super.stats.R2,  stats_MB.R2X_overall, 5)
+    assertEAE(mbmodel.super.stats.R2X,  stats_PLS.R2X_overall, 10)
+    assertEAE(mbmodel.super.stats.R2Y,  stats_PLS.R2Y_overall, 10)
+    
+    % Compare block R2 values for block 1 and 2
+    assertEAE(mbmodel.stats{1}.R2b_a,  stats_MB.R2X{1}, 8)
+    assertEAE(mbmodel.stats{1}.R2b_a,  stats_PLS.R2X{1},8)
+    assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 8)
+    assertEAE(mbmodel.stats{2}.R2b_a,  stats_PLS.R2X{2},8)
+
+    % TODO(KGD): compare block loadings, SPE and T2 value
+    
 return
 
 % =========================================================================

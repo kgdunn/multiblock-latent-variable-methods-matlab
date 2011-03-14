@@ -8,6 +8,7 @@ classdef mbpls < mblvm
     properties (SetAccess = protected)
         Y = [];
         Yhat = [];
+        YPP = [];
     end
         
     methods 
@@ -37,8 +38,23 @@ classdef mbpls < mblvm
         
         % Superclass abstract method implementation
         function self = expand_storage(self, varargin)
-            % Do nothing: super-class methods are good enough
+            if numel(self.YPP) == 0
+                self.YPP = struct('mean_center', [], ...
+                    'scaling', [], ...
+                    'is_preprocessed', false);
+            end
         end % ``expand_storage``
+        
+        % Superclass abstract method implementation
+        function self = preprocess_extra(self)
+            if ~self.YPP.is_preprocessed
+                [self.Y, PP_block] = self.Y.preprocess();
+                self.YPP.is_preprocessed = true;
+                self.YPP.mean_center = PP_block.mean_center;
+                self.YPP.scaling = PP_block.scaling;                    
+            end
+            
+        end
         
         % Superclass abstract method implementation
         function self = calc_model(self, A)
@@ -68,7 +84,7 @@ classdef mbpls < mblvm
                     self.super.stats.ssq_Y_before = ssq_Y_before;
                 else
                     ssq_before = ssq(self.data, 1);
-                    ssq_before_Y = ssq(self.Y.data, 1);
+                    ssq_Y_before = ssq(self.Y.data, 1);
                 end
                 
                 if all(ssq_before < self.opt.tolerance)
