@@ -117,8 +117,8 @@ classdef mbpca < mblvm
                     self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
                     self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
                     if a>1
-                        self.stats{b}.R2k_a(:,a) = self.stats{b}.R2k_a(:,a) - self.stats{b}.R2k_a(:,a-1);
-                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - self.stats{b}.R2b_a(1,a-1);
+                        self.stats{b}.R2k_a(:,a) = self.stats{b}.R2k_a(:,a) - sum(self.stats{b}.R2k_a(:,1:a-1), 2);
+                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - sum(self.stats{b}.R2b_a(1,1:a-1), 2);
                     end
                     
                     self.stats{b}.SPE(:,a) = sqrt(row_ssq ./ numel(idx));
@@ -128,9 +128,9 @@ classdef mbpca < mblvm
                 % block. Do we use the block loading, or the overall loadings?
                     
                 % Cumulative R2 value for the whole component
-                self.super.stats.R2(a) = 1 - ssq_cumul/ssq_before;
+                self.super.stats.R2X(a) = 1 - ssq_cumul/ssq_before;
                 if a>1
-                    self.super.stats.R2(a) = self.super.stats.R2(a) - self.super.stats.R2(a-1);
+                    self.super.stats.R2X(a) = self.super.stats.R2X(a) - sum(self.super.stats.R2X(1:a-1), 2);
                 end
                 
                 % Store explained variance
@@ -326,7 +326,7 @@ classdef mbpca < mblvm
             
             for a = 1:self.A
                 fprintf_args = zeros(1, 2+self.B);
-                fprintf_args(1:2) =  [a, self.super.stats.R2(a)*100];
+                fprintf_args(1:2) =  [a, self.super.stats.R2X(a)*100];
                 for b = 1:self.B
                     fprintf_args(2+b) = self.stats{b}.R2b_a(a)*100;
                 end
@@ -334,7 +334,7 @@ classdef mbpca < mblvm
             end
             
             disp(repmat('-', 1, line_length))
-            fprintf('Overall R2X(cumul) = %6.2f%%\n', sum(self.super.stats.R2)*100)
+            fprintf('Overall R2X(cumul) = %6.2f%%\n', sum(self.super.stats.R2X)*100)
             fprintf('Time to calculate (s): = [');
             for a= 1:self.A
                 fprintf('%3.2f', self.model.stats.timing(a))

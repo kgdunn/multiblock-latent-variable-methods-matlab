@@ -14,6 +14,7 @@ classdef mblvm < handle
         B = 0;              % number of blocks
         K = 0;              % size (width) of each block in the model
         N = 0;              % number of observations in the model
+        M = 0;              % number of variables in the Y-block (if present)
         
         opt = struct();     % model options
         stats = cell({});   % Model statistics for each block
@@ -318,9 +319,18 @@ classdef mblvm < handle
             self.super.P = [];    
             % Superblocks's weights (used in PLS only)
             % B x A
-            self.super.W = [];   
+            self.super.W = [];
+            % Superblocks's weights for Y-space (used in PLS only)
+            % M x A
+            self.super.C = [];
+            % Superblocks's scores for Y-space (used in PLS only)
+            % N x A
+            self.super.U = [];
+            
             % R2 for each component for the overall model
-            self.super.stats.R2 = [];
+            self.super.stats.R2X = [];
+            self.super.stats.R2Y = [];
+            self.super.stats.R2Yk_a = [];
             self.super.stats.SSQ_exp = [];
             % The VIP for each block, and the VIP calculation factor
             self.super.stats.VIP = [];
@@ -360,9 +370,7 @@ classdef mblvm < handle
                 self.P{b} = zeroexp([dblock.K, A], self.P{b});  % block loadings; 
                 self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores
                 self.W{b} = zeroexp([dblock.K, A], self.W{b});  % PLS block weights
-                self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS block weights
-                self.C{b} = zeroexp([dblock.K, A], self.C{b});  % PLS Y-space loadings
-                self.U{b} = zeroexp([dblock.N, A], self.U{b});  % PLS Y-space scores
+               %self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS block weights
                %self.S{b} = zeroexp([1, A], self.S{b});         % score scaling factors
                 
                 % Block preprocessing options: resets them
@@ -378,7 +386,7 @@ classdef mblvm < handle
                     self.stats{b}.SPE_j = [];
 
                     self.stats{b}.start_SS_col = [];
-                    self.stats{b}.R2k_a = [];  % not cumulative !
+                    self.stats{b}.R2Xk_a = [];  % not cumulative !                    
                     self.stats{b}.col_ssq_prior = [];
                     self.stats{b}.R2b_a = [];
                     self.stats{b}.SSQ_exp = [];
@@ -425,7 +433,11 @@ classdef mblvm < handle
                 
                 % R^2 for every variable in the block, per component (not cumulative)
                 % K(b) x A
-                self.stats{b}.R2k_a = zeroexp([dblock.K, A], self.stats{b}.R2k_a);
+                self.stats{b}.R2Xk_a = zeroexp([dblock.K, A], self.stats{b}.R2Xk_a);
+                
+                % R^2 for every variable in the Y-block, per component (not cumulative)
+                % M x A
+                self.super.stats.R2Yk_a = zeroexp([self.M, A], self.super.stats.R2Yk_a);
                 
                 % Sum of squares for each column in the block, prior to the component
                 % being extracted.
@@ -494,6 +506,9 @@ classdef mblvm < handle
             self.super.T = zeroexp([self.N, A], self.super.T);
             self.super.P = zeroexp([self.B, A], self.super.P);
             self.super.W = zeroexp([self.B, A], self.super.W);
+            self.super.C = zeroexp([self.M, A], self.super.C);  % PLS Y-space loadings
+            self.super.U = zeroexp([self.N, A], self.super.U);  % PLS Y-space scores
+               
             
             % T2, using all components 1:A, in the superblock
             self.super.T2 = zeroexp([self.N, A], self.super.T2);
@@ -504,8 +519,11 @@ classdef mblvm < handle
             self.super.lim.SPE = zeroexp([1, A], self.super.lim.SPE);
             
             % Statistics in the superblock
-            self.super.stats.R2 = zeroexp([1, A], self.super.stats.R2);
-            self.super.stats.SSQ_exp = zeroexp([1, A], self.super.stats.R2);
+            self.super.stats.R2X = zeroexp([1, A], self.super.stats.R2X);
+            self.super.stats.R2Y = zeroexp([1, A], self.super.stats.R2Y);
+            self.super.stats.ssq_Y_before = [];
+            
+            self.super.stats.SSQ_exp = zeroexp([1, A], self.super.stats.SSQ_exp);
             % The VIP's for each block, and the VIP calculation factor
             self.super.stats.VIP = zeroexp([self.B, 1], self.super.stats.VIP);
             %self.super.stats.VIP_f = cell({});
@@ -701,72 +719,122 @@ classdef mblvm < handle
             y(xOutOfRange & ~isnan(a) & ~isnan(b)) = 0;
         end
             
-        function y = chi2inv(p, nu)
-            % http://www.atmos.washington.edu/~wmtsa/
-            %
-            % Copyright (c) 2003,2004,2005, Charles R. Cornish
-            % All rights reserved.
-            % 
-            % Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-            % 
-            %     * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-            %     * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-            %     * Neither the name of the owner nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-            % 
-            % THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-         
-            p = 1 - p;
-            
-            % computes the  abscissae y for given probability p (upper tail)
-            % for a chi square distribution with nu >=2 degrees
-            % of freedom, NOT NECESSARILY AN INTEGER. Based on
-            % Goldstein, R.B., Collected Algorithms for Computer Machinery,
-            % 16, 483-485.
-            %
-            %  p: real col vector of right-tail probs
-            %  nu: possibly non-integer deg of freedom
-            %  y: real column vector of abscissae
-            %
-            % Author: Andrew Walden
+        function x = chi2inv(p, v)
+            %CHI2INV Inverse of the chi-square cumulative distribution function (cdf).
+            %   X = CHI2INV(P,V)  returns the inverse of the chi-square cdf with V  
+            %   degrees of freedom at the values in P. The chi-square cdf with V 
+            %   degrees of freedom, is the gamma cdf with parameters V/2 and 2.   
 
+            % NOTE: This function is a pure copy and paste of the relevant parts of the Matlab statistical toolbox function "chi2inv.m"
+            % Please use the Statistical Toolbox function, if you have the toolbox
 
-            c=[1.565326e-3,1.060438e-3,-6.950356e-3,-1.323293e-2,2.277679e-2,...
-            -8.986007e-3,-1.513904e-2,2.530010e-3,-1.450117e-3,5.169654e-3,...
-            -1.153761e-2,1.128186e-2,2.607083e-2,-0.2237368,9.780499e-5,-8.426812e-4,...
-            3.125580e-3,-8.553069e-3,1.348028e-4,0.4713941,1.0000886];
+            % Call the gamma inverse function. 
 
-            a=[1.264616e-2,-1.425296e-2,1.400483e-2,-5.886090e-3,...
-            -1.091214e-2,-2.304527e-2,3.135411e-3,-2.728484e-4,...
-            -9.699681e-3,1.316872e-2,2.618914e-2,-0.2222222,...
-            5.406674e-5,3.483789e-5,-7.274761e-4,3.292181e-3,...
-            -8.729713e-3,0.4714045,1.0];
+            % Guaratentees: % 0<p<1
+            a = v/2;        % a>0
+            b = 2;          % b>0
+            %x = gaminv(p,v/2,2);
 
-            %  I HAVE RESTRICTED TO Nu>=2 SO THAT CAN MAKE Nu REAL.
-            if (nu < 2) 
-              error('QChisq ERROR: degrees of freedom < 2') 
-            end 
-            if nu==2
-                y = -2.*log(p);
-            else % nu >2
-                f=nu;
-                f1=1./f;
-                t = sqrt(2).*erfinv(1-2.*p); % upper tail area p
-                f2=sqrt(f1).*t;
-                if nu < 2.+fix(4.*abs(t))
-                    y=(((((((c(1).*f2+c(2)).*f2+c(3)).*f2+c(4)).*f2...
-                    +c(5)).*f2+c(6)).*f2+c(7)).*f1+((((((c(8)+c(9).*f2).*f2...
-                    +c(10)).*f2+c(11)).*f2+c(12)).*f2+c(13)).*f2+c(14))).*f1...
-                    +(((((c(15).*f2+c(16)).*f2+c(17)).*f2+c(18)).*f2...
-                    +c(19)).*f2+c(20)).*f2+c(21);
-                else
-                    y=(((a(1)+a(2).*f2).*f1+(((a(3)+a(4).*f2).*f2...
-                   +a(5)).*f2+a(6))).*f1+(((((a(7)+a(8).*f2).*f2+a(9)).*f2...
-                   +a(10)).*f2+a(11)).*f2+a(12))).*f1+(((((a(13).*f2...
-                   +a(14)).*f2+a(15)).*f2+a(16)).*f2+a(17)).*f2.*f2...
-                   +a(18)).*f2+a(19);
+            % ==== Newton's Method to find a root of GAMCDF(X,A,B) = P ====
+            maxiter = 500;
+            iter = 0;
+
+            % Choose a starting guess for q.  Use quantiles from a lognormal
+            % distribution with the same mean (==a) and variance (==a) as G(a,1).
+            loga = log(a);
+            sigsq = log(1+a) - loga;
+            mu = loga - 0.5 .* sigsq;
+            q = exp(mu - sqrt(2.*sigsq).*erfcinv(2*p));
+            h = ones(size(p));
+
+            % Break out of the iteration loop when the relative size of the last step
+            % is small for all elements of q.
+            myeps = eps(class(p+a+b));
+            reltol = myeps.^(3/4);
+            dF = zeros(size(p));
+            while any(abs(h(:)) > reltol*q(:))
+                iter = iter + 1;
+                if iter > maxiter
+                    % Too many iterations.  This should not happen.
+                    break
                 end
-                y = (y.^3).*f;
+
+                F = mblvm.gamcdf(q,a,1);
+                f = max(mblvm.gampdf(q,a,1), realmin(class(p)));
+                dF = F-p;
+                h = dF ./ f;
+                qnew = q - h;
+                % Make sure that the current iterates stay positive.  When Newton's
+                % Method suggests steps that lead to negative values, take a step
+                % 9/10ths of the way to zero instead.
+                ksmall = find(qnew <= 0);
+                if ~isempty(ksmall)
+                    qnew(ksmall) = q(ksmall) / 10;
+                    h = q - qnew;
+                end
+                q = qnew;
             end
+
+            badcdf = (isfinite(a) & abs(dF)>sqrt(myeps));
+            if iter>maxiter || any(badcdf(:))   % too many iterations or cdf is too far off
+                didnt = find(abs(h)>reltol*q | badcdf);
+                didnt = didnt(1);
+                if numel(a) == 1, abad = a; else abad = a(didnt); end
+                if numel(b) == 1, bbad = b; else bbad = b(didnt); end
+                if numel(p) == 1, pbad = p; else pbad = p(didnt); end
+                warning('chi2inv:NoConvergence','Did not converge for a = %g, b = %g, p = %g.',abad,bbad,pbad);
+            end
+            x = q .* b;
+
+        end
+        
+        function y = gampdf(x,a,b)
+            %GAMPDF Gamma probability density function.
+            %   Y = GAMPDF(X,A,B) returns the gamma probability density function with
+            %   shape and scale parameters A and B, respectively, at the values in X.
+            %   Copyright 1993-2004 The MathWorks, Inc.
+            %   $Revision: 2.10.2.6 $  $Date: 2004/12/24 20:46:51 $
+
+            % Return NaN for out of range parameters.
+            a(a <= 0) = NaN;
+            b(b <= 0) = NaN;
+
+            z = x ./ b;
+            % Negative data would create complex values, potentially creating
+            % spurious NaNi's in other elements of y.  Map them to the far right
+            % tail, which will be forced to zero.
+            z(z < 0) = Inf;
+            % Prevent LogOfZero warnings.
+            warn = warning('off','MATLAB:log:logOfZero');
+            u = (a - 1) .* log(z) - z - gammaln(a);
+            warning(warn);
+
+            % Get the correct limit for z == 0.
+            u(z == 0 & a == 1) = 0;
+            % These two cases work automatically
+            %  u(z == 0 & a < 1) = Inf;
+            %  u(z == 0 & a > 1) = -Inf;
+
+            % Force a 0 for extreme right tail, instead of getting exp(Inf-Inf)==NaN
+            u(z == Inf & isfinite(a)) = -Inf;
+            % Force a 0 when a is infinite, instead of getting exp(Inf-Inf)==NaN
+            u(z < Inf & a == Inf) = -Inf;
+            y = exp(u) ./ b;
+
+        end
+        
+        function p = gamcdf(x,a,b)
+            %GAMCDF Gamma cumulative distribution function.
+            %   P = GAMCDF(X,A,B) returns the gamma cumulative distribution function
+            %   with shape and scale parameters A and B, respectively, at the values in X.
+            %   Copyright 1993-2004 The MathWorks, Inc. 
+            %   $Revision: 2.12.2.4 $  $Date: 2004/12/24 20:46:50 $
+            
+            x(x < 0) = 0;
+            z = x ./ b;
+            p = gammainc(z, a);
+            p(z == Inf) = 1;
+            
         end
         
         function x = tinv(p,v)
@@ -827,7 +895,7 @@ classdef mblvm < handle
             % k = find(p>0 & p<1 & ~isnan(x) & v >= 1000);
             k = find(k0 & (v >= 1000));
             if any(k)
-               xn = my_norminv(p(k));
+               xn = mblvm.norminv(p(k));
                df = v(k);
                x(k) = xn + (xn.^3+xn)./(4*df) + ...
                        (5*xn.^5+16.*xn.^3+3*xn)./(96*df.^2) + ...

@@ -7,6 +7,7 @@
 classdef mbpls < mblvm
     properties (SetAccess = protected)
         Y = [];
+        Yhat = [];
     end
         
     methods 
@@ -28,6 +29,9 @@ classdef mbpls < mblvm
             varargin{1} = blocks_given;
             self = self@mblvm(varargin{:});  
             self.Y = Y_block;
+            self.Yhat = copy(Y_block);
+            self.Yhat.data = self.Yhat.data .* 0;
+            self.M = shape(self.Y, 2);
             
         end % ``mbpls``        
         
@@ -60,7 +64,8 @@ classdef mbpls < mblvm
                     ssq_before = ssq(self.data, 1);
                     self.split_result(ssq_before, 'stats', 'start_SS_col');
                     
-                    ssq_before_Y = ssq(self.Y.data, 1);
+                    ssq_Y_before = ssq(self.Y.data, 1);
+                    self.super.stats.ssq_Y_before = ssq_Y_before;
                 else
                     ssq_before = ssq(self.data, 1);
                     ssq_before_Y = ssq(self.Y.data, 1);
@@ -69,7 +74,7 @@ classdef mbpls < mblvm
                 if all(ssq_before < self.opt.tolerance)
                     warning('mbpls:calc_model', 'There is no variance left in the X-data')
                 end
-                if all(ssq_before_Y < self.opt.tolerance)
+                if all(ssq_Y_before < self.opt.tolerance)
                     warning('mbpls:calc_model', 'There is no variance left in the Y-data')
                 end 
                                  
@@ -131,7 +136,7 @@ classdef mbpls < mblvm
                         denom = sum(self.stats{b}.start_SS_col - ssq_after);
                         self.stats{b}.VIP_f{a_iter,a} = sum(self.stats{b}.col_ssq_prior(:,a_iter)) /  denom;
                         % was dividing by /(sum(self.stats{b}.start_SS_col) - sum(ssq_after));
-                        VIP_temp = VIP_temp + self.P{b}(:,a_iter) .^ 2 * self.stats{b}.VIP_f{a_iter,a} * self.K(b);
+                        VIP_temp = VIP_temp + self.W{b}(:,a_iter) .^ 2 * self.stats{b}.VIP_f{a_iter,a} * self.K(b);
                     end
                     self.stats{b}.VIP_a(:,a) = sqrt(VIP_temp);
                 
@@ -145,33 +150,83 @@ classdef mbpls < mblvm
                 self.super.T_summary(:,:,a) = t_superblock;
                 self.super.T(:,a) = t_a;
                 self.super.W(:,a) = w_super;
+                self.super.C(:,a) = c_a;
+                self.super.U(:,a) = u_a;
                                 
                 % Now deflate the data matrix using the superscore
                 self.data = self.data - t_a * p_a';
-                self.Y.data = self.Y.data - t_a * c_a';
+                
+                % Make current predictions of Y using all available PCs
+                Y_hat_update = t_a * c_a';
+                self.Yhat.data = self.Yhat.data + Y_hat_update;
+                self.Y.data = self.Y.data - Y_hat_update;
+                ssq_Y_after = ssq(self.Y.data, 1)';
+                self.super.stats.R2Yk_a(:,a) = 1 - ssq_Y_after ./ ssq_Y_before';
+                self.super.stats.R2Y(a) = 1 - sum(ssq_Y_after)/ sum(ssq_Y_before);
+                if a>1
+                    self.super.stats.R2Y(a) = self.super.stats.R2Y(a) - sum(self.super.stats.R2Y(1:a-1), 2);
+                end
+                
+                
                 
                 ssq_cumul = 0;
                 ssq_before = 0;
                 for b = 1:self.B
                     idx = self.b_iter(b);
+                    
+                    % X_portion has already been deflated by the current PC
                     X_portion = self.data(:, idx);
-                    col_ssq = ssq(X_portion, 1)';
+                    
+                    % Calculate SPE
                     row_ssq = ssq(X_portion, 2);
-                    ssq_cumul = ssq_cumul + sum(col_ssq);
+                    self.stats{b}.SPE(:,a) = sqrt(row_ssq ./ numel(idx));
+                    
+                    % Calculate R2 per variable
+                    col_ssq_remain = ssq(X_portion, 1)';
+                    ssq_cumul = ssq_cumul + sum(col_ssq_remain);
                     ssq_before = ssq_before + sum(self.stats{b}.start_SS_col);
                     
-                    self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ self.stats{b}.start_SS_col';
-                    self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
-                    self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
+                    self.stats{b}.R2Xk_a(:,a) = 1 - col_ssq_remain ./ self.stats{b}.start_SS_col';
+                    self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq_remain) / sum(self.stats{b}.start_SS_col);
+                    self.stats{b}.SSQ_exp(1,a) = sum(col_ssq_remain);
                     if a>1
-                        self.stats{b}.R2k_a(:,a) = self.stats{b}.R2k_a(:,a) - self.stats{b}.R2k_a(:,a-1);
-                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - self.stats{b}.R2b_a(1,a-1);
+                        self.stats{b}.R2Xk_a(:,a) = self.stats{b}.R2Xk_a(:,a) - sum(self.stats{b}.R2Xk_a(:,1:a-1), 2);
+                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - sum(self.stats{b}.R2b_a(1,1:a-1), 2);
                     end
+                     
                     
-                    self.stats{b}.SPE(:,a) = sqrt(row_ssq ./ numel(idx));
                 end
                 
                 
+                % Cumulative R2 value for the whole component
+                self.super.stats.R2X(a) = 1 - ssq_cumul/ssq_before;
+                if a>1
+                    self.super.stats.R2X(a) = self.super.stats.R2X(a) - sum(self.super.stats.R2X(1:a-1), 2);
+                end
+                
+                % Store explained variance
+                self.super.stats.SSQ_exp(1,a) = ssq_cumul;
+                
+                % Model summary SPE (not the superblock's SPE!), merely the
+                % overall SPE from the merged model
+                row_ssq_deflated = ssq(self.data, 2);
+                self.super.SPE(:,a) = sqrt(row_ssq_deflated ./ sum(self.K));
+                
+                % Model summary T2 (not the superblock's T2!), merely the
+                % overall T2 from the merged model
+                self.super.T2(:,a) = self.mahalanobis_distance(self.super.T(:,1:a));
+                
+                VIP_temp = zeros(sum(self.B), 1);
+                for a_iter = 1:a
+                    self.super.stats.VIP_f{a_iter,a} = self.super.stats.SSQ_exp(1,a_iter) / sum(self.super.stats.SSQ_exp);
+                    VIP_temp = VIP_temp + self.super.W(:,a_iter) .^ 2 * self.super.stats.VIP_f{a_iter,a} * sum(self.B);
+                end
+                self.super.stats.VIP(1:self.B,a) = sqrt(VIP_temp);
+                
+                
+                
+                
+               
                 % Calculate the limits                
                 self.calc_statistics_and_limits(a);
                 

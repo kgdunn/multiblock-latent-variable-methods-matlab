@@ -1,10 +1,9 @@
 function unit_tests(varargin)
     close all;
     
-    test_significant_figures()    
+    test_significant_figures()
     
-    
-   Wold_article_PCA_test()
+    Wold_article_PCA_test()
     MBPCA_tests()    
     PCA_no_missing_data()      
     PCA_with_missing_data()    
@@ -15,7 +14,8 @@ function unit_tests(varargin)
     PLS_no_missing_data()    
     PLS_with_missing_data()
     
-    
+    % External testing file
+    test_blocks()
     
     
     PLS_randomization_tests()
@@ -350,24 +350,24 @@ function PLS_no_missing_data()
     % Y-hat
     Y_hat_col = 7:11;
     Y_hat = exp_m.observations{2}.data(:, Y_hat_col);
-    Y_hat_calc = PLS.blocks{2}.data_pred;
-    Y_hat_PP = PLS.blocks{2}.preprocess(block(Y_hat_calc));
-    assertEAE(Y_hat_PP.data, Y_hat, 2);
+    %_hat_calc = PLS..data_pred;
+    %Y_hat_PP = PLS.blocks{2}.preprocess(block(Y_hat_calc));
+    assertEAE(PLS.Yhat.data, Y_hat, 2);
     
     % W-Loadings
     loadings_col = 1:6;
     W = exp_m.variables{1}.data(:, loadings_col);
-    assertEAE(PLS.blocks{1}.W, W, 3, true);
+    assertEAE(PLS.W{1}, W, 3, true);
     
     % R2-per variable(k)-cumulative: X-space
     R2X_col = 24;
     R2kX_cum = exp_m.variables{1}.data(:, R2X_col);
-    assertEAE(PLS.blocks{1}.stats.R2k_cum(:,end), R2kX_cum, 4); 
+    assertEAE(sum(PLS.stats{1}.R2Xk_a(:,1:end),2), R2kX_cum, 4); 
     
     % R2-per variable(k)-per component(a): Y-space
     R2Y_col = 8;
     R2kY_cum = exp_m.variables{2}.data(:, R2Y_col);
-    assertEAE(PLS.blocks{2}.stats.R2k_cum(:,end), R2kY_cum, 4); 
+    assertEAE(PLS.super.stats.R2Yk_a(:,end), R2kY_cum, 4); 
     
     % TODO(KGD): Coefficients
 
@@ -869,7 +869,7 @@ function MBPCA_tests()
     % Compare overall R2
     % TODO(KGD): why are these R2 values slightly different?
     % assertEAE(mbmodel.super.stats.R2,  stats_MB.R2X_overall, 5)
-    assertEAE(mbmodel.super.stats.R2,  stats_PCA.R2X_overall, 14)
+    assertEAE(mbmodel.super.stats.R2X,  stats_PCA.R2X_overall, 14)
     
     % Compare block R2 values for block 1 and 2
     assertEAE(mbmodel.stats{1}.R2b_a,  stats_MB.R2X{1}, 5)
