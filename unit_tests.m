@@ -973,7 +973,7 @@ function MBPLS_tests()
     for a = 1:A
         u_a = randn(N, 1);
         u_a_guess = u_a * 2;
-        while norm(u_a_guess - u_a) > eps^(2/3)
+        while norm(u_a_guess - u_a) > eps^(6/7)
             u_a_guess = u_a;
             w_a = X_merged' * u_a / (u_a' * u_a);
             w_a = w_a / norm(w_a);
@@ -1079,7 +1079,7 @@ function MBPLS_tests()
         % The superscore from the superblock
         u_a = randn(N, 1);
         u_a_guess = u_a * 2;
-        while norm(u_a - u_a_guess) > eps^(2/3)
+        while norm(u_a - u_a_guess) > eps^(6/7)
             u_a_guess = u_a;
 
             % Iterate over all blocks
@@ -1216,9 +1216,9 @@ function MBPLS_tests()
     
     % Compare block scores and super scores (tolerance levels are different
     % between the models)
-    assertEAE(mbmodel.T{1},            T_b{1}, 7, true)
+    assertEAE(mbmodel.T{1},            T_b{1}, 6, true)
     assertEAE(mbmodel.T{2},            T_b{2}, 7, true)
-    assertEAE(mbmodel.super.T_summary, T_sum,  7, true)
+    assertEAE(mbmodel.super.T_summary, T_sum,  6, true)
     assertEAE(mbmodel.super.T,         T_s,    6, true)
     
     % Compare superblock's loadings
@@ -1227,8 +1227,8 @@ function MBPLS_tests()
     % Compare overall R2
     % TODO(KGD): why are these R2 values slightly different?
     % assertEAE(mbmodel.super.stats.R2,  stats_MB.R2X_overall, 5)
-    assertEAE(mbmodel.super.stats.R2X,  stats_PLS.R2X_overall, 10)
-    assertEAE(mbmodel.super.stats.R2Y,  stats_PLS.R2Y_overall, 10)
+    assertEAE(mbmodel.super.stats.R2X,  stats_PLS.R2X_overall, 9)
+    assertEAE(mbmodel.super.stats.R2Y,  stats_PLS.R2Y_overall, 8)
     
     % Compare block R2 values for block 1 and 2
     assertEAE(mbmodel.stats{1}.R2b_a,  stats_MB.R2X{1}, 8)
@@ -1236,7 +1236,7 @@ function MBPLS_tests()
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 8)
     assertEAE(mbmodel.stats{2}.R2b_a,  stats_PLS.R2X{2},8)
 
-    % TODO(KGD): compare block loadings, SPE and T2 value
+    % TODO(KGD): compare block loadings, SPE and T2 value, variable-based R2
     
 return
 

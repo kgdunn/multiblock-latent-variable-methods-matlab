@@ -177,10 +177,11 @@ classdef mbpls < mblvm
                 self.Yhat.data = self.Yhat.data + Y_hat_update;
                 self.Y.data = self.Y.data - Y_hat_update;
                 ssq_Y_after = ssq(self.Y.data, 1)';
-                self.super.stats.R2Yk_a(:,a) = 1 - ssq_Y_after ./ ssq_Y_before';
-                self.super.stats.R2Y(a) = 1 - sum(ssq_Y_after)/ sum(ssq_Y_before);
+                self.super.stats.R2Yk_a(:,a) = 1 - ssq_Y_after ./ self.super.stats.ssq_Y_before';
+                self.super.stats.R2Y(a) = 1 - sum(ssq_Y_after)/ sum(self.super.stats.ssq_Y_before);
                 if a>1
                     self.super.stats.R2Y(a) = self.super.stats.R2Y(a) - sum(self.super.stats.R2Y(1:a-1), 2);
+                    self.super.stats.R2Yk_a(:,a) = self.super.stats.R2Yk_a(:,a) - sum(self.super.stats.R2Yk_a(:,1:a-1), 2);
                 end
                 
                 
