@@ -438,6 +438,7 @@ classdef block_base < handle
         function out = ssq(self, varargin)
             out = ssq(self.data, varargin{:});
         end
+        
 %         function self = un_preprocess(self, varargin)
 %             % UNdoes preprocessing for a block.
 %             %
@@ -499,79 +500,58 @@ classdef block_base < handle
 %             end
 %         end
          
-%         function [self, other] = exclude(self, dim, which)
-%             % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
-%             % given by entries in the vector ``which``.
-%             %
-%             % The excluded entries are returned as a new block in ``other``.
-%             % Note that ``self`` is actually returned as a new block also,
-%             % to accomodate the fact that modelling elements might have been 
-%             % removed.  E.g. if user excluded rows, then the scores are not
-%             % valid anymore.
-%             %
-%             % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
-%             %
-%             % NOTE: at this time, you cannot exclude a variable from a batch
-%             % block.  To do that, exclude the variable in the raw data, before
-%             % creating the block.
-%             
-%             
-%             s_ordinary = struct; 
-%             s_ordinary.type = '()';
-%             s_ordinary_remain = struct; 
-%             s_ordinary_remain.type = '()';
-%             self_tagnames = self.tagnames;
-%             if dim == 1 
-%                 if any(which>self.N)
-%                     error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')
-%                 end
-%                 s_ordinary.subs = {which, ':'};
-%                 remain = 1:self.N;
-%                 remain(which) = [];
-%                 s_ordinary_remain.subs = {remain, ':'};
-%                 other_tagnames = self.tagnames;
-%             end
-%             if dim == 2 
-%                 if any(which>self.K)
-%                     error('block:exclude', 'Entries to exclude exceed the size (columns) of the block.')
-%                 end
-%                 if strcmp(self.block_type, 'batch')
-%                     error('block:exclude', 'Excluding tags from batch blocks is not currently supported.')
-%                 end
-%                 s_ordinary.subs = {':', which};
-%                 
-%                 other_tagnames = self.tagnames(which);
-%                 self_tagnames(which) = [];
-%                 remain = 1:self.K;
-%                 remain(which) = [];
-%                 s_ordinary_remain.subs = {':', remain};
-%             end
-%             
-%             if strcmp(self.block_type, 'batch')
-%                 other = block(subsref(self.data, s_ordinary), self.name);
-%                 other.block_type = 'batch';
-%                 other.nTags = self.nTags;
-%                 other.J = self.J;
-%                 other.tagnames = self.tagnames;
-%                 other.raw_data = cell(numel(which), 1);
-%                 for n = 1:numel(which)
-%                     other.raw_data{n} = self.raw_data{which(n)};
-%                 end
-%                 
-%                 self_raw_data = self.raw_data;
-%                 self_data = subsref(self.data, s_ordinary_remain);
-%                 self = block(self_data, self.name);
-%                 self.block_type = 'batch';
-%                 self.J = other.J;
-%                 self.nTags = other.nTags;
-%                 self.tagnames = other.tagnames;
-%                 self.raw_data = cell(numel(remain), 1);
-%                 for n = 1:numel(remain)
-%                     self.raw_data{n} = self_raw_data{remain(n)};
-%                 end
-%             end
-%         end
+    function [self, other] = exclude(self, dim, which)
+        % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
+        % given by entries in the vector ``which``.
+        %
+        % The excluded entries are returned as a new block in ``other``.
+        % Note that ``self`` is actually returned as a new block also,
+        % to accomodate the fact that modelling elements might have been 
+        % removed.  E.g. if user excluded rows, then the scores are not
+        % valid anymore.
+        %
+        % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
+        %
+        % NOTE: at this time, you cannot exclude a variable from a batch
+        % block.  To do that, exclude the variable in the raw data, before
+        % creating the block.
+
+        self.exclude_post(dim, which);
+
+        s_ordinary = struct; 
+        s_ordinary.type = '()';
+        s_ordinary_remain = struct; 
+        s_ordinary_remain.type = '()';
+        self_tagnames = self.tagnames;
+        if dim == 1 
+            if any(which>self.N)
+                error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')
+            end
+            s_ordinary.subs = {which, ':'};
+            remain = 1:self.N;
+            remain(which) = [];
+            s_ordinary_remain.subs = {remain, ':'};
+            other_tagnames = self.tagnames;
+        end
+        if dim == 2 
+            if any(which>self.K)
+                error('block:exclude', 'Entries to exclude exceed the size (columns) of the block.')
+            end
+            if strcmp(self.block_type, 'batch')
+                error('block:exclude', 'Excluding tags from batch blocks is not currently supported.')
+            end
+            s_ordinary.subs = {':', which};
+
+            other_tagnames = self.tagnames(which);
+            self_tagnames(which) = [];
+            remain = 1:self.K;
+            remain(which) = [];
+            s_ordinary_remain.subs = {':', remain};
+        end
+
         
+    end
+
  
     end % end methods (ordinary)
     
@@ -675,9 +655,9 @@ classdef block_base < handle
     end % end methods (static)
 
     % Subclass must redefine these methods
-    %methods (Abstract=true)
-    %    new(self);
-    %end % end methods (abstract)
+    methods (Abstract=true)
+        exclude_post(self);
+    end % end methods (abstract)
 end % end classdef
             
 %-------- Helper functions. May NOT modify ``self``.

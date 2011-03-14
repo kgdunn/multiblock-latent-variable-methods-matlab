@@ -1,29 +1,26 @@
 function unit_tests(varargin)
     close all;
     
-    
-    
     test_significant_figures()
     
-    Wold_article_PCA_test() 
-    MBPCA_tests()    
-    PCA_no_missing_data()      
-    PCA_with_missing_data()    
+    % PCA tests
+    Wold_article_PCA_test()
+    PCA_no_missing_data()
+    PCA_with_missing_data()
     PCA_batch_data()
     PCA_cross_validation_no_missing()
+    MBPCA_tests()
     
+    % PLS tests
     basic_PLS_test()
-    PLS_no_missing_data()    
-    PLS_with_missing_data()
-    
+    PLS_no_missing_data()
+    PLS_with_missing_data()    
     MBPLS_tests();
+    %PLS_randomization_tests()
     
     % External testing file
     test_blocks()
-    
-    
-    %PLS_randomization_tests()
-    
+        
     
     % TODO(KGD):
     % -----------

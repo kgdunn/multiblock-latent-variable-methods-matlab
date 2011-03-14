@@ -1,5 +1,8 @@
 function test_blocks(varargin)
     close all;
+    
+    test_exclude();
+    
     test_basic_syntax();
     test_batch_blocks();
     test_labels();
@@ -41,6 +44,25 @@ function test_basic_syntax()
     assertTrue(b.K == 1)
     assertTrue(strcmpi(b.name, 'block-1-1'))
     assertTrue(b.has_missing == true);
+end
+
+function test_exclude()
+% Excluding rows from the block
+
+    % Batch blocks
+    X = randn(50,4);
+    batch_names = {'A', 'B', 'C', 'Four', 'E', 'F', 'G', 'H', 'I', 'Ten'};
+    time_names = {'1', '2', '3', '4', '5'};
+    tag_names = {'Temp', 'Pres', 'Flow', 'Heat input', 'Flow2'};
+    b = block(X, 'X block', {'batch_names', batch_names}, ...
+                            {'batch_tag_names', tag_names}, ....
+                            {'time_names', time_names});
+                        
+    b.exclude(1, 4);
+    b.exclude(1, 'A');
+    
+    b.exclude(1, {'A'});
+    b.exclude(1, {'A', 'H'});
 end
 
 function test_batch_blocks()

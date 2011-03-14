@@ -134,7 +134,31 @@ classdef block_batch < block_base
                 out = out(varargin{1});
             end
         end
+        
+        function self = exclude_post(self, dim, which)
+            other = block(subsref(self.data, s_ordinary), self.name);
+            other.block_type = 'batch';
+            other.nTags = self.nTags;
+            other.J = self.J;
+            other.tagnames = self.tagnames;
+            other.raw_data = cell(numel(which), 1);
+            for n = 1:numel(which)
+                other.raw_data{n} = self.raw_data{which(n)};
+            end
 
+            self_raw_data = self.raw_data;
+            self_data = subsref(self.data, s_ordinary_remain);
+            self = block(self_data, self.name);
+            self.block_type = 'batch';
+            self.J = other.J;
+            self.nTags = other.nTags;
+            self.tagnames = other.tagnames;
+            self.raw_data = cell(numel(remain), 1);
+            for n = 1:numel(remain)
+                self.raw_data{n} = self_raw_data{remain(n)};
+            end
+        end
+        
         function varargout = plot(self, varargin)
             % X = randn(50,4);
             % batch_names = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'Ten'};
