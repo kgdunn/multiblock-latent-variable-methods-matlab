@@ -64,18 +64,25 @@ end
 % Create monitoring model
 bad_batch = [3, 5, 6, 7, 34:71];
 
-Z.exclude(1, bad_batch)
-Z.exclude(2, [1:8])
-Y.exclude(1, bad_batch)
+Z.exclude(1, bad_batch);
+Z.exclude(2, [1:8]);
+Zcopy.exclude(2, [1:8]);
+Y.exclude(1, bad_batch);
 X.data(bad_batch, :) = [];
 X.batch_raw(bad_batch, :) = [];
 
 A_mon = 2;
 mon = lvm({'Z', Z, 'X', X, 'y', Y}, A_mon);
 
+% SPEs are in disagreement: too high
+% Scores for existing batches are offset slightly, or a lot in some cases
+
+
+N = mon.N;
 if special_plots
     % Score plot
     hF = figure('Color', [1, 1, 1]);
+    hT = axes;
     plot(mon.super.T(:,1), mon.super.T(:,2),'.')
     hold on
     %S = std(mon.super.T);
@@ -85,13 +92,45 @@ if special_plots
     grid()
     xlabel('t_1', 'FontSize', fontsize, 'Fontweight', 'bold')
     ylabel('t_2', 'FontSize', fontsize, 'Fontweight', 'bold')
+    
+    % SPE plot
+    hF = figure('Color', [1, 1, 1]);
+    hS = axes;
+    plot(mon.super.SPE(:,A_mon), '.-')
+    hold on
+    hS_lim = plot([0 N], [mon.super.lim.SPE(A_mon) mon.super.lim.SPE(A_mon)], 'r-', 'linewidth', 2)
+    grid()
+    xlabel('Batches', 'FontSize', fontsize, 'Fontweight', 'bold')
+    ylabel('SPE', 'FontSize', fontsize, 'Fontweight', 'bold')
+    
+    
+    % Where does batch 3 lie?
+    which = 3;
+    new = cell(1, 2);
+    new{1} = Zcopy.data(which,:);
+    new{2} = Xcopy.data(which,:);
+    out = mon.apply(new);
+
+    
+    for n = 1:shape(Zcopy, 1)
+        which = n;
+        new = cell(1, 2);
+        new{1} = Zcopy.data(which,:);
+        new{2} = Xcopy.data(which,:);
+        out = mon.apply(new);
+        
+        axes(hT)
+        plot(hT, out.T_super(1), out.T_super(2), 'k.')
+        text(hT, out.T_super(1)+0.1, out.T_super(2)+.1, num2str(n))
+        
+        plot(hS, n +N,  out.stats.SPE{A_mon}, 'k.')
+        text(hS, n+N,   out.stats.SPE{A_mon}+0.1, num2str(n))
+        set(hS_lim, 'XData', [0 N+n])
+    end
+
+
+
 end
 
-% Batch 3 lie?
-which = 3;
-new = cell(1, 2);
-new{1} = Z.data(3,:);
-new{2} = X.data(3,:);
 
-out = mon.apply(new);
 
