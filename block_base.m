@@ -440,7 +440,9 @@ classdef block_base < handle
                 
                 % Will scaling introduce missing values?
                 if any(isnan(scaling))
-                    other.has_missing = true;
+                    % TODO(KGD): how to do this programmatically?
+                    % in case we change mmap definition in the future?
+                    other.mmap = ~isnan(scaling);
                 end
                 
                 other.data = block_data;
@@ -460,8 +462,8 @@ classdef block_base < handle
             % correctly
             if any(scaling < sqrt(eps))
                 scaling(scaling < sqrt(eps)) = NaN;
-                self.has_missing = true;
-                block_data.has_missing = true;
+                self.mmap = ~isnan(scaling);
+                block_data.mmap = ~isnan(scaling);
             end                
             scaling = 1./scaling;
 
