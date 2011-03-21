@@ -3,11 +3,6 @@ function unit_tests(varargin)
     
     test_significant_figures()
     
-    
-    
-    PLS_batch_data();
-    
-    
     % PCA tests
     Wold_article_PCA_test()
     PCA_no_missing_data()
@@ -21,9 +16,9 @@ function unit_tests(varargin)
     basic_PLS_test()
     PLS_no_missing_data()
     PLS_with_missing_data() 
-    
-    
     MBPLS_tests();
+    PLS_batch_data();
+    
     %PLS_randomization_tests()
     
     % Basic plots
