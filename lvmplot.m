@@ -28,6 +28,8 @@ classdef lvmplot < handle
         hSelectX = -1;
         hSelectY = -1;
         
+        registered = {};    % Cell array of registered plots
+        
         opt = struct;       % Default plotting options
     end 
     
@@ -42,6 +44,7 @@ classdef lvmplot < handle
             self.set_defaults();
             self.model = model;
             if nargin > 1
+                self.get_registered_plots()
                 self.ptype = varargin{1};
             else
                 self.start_plotter();
@@ -292,8 +295,17 @@ classdef lvmplot < handle
             end
         end % ``add_text_labels``
         
-        
-
+        function get_registered_plots(self)
+            plts = self.model.register_plots();
+            self.registered = {};
+            for j = 1:numel(plts)
+                self.registered{end+1, 1} = plts(j).name;
+                self.registered{end, 2} = plts(j).weight;
+                self.registered{end, 3} = plts(j).dim;
+                self.registered{end, 4} = plts(j).callback;
+            end           
+            
+        end
         
         
     end % end: methods (ordinary)
@@ -307,12 +319,27 @@ function mouseclick_callback(varargin)
     disp(get(varargin{1}, 'UserData'))
 end
 
+function dropdown_callback_level_1(varargin)
+    % A dropdown in the figure has changed; update plot
+    disp('Callback changed')
+end
+
 function adjust_axes(varargin)
     hOb = varargin{1};
     self = get(get(hOb, 'Parent'), 'UserData');
     
     % User wants to change axes
     if get(hOb, 'Value') == 1
+        
+        this_dim = cell2mat(self.registered(:,3)) == self.dim;
+        dropdown_str = self.registered(this_dim,1);
+        dropdown_weight = cell2mat(self.registered(this_dim, 2));
+        registered_callback = self.registered(this_dim, 4);
+        [dropdown_weight, idx] = sort(dropdown_weight, 1, 'descend');
+        dropdown_strs = dropdown_str(idx);
+        registered_callback = registered_callback(idx);
+        
+        
         hAx = self.gca;
         set(hAx, 'Unit', 'Normalized')
         hAx_pos = get(hAx, 'Position');
@@ -336,6 +363,7 @@ function adjust_axes(varargin)
         set(hFr, 'Position', [hFr_pos(1) hFr_pos(3), 200, 50])
         self.hSelectX = hFr;
         
+        
         %set(self.hF, 'Units', 'Normalized');
         ctl.Units = 'pixels';
         hFr = uipanel(ctl, 'Title', 'Y-axis series', ...
@@ -344,6 +372,23 @@ function adjust_axes(varargin)
             'TitlePosition', 'centertop');
         
         self.hSelectY = hFr;
+        
+        
+        ctl.Parent = self.hSelectX;
+        ctl.units = 'Normalized';
+        uicontrol(ctl, 'Style', 'popupmenu', ...
+            'String', dropdown_strs, ...
+            'Callback', @dropdown_callback_level_1, ...
+            'Position', [0, 0, 00.70, .9]);
+        uicontrol(ctl, 'Style', 'popupmenu', ...
+            'String', dropdown_strs, ...
+            'Callback', @dropdown_callback_level_2, ...
+            'Position', [0, 0, 00.70, .9]);
+            
+            
+            
+        set(hDropdown, 'UserData', registered_callback);
+        
         
         set(self.hF, 'Units', units);
         

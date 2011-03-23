@@ -874,9 +874,9 @@ classdef mblvm < handle
             
             switch show_what
                 case 'scores'
-                    plot_scores(h);
+                    basic_plot__scores(h);
                 case 'loadings'
-                    plot_loadings(h);
+                    basic_plot__loadings(h);
             end
             set(h.hF, 'Visible', 'on')
             for i=1:nargout
@@ -906,6 +906,99 @@ classdef mblvm < handle
             % Subclasses get to over ride the registration afterwards by
             % defining registrations in self.registers_plots_post()
             out = [];
+            
+            % These plots are common for PCA and PLS models
+            
+            % plt.name     : name in the drop down
+            % plt.weight   : ordering in drop down menu: higher values first
+            % plt.dim      : dimensionality: 0=component, 1=rows, 2=columns
+            % plt.callback : function that will show the plot
+            
+            plt = struct;  
+            
+            % Dimension 0 (component) plots
+            % =========================
+            
+            plt.name = 'R2 (component)';
+            plt.weight = 60;
+            plt.dim = 0;
+            plt.callback = @self.R2_component_plot;
+            plt.level2 = [];
+            out = [out; plt];
+            
+            
+            plt.name = 'Eigenvalues'; 
+            plt.weight = 0;
+            plt.dim = 0;
+            plt.level2 = [];
+            plt.callback = @self.model_eigenvalue_plot;
+            out = [out; plt];
+            
+            
+            % Dimension 1 (rows) plots
+            % =========================
+            
+            plt.name = 'Scores';   % t-scores
+            plt.weight = 60;
+            plt.dim = 1;
+            plt.level2 = '1:A';
+            plt.callback = @self.score_plot;
+            
+            out = [out; plt];
+            
+            
+            plt.name = 'Hot T2';  % Hotelling's T2
+            plt.weight = 40;
+            plt.dim = 1;
+            plt.level2 = 'Using';
+            plt.callback = @self.hot_T2_plot;
+            out = [out; plt];
+            
+            plt.name = 'SPE';
+            plt.weight = 50;
+            plt.dim = 1;
+            plt.level2 = '1:A';
+            plt.callback = @self.spe_plot;
+            out = [out; plt];
+            
+            % Dimension 2 (columns) plots
+            % ============================      
+            
+            plt.name = 'Loadings';
+            plt.weight = 20;
+            plt.dim = 2;
+            plt.level2 = '1:A';
+            plt.callback = @self.loadings_plot;
+            out = [out; plt];
+            
+            plt.name = 'VIP';
+            plt.weight = 40;
+            plt.dim = 2;
+            plt.level2 = 'Using';
+            plt.callback = @self.VIP_plot;
+            out = [out; plt];
+            
+            plt.name = 'R2 (variable)';
+            plt.weight = 50;
+            plt.dim = 2;
+            plt.level2 = '1:A';
+            plt.callback = @self.R2_plot;
+            out = [out; plt];
+            
+            plt.name = 'Centering';
+            plt.weight = -40;
+            plt.dim = 2;
+            plt.level2 = [];
+            plt.callback = @self.mean_centering_plot;
+            out = [out; plt];
+            
+            plt.name = 'Scaling';
+            plt.weight = -41;
+            plt.dim = 2;
+            plt.level2 = [];
+            plt.callback = @self.scaling_plot;
+            out = [out; plt];            
+            
             extra = register_plots_post(self);
             out = [out; extra];
         end
@@ -1390,7 +1483,7 @@ classdef mblvm < handle
     end % end: methods (sealed and static)
     
     methods (Static=true)
-        function score_plots(hP, t_h, t_v)
+        function score_plot(hP, t_h, t_v)
             % Do the actual score plots
             
             block = 1;
@@ -1404,8 +1497,16 @@ classdef mblvm < handle
             
         end
         
-        function plot_T2(hP)
+        function hot_T2_plot(hP, varargin)
             disp(['scatter plot of T2'])
+        end
+        
+        function spe_plot(hP, varargin)
+            disp(['SPE plot'])
+        end
+        
+        function loadings_plot(hP, varargin)
+            disp(['Loadings plot'])
         end
 
 
@@ -1503,11 +1604,10 @@ function h = plot_score_scatterplot(block, t_h, t_v)
     
 end
 
-function plot_scores(hP)
+function basic_plot__scores(hP)
     % Show a basic set of score plots.  The plot layout is a function of how
     % many components are in the model.
 
-    
     hP.new_figure();
     
     % These are observation-based plots
@@ -1517,32 +1617,30 @@ function plot_scores(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.model.score_plots(hP, 0, 1)
+        hP.model.score_plot(hP, 0, 1)
     elseif hP.model.A == 2
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.model.score_plots(hP, 1, 2);
+        hP.model.score_plot(hP, 1, 2);
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
         hP.nCol = 2;
         hP.new_axis([1, 2, 3, 4]);
-        hP.model.score_plots(hP, 1, 2);
-        hP.model.score_plots(hP, 3, 2);
-        hP.model.score_plots(hP, 1, 3);
-        hP.model.plot_T2    (hP);
+        hP.model.score_plot(hP, 1, 2);
+        hP.model.score_plot(hP, 3, 2);
+        hP.model.score_plot(hP, 1, 3);
+        hP.model.hot_T2_plot(hP);
     end
 end % ``plot_scores``
 
-function plot_loadings(hP)
+function basic_plot__loadings(hP)
     % Show a basic set of loadings plots.  The plot layout is a function of how
     % many components are in the model.
 
     %popt.footer_string = {title_str, popt.footer_string{:}};
     hP.new_figure();
-    
-    
     if hP.model.A == 1
         hP.nRow = 1;
         hP.nCol = 1;

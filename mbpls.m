@@ -278,7 +278,7 @@ classdef mbpls < mblvm
                 end
 
                 if all(initial_ssq_total < self.opt.tolerance)
-                    warning('mbpca:apply_model', 'There is no variance left in one/some of the new data observations')
+                    warning('mbpls:apply_model', 'There is no variance left in one/some of the new data observations')
                 end
 
                 for b = 1:self.B
@@ -387,6 +387,32 @@ classdef mbpls < mblvm
                 end
             end
             fprintf(']\n');
+            
+        end
+        
+        % Superclass abstract method implementation
+        function out = register_plots_post(self)
+            out = [];
+            
+            % Dimension 1 (rows) plots
+            % =========================
+            plt.name = 'Predictions';
+            plt.weight = 50;
+            plt.dim = 1;
+            plt.level2 = 'Using';
+            plt.callback = @self.coefficient_plot;
+            out = [out; plt];
+            
+            
+            % Dimension 2 (columns) plots
+            % ============================          
+            plt.name = 'Coeffients';
+            plt.weight = 30;
+            plt.dim = 2;
+            plt.level2 = 'Using';
+            plt.callback = @self.coefficient_plot;
+            out = [out; plt];
+            
             
         end
         
