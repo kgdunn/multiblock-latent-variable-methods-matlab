@@ -860,104 +860,55 @@ classdef mblvm < handle
             % Scores for block 1 (a batch block), only showing batch 38
             % > plot(model, 'scores', {'block', 1}, {'batch', 38)  
             
-            
-            % Set the defaults in the ``popt``: plot options
-            popt = struct;
-            popt.footer_string = {datestr(now)};
-            popt.show_labels = true;
-            popt.block = 'overall';
-            popt.components = 1:self.A;
-            popt.other = {};
-            
-            for i = 1:numel(varargin)
-                key = varargin(i);
-                value = [];
-                if iscell(key)
-                    if ischar(key{:})
-                        key = key{1};
-                    else
-                        key = varargin{i}{1};
-                        if numel(varargin{i}) > 1
-                            value = varargin{i}{2};
-                        end 
-                    end
+            if nargin == 1
+                h = lvmplot(self);
+                for i=1:nargout
+                    varargout{i} = h;
                 end
+                return
+            else
+                show_what = varargin{1};
+                h = lvmplot(self, show_what);
                 
-                if strcmpi(key, 'scores')
-                    show_what = 'scores';
-                    if ~isempty(value)
-                        popt.components = value;
-                    end
-                elseif strcmpi(key, 'loadings')
-                    show_what = 'loadings';
-                    if ~isempty(value)
-                        popt.components = value;
-                    end
-                elseif strcmpi(key, 'block')
-                    if ~isempty(value)
-                        if ischar(value)
-                            for b = 1:self.B
-                                if strcmpi(self.blocks{b}.name, value)
-                                    popt.block = b;
-                                end
-                            end
-                        else
-                            popt.block = uint32(value);
-                        end
-                    end
-                elseif strcmpi(key, 'T2')
-                    show_what = 'T2';
-                elseif strcmpi(key, 'SPE')
-                    show_what = 'SPE';
-                elseif strcmpi(key, 'R2')
-                    show_what = 'R2';
-                elseif strcmpi(key, 'show_labels')
-                    popt.show_labels = value;
-                else
-                    popt.other = {varargin(i), popt.other{:}};
-                end 
-            end
-            
-            if isinteger(popt.block) && isa(self.blocks{popt.block}, 'block_batch')
-                switch show_what
-                    case 'scores'
-                        [h, hHeaders, hFooters, title_str] = plot_batch_scores(self, popt);
-                    case 'loadings'
-                        [h, hHeaders, hFooters, title_str] = plot_batch_loadings(self, popt);
-                    case 'T2'
-                        [h, hHeaders, hFooters, title_str] = plot_batch_T2(self, popt);
-                    case 'R2'
-                        [h, hHeaders, hFooters, title_str] = plot_batch_R2(self, popt);
-                    case 'SPE'
-                        [h, hHeaders, hFooters, title_str] = plot_batch_SPE(self, popt);
-                    otherwise
-                        [h, hHeaders, hFooters, title_str] = plot_batch_summary(self, popt);
-                end
-
             end
             
             switch show_what
                 case 'scores'
-                    [h, hHeaders, hFooters, title_str] = plot_scores(self, popt);
+                    plot_scores(h);
                 case 'loadings'
-                    [h, hHeaders, hFooters, title_str] = plot_loadings(self, popt);
-                case 'T2'
-                    [h, hHeaders, hFooters, title_str] = plot_T2(self, popt);
-                case 'R2'
-                    [h, hHeaders, hFooters, title_str] = plot_R2(self, popt);
-                case 'SPE'
-                    [h, hHeaders, hFooters, title_str] = plot_SPE(self, popt);
-                otherwise 
-                    [h, hHeaders, hFooters, title_str] = plot_summary(self, popt);
+                    plot_loadings(h);
             end
-            
-            self.add_plot_footers(hFooters, popt.footer_string);
-            self.add_plot_window_title(hHeaders, title_str)
+            set(h.hF, 'Visible', 'on')
             for i=1:nargout
                 varargout{i} = h;
             end
+
+
+%                     if ~isempty(value)
+%                         if ischar(value)
+%                             for b = 1:self.B
+%                                 if strcmpi(self.blocks{b}.name, value)
+%                                     popt.block = b;
+%                                 end
+%                             end
+%                         else
+%                             popt.block = uint32(value);
+%                         end
+%                     end
+
+       
+%             self.add_plot_footers(hFooters, popt.footer_string);
+%             self.add_plot_window_title(hHeaders, title_str)
         end % ``plot``
         
+        function out = register_plots(self)
+            % Register which variables in ``self`` are plottable
+            % Subclasses get to over ride the registration afterwards by
+            % defining registrations in self.registers_plots_post()
+            out = [];
+            extra = register_plots_post(self);
+            out = [out; extra];
+        end
     end % end: methods (sealed)
     
     % Subclasses must redefine these methods
@@ -968,8 +919,10 @@ classdef mblvm < handle
         apply_model(self, other) % applies the model to ``new`` data
         expand_storage(self, A)  % expands the storage to accomodate ``A`` components
         summary(self)            % show a text-based summary of ``self``
+        register_plots_post(self)% register which variables are plottable      
     end % end: methods (abstract)
     
+    % Subclasses may not redefine these methods
     methods (Sealed=true, Static=true)
         function [T2, varargout] = mahalanobis_distance(T, varargin)
             % If given ``S``, an estimate of the variance-covariance matrix,
@@ -1437,82 +1390,89 @@ classdef mblvm < handle
     end % end: methods (sealed and static)
     
     methods (Static=true)
-        function [hF, hHead, hFoot] = add_figure()
-            % Adds a new figure
-            background_colour = [1, 1, 1];
-            font_size = 14;
-            hF = figure('Color', background_colour);
-            set(hF, 'ToolBar', 'figure')
-            units = get(hF, 'Units');
-            set(hF, 'units', 'Pixels');
-             
-            screen = get(0,'ScreenSize');   
-            fPos = get(hF, 'position');
-            fPos(1) = round(0.05*screen(3));
-            fPos(2) = round(0.1*screen(4));
-            fPos(3) = 0.90*screen(3);
-            fPos(4) = 0.80*screen(4);
-            set(hF, 'Position', fPos);
-  
-            Txt.Interruptible = 'off';  % Text fields different to default values
-            Txt.BusyAction    = 'queue';
-            Txt.Style         = 'text';
-            Txt.Units         = 'normalized';
-            Txt.HorizontalAli = 'center';
-            Txt.Background    = background_colour;
-            Txt.FontSize      = font_size;
-            Txt.Parent        = hF;
-            set(hF, 'Units', 'normalized')
+        function score_plots(hP, t_h, t_v)
+            % Do the actual score plots
             
-            hHead = uicontrol(Txt, ...
-                             'Position',[0, 0, eps, eps], ...  %'Position',[0.02, 0.95, 0.96 0.04], ...
-                             'ForegroundColor',[0 0 0], 'String', '');
-            %set(hHead, 'Units', 'Pixels')
-            %p = get(hHead, 'Position')
-            Txt.FontSize = 10;
-            hFoot = uicontrol(Txt, ...
-                             'Position',[0.02, 0.005, 0.96 0.04], ...
-                             'ForegroundColor',[0 0 0], 'String', '', ...
-                             'HorizontalAlignment', 'left');
-            set(hF, 'units', units);
+            block = 1;
+            ax = hP.gca();
+            % Line plot of the scores
+            if t_h == 0
+                disp(['line plot of t-', num2str(t_v)])
+                return
+            end
+            disp(['scatter plot of t-', num2str(t_h), ' vs t-', num2str(t_v)])
+            
         end
         
-        function add_plot_window_title(hHeaders, text_to_add)
-            for k = 1:numel(hHeaders)
-                hF = get(hHeaders(k), 'Parent');
-                set(hF, 'Name', text_to_add);
-            end
+        function plot_T2(hP)
+            disp(['scatter plot of T2'])
         end
-        
-        function add_plot_footers(hFooters, footer_string)
-            % Convert the cell string to a long char string
-            foot = footer_string{1};
-            for j = 2:numel(footer_string)
-                foot = [foot, footer_string{j}]; %#ok<AGROW>
-            end
-            for k = 1:numel(hFooters)
-                set(hFooters(k), 'String', footer_string)
-            end
-        end
+
+
+%         function [hF, hHead, hFoot] = add_figure()
+%             % Adds a new figure
+%             background_colour = [1, 1, 1];
+%             font_size = 14;
+%             hF = figure('Color', background_colour);
+%             set(hF, 'ToolBar', 'figure')
+%             units = get(hF, 'Units');
+%             set(hF, 'units', 'Pixels');
+%              
+%             screen = get(0,'ScreenSize');   
+%             fPos = get(hF, 'position');
+%             fPos(1) = round(0.05*screen(3));
+%             fPos(2) = round(0.1*screen(4));
+%             fPos(3) = 0.90*screen(3);
+%             fPos(4) = 0.80*screen(4);
+%             set(hF, 'Position', fPos);
+%   
+%             Txt.Interruptible = 'off';  % Text fields different to default values
+%             Txt.BusyAction    = 'queue';
+%             Txt.Style         = 'text';
+%             Txt.Units         = 'normalized';
+%             Txt.HorizontalAli = 'center';
+%             Txt.Background    = background_colour;
+%             Txt.FontSize      = font_size;
+%             Txt.Parent        = hF;
+%             set(hF, 'Units', 'normalized')
+%             
+%             hHead = uicontrol(Txt, ...
+%                              'Position',[0, 0, eps, eps], ...  %'Position',[0.02, 0.95, 0.96 0.04], ...
+%                              'ForegroundColor',[0 0 0], 'String', '');
+%             %set(hHead, 'Units', 'Pixels')
+%             %p = get(hHead, 'Position')
+%             Txt.FontSize = 10;
+%             hFoot = uicontrol(Txt, ...
+%                              'Position',[0.02, 0.005, 0.96 0.04], ...
+%                              'ForegroundColor',[0 0 0], 'String', '', ...
+%                              'HorizontalAlignment', 'left');
+%             set(hF, 'units', units);
+%         end
+%         
+%         function add_plot_window_title(hHeaders, text_to_add)
+%             for k = 1:numel(hHeaders)
+%                 hF = get(hHeaders(k), 'Parent');
+%                 set(hF, 'Name', text_to_add);
+%             end
+%         end
+%         
+%         function add_plot_footers(hFooters, footer_string)
+%             % Convert the cell string to a long char string
+%             foot = footer_string{1};
+%             for j = 2:numel(footer_string)
+%                 foot = [foot, footer_string{j}]; %#ok<AGROW>
+%             end
+%             for k = 1:numel(hFooters)
+%                 set(hFooters(k), 'String', footer_string)
+%             end
+%         end
 
     end % end methods (static)
     
 end % end classdef
 
 %-------- Helper functions (usually used in 2 or more places). May NOT change ``self``
-function add_text_labels(hA, x, y, labels, popt)
-    % Adds text labels to axis ``hA`` at the ``x`` and ``y`` coordinates
-    if popt.show_labels
-        extent = axis(hA);
-        delta_x = 0.01*diff(extent(1:2));
-        delta_y = 0.01*diff(extent(3:4));
-        for n = 1:numel(x)
-            text(x+delta_x, y+delta_y, labels(n), 'parent', hA)
-        end
-    end
-end
-
-function h = plot_score_scatterplot(t_h, t_v, block, popt)
+function h = plot_score_scatterplot(block, t_h, t_v)
     % Plots the t_h vs t_v score scatterplot with the confidence limit (95%).
     % Uses component ``th`` on the horizontal axis and ``tv`` on the vertical
     % axis.
@@ -1542,100 +1502,65 @@ function h = plot_score_scatterplot(t_h, t_v, block, popt)
     
     
 end
-        
-function [hA, hHeaders, hFooters, title_str] = plot_scores(self, popt)
-    hA = 0;
-    hHeaders = [];
-    hFooters = [];
-    title_str = 'Score plots';
-    popt.footer_string = {title_str, popt.footer_string{:}};
-    % [hF, hHead, hFoot] = self.add_figure(); %#ok<ASGLU>
-    %hHeaders(end+1) = hHead; %#ok<*AGROW>
-    %hFooters(end+1) = hFoot;
 
-%     
-%     if blockX.A == 1        
-%         plot_score_lineplot(blockX, 1, show_labels);
-%    
-%     elseif blockX.A == 2
-%         nrow = 1;
-%         ncol = 2;
-%         subplot(nrow, ncol, ax);
-%         plot_score_scatterplot(blockX, 1, 2, show_labels);
-%         ax = ax + 1;
-%         
-%         % t1-t2 scatter plot with ellipse
-%         subplot(nrow, ncol, ax);
-%         plot_Hotellings_T2_lineplot(blockX, true, show_labels);
-%     elseif blockX.A >= 3
-%         nrow = 2;
-%         ncol = 2;
-%         
-%         subplot(nrow, ncol, ax);
-%         plot_score_scatterplot(blockX, 1, 2, show_labels);
-%         ax = ax + 1;
-%         subplot(nrow, ncol, ax);
-%         plot_score_scatterplot(blockX, 3, 2, show_labels);
-%         ax = ax + 1;
-%         subplot(nrow, ncol, ax);
-%         plot_score_scatterplot(blockX, 1, 3, show_labels);
-%         ax = ax + 1;
-%         subplot(nrow, ncol, ax);
-%         plot_Hotellings_T2_lineplot(blockX, true, show_labels);
-%     end    
+function plot_scores(hP)
+    % Show a basic set of score plots.  The plot layout is a function of how
+    % many components are in the model.
+
+    
+    hP.new_figure();
+    
+    % These are observation-based plots
+    hP.dim = 1;
+    
+    if hP.model.A == 1
+        hP.nRow = 1;
+        hP.nCol = 1;
+        hP.new_axis(1);
+        hP.model.score_plots(hP, 0, 1)
+    elseif hP.model.A == 2
+        hP.nRow = 1;
+        hP.nCol = 1;
+        hP.new_axis(1);
+        hP.model.score_plots(hP, 1, 2);
+    elseif hP.model.A >= 3
+        % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
+        hP.nRow = 2;
+        hP.nCol = 2;
+        hP.new_axis([1, 2, 3, 4]);
+        hP.model.score_plots(hP, 1, 2);
+        hP.model.score_plots(hP, 3, 2);
+        hP.model.score_plots(hP, 1, 3);
+        hP.model.plot_T2    (hP);
+    end
 end % ``plot_scores``
 
-function [hA, hHeaders, hFooters, title_str] = plot_loadings(self, popt)
-    hA = 0;
-    hHeaders = [];
-    hFooters = [];
-    title_str = 'Loading plots';
-    popt.footer_string = {title_str, popt.footer_string{:}};
+function plot_loadings(hP)
+    % Show a basic set of loadings plots.  The plot layout is a function of how
+    % many components are in the model.
+
+    %popt.footer_string = {title_str, popt.footer_string{:}};
+    hP.new_figure();
     
-    disp('Plot the scores')
-    popt
+    
+    if hP.model.A == 1
+        hP.nRow = 1;
+        hP.nCol = 1;
+        hP.new_axis(1);
+        plot_loadings(hP, 0, 1)
+    elseif hP.model.A == 2
+        hP.nRow = 1;
+        hP.nCol = 1;
+        hP.new_axis(1);
+        plot_loadings(hP, 1, 2);
+    elseif hP.model.A >= 3
+        % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
+        hP.nRow = 2;
+        hP.nCol = 2;
+        hP.new_axis([1, 2, 3, 4]);
+        plot_loadings(hP, 1, 2);
+        plot_loadings(hP, 3, 2);
+        plot_loadings(hP, 1, 3);
+        plot_VIP     (hP);
+    end
 end % ``plot_loadings``
-
-function [hA, hHeaders, hFooters, title_str] = plot_T2(self, popt)
-    hA = 0;
-    hHeaders = [];
-    hFooters = [];
-    title_str = 'Hotelling''s T2 plot';
-    popt.footer_string = {title_str, popt.footer_string{:}};
-    
-    disp('Plot HT2')
-    popt
-end % ``plot_T2``
-
-function [hA, hHeaders, hFooters, title_str] = plot_SPE(self, popt)
-    hA = 0;
-    hHeaders = [];
-    hFooters = [];
-    title_str = 'SPE plots';
-    popt.footer_string = {title_str, popt.footer_string{:}};
-    
-    disp('Plot SPE')
-    popt
-end % ``plot_SPE``
-
-function [hA, hHeaders, hFooters, title_str] = plot_R2(self, popt)
-    hA = 0;
-    hHeaders = [];
-    hFooters = [];
-    title_str = 'R2 plots';
-    popt.footer_string = {title_str, popt.footer_string{:}};
-    
-    disp('Plot R2')
-    popt
-end % ``plot_R2``
-
-function [hA, hHeaders, hFooters, title_str] = plot_summary(self, popt)
-    hA = 0;
-    hHeaders = [];
-    hFooters = [];
-    title_str = 'Summary plots';
-    popt.footer_string = {title_str, popt.footer_string{:}};
-    
-    disp('Plot Summary')
-    popt
-end % ``plot_summary``

@@ -297,6 +297,19 @@ classdef mbpca < mblvm
             fprintf(']\n');
 
         end
+       
+        
+        % Superclass abstract method implementation
+        function out = register_plots_post(self)
+            out = [];
+            
+            % t-scores
+            plt = struct;
+            plt.name = 'Scores';
+            plt.dim = 1;
+            plt.callback = @self.score_plots;
+            out = [out; plt];
+        end
         
     end % end methods (ordinary)
     
