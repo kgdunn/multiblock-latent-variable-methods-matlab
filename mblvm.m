@@ -849,6 +849,12 @@ classdef mblvm < handle
         end
 
         function varargout = plot(self, varargin)
+            
+            % IT IS WEIRD THAT the mblvm class is telling how to use the 
+            % ``lvmplot`` class with all the steps involved.  Or is it?
+            % Should the ``lvmplot`` class be merely a convenient plot
+            % wrapper?
+            
             % SYNTAX
             %
             % > plot(model)                        % summary plot of T2, SPE, R2X per PC
@@ -881,6 +887,9 @@ classdef mblvm < handle
                 case 'loadings'
                     basic_plot__loadings(h);
             end
+            h.update_all_plots();
+            h.update_annotations();
+            
             set(h.hF, 'Visible', 'on')
             for i=1:nargout
                 varargout{i} = h;
@@ -918,6 +927,8 @@ classdef mblvm < handle
             % plt.callback  : function that will show the plot
             % plt.more_text : text that goes between two dropdowns "for component"
             % plt.more_type : tells what to put in the second dropdown
+            % plt.more_block: which block is the more_type variable referring to
+            % plt.annotate  : callback to add annotations to that axis (limits)
             
             plt = struct;  
             
@@ -930,13 +941,11 @@ classdef mblvm < handle
             plt.more_text = '';
             plt.more_type = '<model>';
             plt.more_block = '';
+            plt.annotate = '';
             plt.callback = @self.R2_component_plot;
             out = [out; plt];
-            
-            
+                        
             % plt.name = 'Eigenvalues'; 
-
-            
             
             % Dimension 1 (rows) plots
             % =========================
@@ -948,6 +957,7 @@ classdef mblvm < handle
             plt.more_type = 'a';
             plt.more_block = '';
             plt.callback = @self.score_plot;
+            plt.annotate = @self.score_limits_annotate;
             
             out = [out; plt];
             
@@ -959,6 +969,7 @@ classdef mblvm < handle
             plt.more_type = '1:A';
             plt.more_block = '';
             plt.callback = @self.hot_T2_plot;
+            plt.annotate = @self.hot_T2_limits;
             out = [out; plt];
             
             plt.name = 'SPE';
@@ -968,6 +979,7 @@ classdef mblvm < handle
             plt.more_type = '1:A';
             plt.more_block = '';
             plt.callback = @self.spe_plot;
+            plt.annotate = @self.spe_limits;
             out = [out; plt];
             
             % Dimension 2 (columns) plots
@@ -980,6 +992,7 @@ classdef mblvm < handle
             plt.more_type = 'a';
             plt.more_block = '';
             plt.callback = @self.loadings_plot;
+            plt.annotate = '';
             out = [out; plt];
             
             plt.name = 'VIP';
@@ -989,6 +1002,7 @@ classdef mblvm < handle
             plt.more_type = '1:A';
             plt.more_block = '';
             plt.callback = @self.VIP_plot;
+            plt.annotate = @self.VIP_limits;
             out = [out; plt];
             
             plt.name = 'R2 (variable)';
@@ -1487,13 +1501,12 @@ classdef mblvm < handle
     end % end: methods (sealed and static)
     
     methods (Static=true)
-        function score_plot(hP)
+        function score_plot(hP, series)
             % Do the actual score plots
             ax = hP.gca();
             block = hP.c_block;
-            t_h = hP.curr_x;
-            t_v = hP.curr_y;
-            
+            t_h = series.x_num;
+            t_v = series.y_num;
             
             % Line plot of the scores
             if t_h == 0
@@ -1504,29 +1517,20 @@ classdef mblvm < handle
             % Scatter plot of the scores
             if block == 0
                 scores = hP.model.super.T(:,[t_h t_v]);
-                limit = hP.model.super.lim.T2(2);
             else
                 scores = hP.model.T{block}(:,[t_h t_v]);
-                limit = hP.model.lim{block}.T2(2);
             end
-            
-            plot(ax, scores(:,1), scores(:,2), 'k.');
-            hold on
-            ellipse_coords = ellipse_coordinates(scores, limit);
-            plot(ellipse_coords(:,1), ellipse_coords(:,2), 'r--', 'linewidth', 1)            
-            title('Score  plot')
-            grid on
-            xlabel(['t_', num2str(t_h)])
-            ylabel(['t_', num2str(t_v)])    
-            extent = axis;
-            hd = plot([0, 0], [-1E10, 1E10], 'k', 'linewidth', 2);
-            set(hd, 'tag', 'vline', 'HandleVisibility', 'off');
-            hd = plot([-1E50, 1E50], [0, 0], 'k', 'linewidth', 2);
-            set(hd, 'tag', 'hline', 'HandleVisibility', 'off');
-            xlim(extent(1:2))
-            ylim(extent(3:4)) 
-
-            %add_text_labels(hPlot, hP, 1)
+            hPlot = findobj(ax, 'Tag', 'scores');
+            if ~isempty(hPlot)
+                set(hPlot, 'XData', scores(:,1));
+                set(hPlot, 'YData', scores(:,2));
+            else
+                set(ax, 'Nextplot', 'add');
+                hPlot = plot(ax, scores(:,1), scores(:,2)); 
+                set(hPlot, 'Tag', 'scores')
+                
+            end
+            set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
             
         end
         
@@ -1540,6 +1544,41 @@ classdef mblvm < handle
         
         function loadings_plot(hP, varargin)
             disp(['Loadings plot'])
+        end
+        
+        function score_limits_annotate(hP, series)
+            ax = hP.gca();
+            block = hP.c_block;
+            t_h = series.x_num;
+            t_v = series.y_num;
+            
+            % Scatter plot of the scores
+            if block == 0
+                scores = hP.model.super.T(:,[t_h t_v]);
+                limit = hP.model.super.lim.T2(2);
+            else
+                scores = hP.model.T{block}(:,[t_h t_v]);
+                limit = hP.model.lim{block}.T2(2);
+            end
+
+            if t_h > 0 && t_v > 0
+                set(ax, 'NextPlot', 'add')
+                ellipse_coords = ellipse_coordinates(scores, limit);
+                plot(ax, ellipse_coords(:,1), ellipse_coords(:,2), 'r--', 'linewidth', 1)            
+                title('Score plot')
+                grid on
+                xlabel(['t_', num2str(t_h)])
+                ylabel(['t_', num2str(t_v)])
+            elseif t_h > 0
+                set(ax, 'NextPlot', 'add')
+                ellipse_coords = ellipse_coordinates(scores, limit);
+                plot(ax, ellipse_coords(:,1), ellipse_coords(:,2), 'r--', 'linewidth', 1)            
+                title('Score plot')
+                grid on
+                xlabel(['t_', num2str(t_h)])
+                ylabel(['t_', num2str(t_v)])
+                
+            end
         end
 
 
@@ -1606,6 +1645,8 @@ classdef mblvm < handle
 end % end classdef
 
 %-------- Helper functions (usually used in 2 or more places). May NOT change ``self``
+
+
 function ellipse_coords = ellipse_coordinates(scores, T2_limit_alpha)
 % Calculates the ellipse coordinates for any two-column matrix of ``scores``
 % at the given Hotelling's T2 ``T2_limit_alpha``.
@@ -1717,12 +1758,11 @@ function ellipse_coords = ellipse_coordinates(scores, T2_limit_alpha)
     ellipse_coords = (counter_rotate * [x(:) y(:)]')';
     
 end
-function basic_plot__scores(hP)
-    % Show a basic set of score plots.  The plot layout is a function of how
-    % many components are in the model.
 
-    
-    
+
+function basic_plot__scores(hP)
+    % Show a basic set of score plots.
+
     % These are observation-based plots
     hP.dim = 1;
     
@@ -1730,23 +1770,21 @@ function basic_plot__scores(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.model.score_plot(hP, 0, 1)
+        hP.set_plot(1, 1, {'Order', 1}, {'Scores', 1})
     elseif hP.model.A == 2
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.curr_x = 1;
-        hP.curr_y = 2;
-        hP.model.score_plot(hP);
+        hP.set_plot(1, 1, {'scores', 1}, {'scores', 2})        
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
         hP.nCol = 2;
         hP.new_axis([1, 2, 3, 4]);
-        hP.model.score_plot(hP, 1, 2);
-        hP.model.score_plot(hP, 3, 2);
-        hP.model.score_plot(hP, 1, 3);
-        hP.model.hot_T2_plot(hP);
+        hP.set_plot(1, 1, {'Scores', 1}, {'scores', 2})  % t1-t2
+        hP.set_plot(2, 1, {'Scores', 3}, {'scores', 2})  % t3-t2
+        hP.set_plot(3, 1, {'Scores', 1}, {'scores', 3})  % t1-t3
+        hP.set_plot(4, 1, {'Order', 1},  {'HotT2', hp.self.model.A})  % Hot_T2 using all components
     end
 end % ``plot_scores``
 

@@ -403,6 +403,7 @@ classdef mbpls < mblvm
             plt.more_type = '<label>';
             plt.more_block = '';
             plt.callback = @self.predictions_plot;
+            plt.annotate = @self.predictions_annotate;
             out = [out; plt];
             
             plt.name = 'Observations';
@@ -412,6 +413,7 @@ classdef mbpls < mblvm
             plt.more_type = '<label>';
             plt.more_block = '';
             plt.callback = @self.observed_plot;
+            plt.annotate = '';
             out = [out; plt];
             
             % Dimension 2 (columns) plots
@@ -423,9 +425,8 @@ classdef mbpls < mblvm
             plt.more_type = '<label>';
             plt.more_block = '<Y>';
             plt.callback = @self.coefficient_plot;
+            plt.annotate = '';
             out = [out; plt];
-            
-            
         end
         
     end % end methods (ordinary)

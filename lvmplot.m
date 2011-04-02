@@ -29,10 +29,9 @@ classdef lvmplot < handle
         hSelectY = -1;      % Handle to the Y-axis selection panel
         
         registered = {};    % Cell array of registered plots
-        
+                            % FUTURE: make this a struct (easier to code for)
+                
         c_block = NaN;      % Current block
-        curr_x = -1;        % Dropdown item selected on x-axis
-        curr_y = -1;        % Dropdown item selected on y-axis
         
         opt = struct;       % Default plotting options
     end 
@@ -242,18 +241,21 @@ classdef lvmplot < handle
             % and : http://www.mathworks.com/matlabcentral/newsreader/view_thread/294487
             jToolbar = get(get(hToolbar,'JavaContainer'),'ComponentPeer');
             if ~isempty(jToolbar)
-               dropdown_strings = {'A', 'B', 'C'};
-               jCombo = javax.swing.JComboBox(dropdown_strings);
-               jCombo = handle(jCombo, 'CallbackProperties');
-               set(jCombo, 'ActionPerformedCallback', @dropdown_block_selector);
-               jToolbar(1).add(jCombo,0); %5th position, after printer icon
-               jToolbar(1).repaint;
-               jToolbar(1).revalidate;
-               jCombo.name = num2str(self.hF); % so we can get access to ``self`` later
+                block_names = cell(self.model.B+1, 1);            
+                for b = 1:self.model.B
+                    block_names{b+1} = self.model.blocks{b}.name;
+                end
+                block_names{1} = 'Overall';
+                jCombo = javax.swing.JComboBox(block_names);
+                jCombo = handle(jCombo, 'CallbackProperties');
+                set(jCombo, 'ActionPerformedCallback', @dropdown_block_selector);
+                jToolbar(1).add(jCombo,0); %5th position, after printer icon
+                jToolbar(1).repaint;
+                jToolbar(1).revalidate;
+                jCombo.name = num2str(self.hF); % so we can get access to ``self`` later
             end
             self.c_block = 0;  % The default block is the superblock
-
-                         
+            
             set(self.hF, 'units', units);
             if nargin > 1
                 set(self.hF, 'Visible', varargin{1});
@@ -305,8 +307,102 @@ classdef lvmplot < handle
                     'TooltipString', 'Adjust axes', ...
                     'Callback', @adjust_axes);
                 set(self.hM(i), 'Units', 'Normalized')
+                
+                
+                % How many plot elements will there be?
+                if self.dim == 0
+                    n = self.model.A;
+                else
+                    if self.c_block > 0
+                        n = self.model.blocks{self.c_block}.shape(self.dim);
+                    else
+                        % Superblock plots:
+                        if self.dim == 1
+                            n = size(self.model.super.T, 1);
+                        elseif self.dim == 2;
+                            n = size(self.model.super.T, 2);
+                        end
+                    end
+                end
+                vector = zeros(n, 1) .* NaN;
+                plot(h, vector, vector);
+                
+                series.x_type = {};        % Registration entry: what is on the x-axis; lookup in self.registered
+                series.y_type = {};        % Registration entry: what is on the y-axis; lookup in self.registered
+                series.x_num  = -1;        % Which entry from the dropdown in shown on the x-axis
+                series.y_num  = -1;        % Which entry from the dropdown in shown on the y-axis
+                setappdata(h, 'SeriesData', series)
             end
 
+        end
+        
+        function set_plot(self, idx, dim, xaxis, yaxis)
+            % Sets what is plotted on each axis for the current axis handle,
+            % found by the ``idx`` into self.hA. The ``dim`` tells us which
+            % dimension is being plotted.
+            
+            h = self.hA(idx);
+            series = getappdata(h, 'SeriesData');
+            [series.x_type, series.x_num] = self.validate_plot(xaxis, dim);
+            [series.y_type, series.y_num] = self.validate_plot(yaxis, dim);
+            setappdata(h, 'SeriesData', series)
+        end
+        
+        function [plottype, entry_num] = validate_plot(self, request, dim)
+            % Validates the ``request``ed plot and sees if it exists in the
+            % registered plot types for that ``dim``ension.
+            plottype = '';
+            entry_num = NaN;
+
+            subset_idx = cell2mat(self.registered(:,3)) == dim;
+            subset = self.registered(subset_idx, :);
+            
+            for i = 1:numel(subset)
+                if strcmpi(subset{i,1}, request{1})
+                    plottype = subset(i,:);
+                    entry_num = validate_plot_index(self, subset(i,:), request{2});
+                    break
+                end
+            end
+        end
+        
+        function entry = validate_plot_index(self, plot_entry, index)
+            % Returns all valid indicies for ``plot_entry`` using the
+            % ``plt.more_type`` registration
+            entry = NaN;
+            
+            switch plot_entry{6}
+                case {'a', '1:A'}
+                    A = self.model.A;
+                    if index <= A
+                        entry = index;
+                    end
+                case '<model>';
+                    if index == -1;
+                        entry = index;
+                    end
+                    
+                case 'Variable';
+                    % See which dimension we are plotting in and see if we can
+                    % index into that dimension
+                    block = self.c_block;
+                    
+                    if block >= 1  % we cannot show variables from the superblock
+                        plot_dim = plot_entry{3};
+                        shape = self.model.blocks{block}.shape;
+                        if index <= shape(plot_dim)
+                            entry = index;
+                        end
+                    end
+                    
+            end
+            
+            if isnan(entry)
+                error('lvmplot:validate_plot_index', 'Invalid index supplied')
+            end
+            
+            
+            
         end
         
         function add_text_labels(hA, x, y, labels)
@@ -332,6 +428,7 @@ classdef lvmplot < handle
                 self.registered{end, 5} = plts(j).more_text;
                 self.registered{end, 6} = plts(j).more_type;
                 self.registered{end, 7} = plts(j).more_block;
+                self.registered{end, 8} = plts(j).annotate;
             end           
             
         end
@@ -340,8 +437,51 @@ classdef lvmplot < handle
             % Goes through all plots in the figure and calls their callback
             % function to update the plot, using the latest values in the 
             % dropdowns
+            % Adds annotations to all plots
+            for i = 1:numel(self.hA)
+                hAx = self.hA(i);
+                series = getappdata(hAx, 'SeriesData');
+                
+                hChild = get(hAx, 'Children');
+                for h = 1:numel(hChild)
+                    if ishandle(hChild(h))
+                        delete(hChild(h))
+                    end
+                end
+                
+                % Get the callback function
+                cb_annotate_x = series.x_type{4};
+                cb_annotate_y = series.y_type{4};
+                
+                % Call the plotting callbacks to do the work
+                cb_annotate_x(self, series);
+                cb_annotate_y(self, series);
+            end
+        end
+        
+        function update_annotations(self)
+            % Adds annotations to all plots
+            for i = 1:numel(self.hA)
+                hAx = self.hA(i);
+                series = getappdata(hAx, 'SeriesData');
+                cb_annotate = series.x_type{8};                
+                
+                % Call the annotate callback to do the work
+                cb_annotate(self, series)
+                
+                extent = axis;            
+                hd = plot([0, 0], [-1E10, 1E10], 'k', 'linewidth', 2);
+                set(hd, 'tag', 'vline', 'HandleVisibility', 'on');   
+                hd = plot([-1E50, 1E50], [0, 0], 'k', 'linewidth', 2);
+                set(hd, 'tag', 'hline', 'HandleVisibility', 'on');
+
+
+                xlim(extent(1:2))
+                ylim(extent(3:4)) 
+            end
             
         end
+            
         
     end % end: methods (ordinary)
     
@@ -354,11 +494,12 @@ function mouseclick_callback(varargin)
     disp(get(varargin{1}, 'UserData'))
 end
 
-function dropdown_block_selector(hCombo, hEvent)
+function dropdown_block_selector(hCombo, varargin)
     idx = get(hCombo,'SelectedIndex');  % 0=topmost item
     self = get(str2double(hCombo.getName), 'UserData');
     self.c_block = idx;
     self.update_all_plots();
+    self.update_annotations();
 end
 
 function dropdown_callback_level_1(varargin)
