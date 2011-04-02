@@ -399,17 +399,29 @@ classdef mbpls < mblvm
             plt.name = 'Predictions';
             plt.weight = 50;
             plt.dim = 1;
-            plt.level2 = 'Using';
-            plt.callback = @self.coefficient_plot;
+            plt.more_text = 'of variable';
+            plt.more_type = '<label>';
+            plt.more_block = '';
+            plt.callback = @self.predictions_plot;
             out = [out; plt];
             
+            plt.name = 'Observations';
+            plt.weight = 50;
+            plt.dim = 1;
+            plt.more_text = 'of variable';
+            plt.more_type = '<label>';
+            plt.more_block = '';
+            plt.callback = @self.observed_plot;
+            out = [out; plt];
             
             % Dimension 2 (columns) plots
             % ============================          
             plt.name = 'Coeffients';
             plt.weight = 30;
             plt.dim = 2;
-            plt.level2 = 'Using';
+            plt.more_text = 'for variable';
+            plt.more_type = '<label>';
+            plt.more_block = '<Y>';
             plt.callback = @self.coefficient_plot;
             out = [out; plt];
             

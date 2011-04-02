@@ -16,19 +16,23 @@ classdef lvmplot < handle
         nRow = NaN;         % Number of rows of axes
         nCol = NaN;         % Number of columns of axes
         index = -1;         % Which entry in self.hA is the current axis?
-        gca = -1;           % This is the handle to the current axis
+        
         model = [];         % The model being plotted
         dim = NaN;          % Which dimension of the data is being plotted
         screen = get(0,'ScreenSize');               
         
         ptype = '';         % Plot type (base type)
         
-        hFoot = -1;         % Handle to the footer
-        
-        hSelectX = -1;
-        hSelectY = -1;
+        gca = -1;           % This is the handle to the current axis
+        hFoot = -1;         % Handle to the footer        
+        hSelectX = -1;      % Handle to the X-axis selection panel
+        hSelectY = -1;      % Handle to the Y-axis selection panel
         
         registered = {};    % Cell array of registered plots
+        
+        c_block = NaN;      % Current block
+        curr_x = -1;        % Dropdown item selected on x-axis
+        curr_y = -1;        % Dropdown item selected on y-axis
         
         opt = struct;       % Default plotting options
     end 
@@ -207,11 +211,15 @@ classdef lvmplot < handle
             Txt.Background    = self.opt.fig.backgd_colour;
             Txt.Parent        = self.hF;
             Txt.FontSize = 10;
+            
+            % Footer
+            % -------
             self.hFoot = uicontrol(Txt, ...
                              'Position',[0.02, 0.005, 0.96 0.04], ...
                              'ForegroundColor',[0 0 0], 'String', '', ...
                              'HorizontalAlignment', 'left');
                          
+            % Block dropdown
                          
             % Add a contribution toolbar icon
             icon = fullfile(matlabroot,'/toolbox/matlab/icons/greenarrowicon.gif');
@@ -226,6 +234,24 @@ classdef lvmplot < handle
             hToolbar = findall(self.hF,'tag','FigureToolBar');
             hSimulate = uipushtool('Parent', hToolbar, 'cdata',cdataRedo, 'tooltip','undo', 'ClickedCallback','uiundo(gcbf,''execUndo'')');
             set(hSimulate,'Separator','on');
+
+            
+            % Block selector panel
+            % ------------
+            % From: http://undocumentedmatlab.com/blog/figure-toolbar-components/
+            % and : http://www.mathworks.com/matlabcentral/newsreader/view_thread/294487
+            jToolbar = get(get(hToolbar,'JavaContainer'),'ComponentPeer');
+            if ~isempty(jToolbar)
+               dropdown_strings = {'A', 'B', 'C'};
+               jCombo = javax.swing.JComboBox(dropdown_strings);
+               jCombo = handle(jCombo, 'CallbackProperties');
+               set(jCombo, 'ActionPerformedCallback', @dropdown_block_selector);
+               jToolbar(1).add(jCombo,0); %5th position, after printer icon
+               jToolbar(1).repaint;
+               jToolbar(1).revalidate;
+               jCombo.name = num2str(self.hF); % so we can get access to ``self`` later
+            end
+            self.c_block = 0;  % The default block is the superblock
 
                          
             set(self.hF, 'units', units);
@@ -303,10 +329,19 @@ classdef lvmplot < handle
                 self.registered{end, 2} = plts(j).weight;
                 self.registered{end, 3} = plts(j).dim;
                 self.registered{end, 4} = plts(j).callback;
+                self.registered{end, 5} = plts(j).more_text;
+                self.registered{end, 6} = plts(j).more_type;
+                self.registered{end, 7} = plts(j).more_block;
             end           
             
         end
         
+        function update_all_plots(self)
+            % Goes through all plots in the figure and calls their callback
+            % function to update the plot, using the latest values in the 
+            % dropdowns
+            
+        end
         
     end % end: methods (ordinary)
     
@@ -319,8 +354,19 @@ function mouseclick_callback(varargin)
     disp(get(varargin{1}, 'UserData'))
 end
 
+function dropdown_block_selector(hCombo, hEvent)
+    idx = get(hCombo,'SelectedIndex');  % 0=topmost item
+    self = get(str2double(hCombo.getName), 'UserData');
+    self.c_block = idx;
+    self.update_all_plots();
+end
+
 function dropdown_callback_level_1(varargin)
     % A dropdown in the figure has changed; update plot
+    hPanel = get(gcbo, 'Parent');
+    callbacks = get(hPanel, 'UserData');
+    selected = get(gcbo, 'Value');
+    
     disp('Callback changed')
 end
 
@@ -334,10 +380,10 @@ function adjust_axes(varargin)
         this_dim = cell2mat(self.registered(:,3)) == self.dim;
         dropdown_str = self.registered(this_dim,1);
         dropdown_weight = cell2mat(self.registered(this_dim, 2));
-        registered_callback = self.registered(this_dim, 4);
+        registered_callback = self.registered(this_dim, :);
         [dropdown_weight, idx] = sort(dropdown_weight, 1, 'descend');
         dropdown_strs = dropdown_str(idx);
-        registered_callback = registered_callback(idx);
+        registered_callbacks = registered_callback(idx, :);
         
         
         hAx = self.gca;
@@ -354,6 +400,8 @@ function adjust_axes(varargin)
         H = 0.95*hAx_pos(3);
         W = 0.95*hAx_pos(4);
        
+        % X-axis panel
+        % ------------
         hFr = uipanel(ctl, 'Title', 'X-axis series', ...
             'Position', [H W H/0.95*0.10 H/0.95*0.35], ...
             'BorderType', 'beveledout', ...
@@ -362,17 +410,7 @@ function adjust_axes(varargin)
         hFr_pos = get(hFr, 'Position');
         set(hFr, 'Position', [hFr_pos(1) hFr_pos(3), 200, 50])
         self.hSelectX = hFr;
-        
-        
-        %set(self.hF, 'Units', 'Normalized');
-        ctl.Units = 'pixels';
-        hFr = uipanel(ctl, 'Title', 'Y-axis series', ...
-            'Position',[hFr_pos(4) hFr_pos(2), 200, 50], ...
-            'BorderType', 'beveledout', ...
-            'TitlePosition', 'centertop');
-        
-        self.hSelectY = hFr;
-        
+        set(self.hSelectX, 'UserData', registered_callbacks);
         
         ctl.Parent = self.hSelectX;
         ctl.units = 'Normalized';
@@ -380,20 +418,31 @@ function adjust_axes(varargin)
             'String', dropdown_strs, ...
             'Callback', @dropdown_callback_level_1, ...
             'Position', [0, 0, 00.70, .9]);
-        uicontrol(ctl, 'Style', 'popupmenu', ...
-            'String', dropdown_strs, ...
-            'Callback', @dropdown_callback_level_2, ...
-            'Position', [0, 0, 00.70, .9]);
-            
-            
-            
-        set(hDropdown, 'UserData', registered_callback);
         
         
         set(self.hF, 'Units', units);
         
         
-    % User wants to finish axis change
+%         
+%         % Y-axis panel
+%         ctl.Units = 'pixels';
+%         hFr = uipanel(ctl, 'Title', 'Y-axis series', ...
+%             'Position',[hFr_pos(4) hFr_pos(2), 200, 50], ...
+%             'BorderType', 'beveledout', ...
+%             'TitlePosition', 'centertop');        
+%         self.hSelectY = hFr;
+%         
+%         ctl.Parent = self.hSelectY;
+%         uicontrol(ctl, 'Style', 'popupmenu', ...
+%             'String', dropdown_strs, ...
+%             'Callback', @dropdown_callback_level_2, ...
+%             'Position', [0, 0, 00.70, .9]);
+%             
+        
+        
+        
+        
+    % User wants to finish axis change: i.e. just hide the dropdowns
     elseif get(hOb, 'Value') == 0
         if ishandle(self.hSelectX)
             delete(self.hSelectX);

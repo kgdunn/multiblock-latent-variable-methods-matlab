@@ -872,6 +872,9 @@ classdef mblvm < handle
                 
             end
             
+            % Start a new figure window
+            h.new_figure();
+            
             switch show_what
                 case 'scores'
                     basic_plot__scores(h);
@@ -909,30 +912,30 @@ classdef mblvm < handle
             
             % These plots are common for PCA and PLS models
             
-            % plt.name     : name in the drop down
-            % plt.weight   : ordering in drop down menu: higher values first
-            % plt.dim      : dimensionality: 0=component, 1=rows, 2=columns
-            % plt.callback : function that will show the plot
+            % plt.name      : name in the drop down
+            % plt.weight    : ordering in drop down menu: higher values first
+            % plt.dim       : dimensionality: 0=component, 1=rows, 2=columns
+            % plt.callback  : function that will show the plot
+            % plt.more_text : text that goes between two dropdowns "for component"
+            % plt.more_type : tells what to put in the second dropdown
             
             plt = struct;  
             
             % Dimension 0 (component) plots
             % =========================
             
-            plt.name = 'R2 (component)';
+            plt.name = 'R2 per component';
             plt.weight = 60;
             plt.dim = 0;
+            plt.more_text = '';
+            plt.more_type = '<model>';
+            plt.more_block = '';
             plt.callback = @self.R2_component_plot;
-            plt.level2 = [];
             out = [out; plt];
             
             
-            plt.name = 'Eigenvalues'; 
-            plt.weight = 0;
-            plt.dim = 0;
-            plt.level2 = [];
-            plt.callback = @self.model_eigenvalue_plot;
-            out = [out; plt];
+            % plt.name = 'Eigenvalues'; 
+
             
             
             % Dimension 1 (rows) plots
@@ -941,7 +944,9 @@ classdef mblvm < handle
             plt.name = 'Scores';   % t-scores
             plt.weight = 60;
             plt.dim = 1;
-            plt.level2 = '1:A';
+            plt.more_text = ': of component';
+            plt.more_type = 'a';
+            plt.more_block = '';
             plt.callback = @self.score_plot;
             
             out = [out; plt];
@@ -950,14 +955,18 @@ classdef mblvm < handle
             plt.name = 'Hot T2';  % Hotelling's T2
             plt.weight = 40;
             plt.dim = 1;
-            plt.level2 = 'Using';
+            plt.more_text = 'using  components';
+            plt.more_type = '1:A';
+            plt.more_block = '';
             plt.callback = @self.hot_T2_plot;
             out = [out; plt];
             
             plt.name = 'SPE';
             plt.weight = 50;
             plt.dim = 1;
-            plt.level2 = '1:A';
+            plt.more_text = 'using  components';
+            plt.more_type = '1:A';
+            plt.more_block = '';
             plt.callback = @self.spe_plot;
             out = [out; plt];
             
@@ -967,38 +976,33 @@ classdef mblvm < handle
             plt.name = 'Loadings';
             plt.weight = 20;
             plt.dim = 2;
-            plt.level2 = '1:A';
+            plt.more_text = ': of component';
+            plt.more_type = 'a';
+            plt.more_block = '';
             plt.callback = @self.loadings_plot;
             out = [out; plt];
             
             plt.name = 'VIP';
             plt.weight = 40;
             plt.dim = 2;
-            plt.level2 = 'Using';
+            plt.more_text = 'using  components';
+            plt.more_type = '1:A';
+            plt.more_block = '';
             plt.callback = @self.VIP_plot;
             out = [out; plt];
             
             plt.name = 'R2 (variable)';
             plt.weight = 50;
             plt.dim = 2;
-            plt.level2 = '1:A';
+            plt.more_text = 'using  components';
+            plt.more_type = '1:A';
+            plt.more_block = '';
             plt.callback = @self.R2_plot;
             out = [out; plt];
             
-            plt.name = 'Centering';
-            plt.weight = -40;
-            plt.dim = 2;
-            plt.level2 = [];
-            plt.callback = @self.mean_centering_plot;
-            out = [out; plt];
-            
-            plt.name = 'Scaling';
-            plt.weight = -41;
-            plt.dim = 2;
-            plt.level2 = [];
-            plt.callback = @self.scaling_plot;
-            out = [out; plt];            
-            
+            % plt.name = 'Centering';
+            % plt.name = 'Scaling';
+             
             extra = register_plots_post(self);
             out = [out; extra];
         end
@@ -1483,17 +1487,46 @@ classdef mblvm < handle
     end % end: methods (sealed and static)
     
     methods (Static=true)
-        function score_plot(hP, t_h, t_v)
+        function score_plot(hP)
             % Do the actual score plots
-            
-            block = 1;
             ax = hP.gca();
+            block = hP.c_block;
+            t_h = hP.curr_x;
+            t_v = hP.curr_y;
+            
+            
             % Line plot of the scores
             if t_h == 0
                 disp(['line plot of t-', num2str(t_v)])
                 return
             end
-            disp(['scatter plot of t-', num2str(t_h), ' vs t-', num2str(t_v)])
+            
+            % Scatter plot of the scores
+            if block == 0
+                scores = hP.model.super.T(:,[t_h t_v]);
+                limit = hP.model.super.lim.T2(2);
+            else
+                scores = hP.model.T{block}(:,[t_h t_v]);
+                limit = hP.model.lim{block}.T2(2);
+            end
+            
+            plot(ax, scores(:,1), scores(:,2), 'k.');
+            hold on
+            ellipse_coords = ellipse_coordinates(scores, limit);
+            plot(ellipse_coords(:,1), ellipse_coords(:,2), 'r--', 'linewidth', 1)            
+            title('Score  plot')
+            grid on
+            xlabel(['t_', num2str(t_h)])
+            ylabel(['t_', num2str(t_v)])    
+            extent = axis;
+            hd = plot([0, 0], [-1E10, 1E10], 'k', 'linewidth', 2);
+            set(hd, 'tag', 'vline', 'HandleVisibility', 'off');
+            hd = plot([-1E50, 1E50], [0, 0], 'k', 'linewidth', 2);
+            set(hd, 'tag', 'hline', 'HandleVisibility', 'off');
+            xlim(extent(1:2))
+            ylim(extent(3:4)) 
+
+            %add_text_labels(hPlot, hP, 1)
             
         end
         
@@ -1573,42 +1606,122 @@ classdef mblvm < handle
 end % end classdef
 
 %-------- Helper functions (usually used in 2 or more places). May NOT change ``self``
-function h = plot_score_scatterplot(block, t_h, t_v)
-    % Plots the t_h vs t_v score scatterplot with the confidence limit (95%).
-    % Uses component ``th`` on the horizontal axis and ``tv`` on the vertical
-    % axis.
+function ellipse_coords = ellipse_coordinates(scores, T2_limit_alpha)
+% Calculates the ellipse coordinates for any two-column matrix of ``scores``
+% at the given Hotelling's T2 ``T2_limit_alpha``.
+
+ 
+% Standard equation of an ellipse for Hotelling's T2
+%
+%             x^2/a^2 + y^2 / b^2 = constant
+%             (t_horiz/s_h)^2 + (t_vert/s_v)^2  =  T2_limit_alpha
+%
+% which is OK if (s_h)^2 and (s_v)^2 are from the covariance matrix of T, 
+% i.e. they are the variances of scores being plotted, and T is orthogonal.
+%
+% For non-orthogonal T's we require a rotation.
+%
+% But how to calculate the rotation of the ellipse from the covariance matrix?
+% Center the vectors to zero and do a PCA, specifically an eigenvector 
+% decomposition, on the scores to find the rotation angle. Since PCA is an 
+% orthogonal decompostation it will find the major axis and minor axis, which
+% are required to be perpendicular to each other.
+%
+% Rotate the scores to align them them with the X-axis, calculate the ellipse
+% for the rotated scores, then rotate the ellipse back.
+% 
+% Apply any shifting via mean centering.
+% Also see: http://www.maa.org/joma/Volume8/Kalman/General.html
+
+    h = 1;
+    v = 2;
+
+    % Calculate the centered score vectors:
+    t_h_offset = mean(scores(:,h));
+    t_v_offset = mean(scores(:,v));
+    t_h = scores(:,h) - t_h_offset;
+    t_v = scores(:,v) - t_v_offset;    
+    scores = [t_h t_v];
+
+    [vec,val]=eig(scores'*scores);
+    val = diag(val);
+
+    % Sort from smallest to largest
+    [val, idx] = sort(val);
+    vec = vec(:, idx);
+    % Direction of the major axis of the ellipse, in direction of largest
+    % eigenvalue/eigenvector pair:  i.e. we are just doing a PCA on the scores
+    % to find the rotation direction.
+    direction = vec(:,end);
+    alpha = atan(direction(v) / direction(h));
+    clockwise_rot_matrix = [cos(alpha) sin(alpha); -sin(alpha) cos(alpha)];
+    scores_rot = (clockwise_rot_matrix * scores')';
+    % NOTE: ``clockwise_rot_matrix`` is so similar to the eigenvectors! 
+    %       it basically is just the rows flipped around.
     
-    % TODO(KGD): handle the case with tilted ellipse: i.e. correlated scores
+    % Now construct a simple ellipse that is aligned with the axes (no rotation)
+    s_h = std(scores_rot(:,1));
+    s_v = std(scores_rot(:,2));
+    alpha = 0;
+    x_offset = 0;
+    y_offset = 0;
+    n_points = 100;
+
+    %function [x, y] = ellipse_coordinates(s_h, s_v, T2_limit_alpha, n_points)
+
+    %     We want the (t_horiz, t_vert) cooridinate pairs that form the T2 ellipse.
+    %
+    %     Inputs: s_h (std deviation of the score on the horizontal axis)
+    %             s_v (std deviation of the score on the vertical axis)
+    %             T2_limit_alpha: the T2_limit at the alpha confidence value
+    %
+    %     Equation of ellipse in canonical form (http://en.wikipedia.org/wiki/Ellipse)
+    %
+    %      (t_horiz/s_h)^2 + (t_vert/s_v)^2  =  T2_limit_alpha
+    %
+    %      s_horiz = stddev(T_horiz)
+    %      s_vert  = stddev(T_vert)
+    %      T2_limit_alpha = T2 confidence limit at a given alpha value (e.g. 99%)
+    %
+    %     Equation of ellipse, parametric form (http://en.wikipedia.org/wiki/Ellipse)
+    %
+    %     t_horiz = sqrt(T2_limit_alpha)*s_h*cos(t)
+    %     t_vert  = sqrt(T2_limit_alpha)*s_v*sin(t)
+    %
+    %     where t ranges between 0 and 2*pi
+    %
+    %     Returns `n-points` equi-spaced points on the ellipse.
+
+
+    % From Wikipedia:
+
+    % An ellipse in general position can be expressed parametrically as the path 
+    % of a point <math>(X(t),Y(t))</math>, where
+    % X(t)=X_c + a\,\cos t\,\cos \varphi - b\,\sin t\,\sin\varphi
+    % Y(t)=Y_c + a\,\cos t\,\sin \varphi + b\,\sin t\,\cos\varphi
+    %as the parameter ''t'' varies from 0 to 2''?''.  
+    % Here <math>(X_c,Y_c)</math> is the center of the ellipse, 
+    %and <math>\varphi</math> is the angle between the <math>X</Math>-axis 
+    % and the major axis of the ellipse.
+
+    h_const = sqrt(T2_limit_alpha) * s_h;
+    v_const = sqrt(T2_limit_alpha) * s_v;
+    dt = 2*pi/(n_points-1);
+    steps = (0:(n_points-1)) .* dt;
+    cos_steps = cos(steps);
+    sin_steps = sin(steps);
+    x = x_offset + h_const.*cos_steps.*cos(alpha) - v_const.*sin_steps.*sin(alpha);
+    y = y_offset + h_const.*cos_steps.*sin(alpha) + v_const.*sin_steps.*cos(alpha);
     
-    
-    h = plot(t_h, t_v, 'k.'); 
-    hold on
-    
-    [x95, y95] = ellipse_coordinates(block.S(ah), block.S(av), block.lim.T2(end), 100);
-    plot(x95, y95, 'r--', 'linewidth', 1)
-    title('Score target plot')
-    grid on
-    %axis equal 
-    xlabel(['t_', num2str(ah)])
-    ylabel(['t_', num2str(av)])    
-    extent = axis;
-    hd = plot([0, 0], [-1E10, 1E10], 'k', 'linewidth', 2);
-    set(hd, 'tag', 'vline', 'HandleVisibility', 'off');
-    hd = plot([-1E50, 1E50], [0, 0], 'k', 'linewidth', 2);
-    set(hd, 'tag', 'hline', 'HandleVisibility', 'off');
-    xlim(extent(1:2))
-    ylim(extent(3:4)) 
-    
-    add_text_labels(h, t_h, t_v, block.labels{1,1}, popt)
-    
+    counter_rotate = inv(clockwise_rot_matrix);
+    ellipse_coords = (counter_rotate * [x(:) y(:)]')';
     
 end
-
 function basic_plot__scores(hP)
     % Show a basic set of score plots.  The plot layout is a function of how
     % many components are in the model.
 
-    hP.new_figure();
+    
     
     % These are observation-based plots
     hP.dim = 1;
@@ -1622,7 +1735,9 @@ function basic_plot__scores(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.model.score_plot(hP, 1, 2);
+        hP.curr_x = 1;
+        hP.curr_y = 2;
+        hP.model.score_plot(hP);
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
@@ -1640,7 +1755,7 @@ function basic_plot__loadings(hP)
     % many components are in the model.
 
     %popt.footer_string = {title_str, popt.footer_string{:}};
-    hP.new_figure();
+    
     if hP.model.A == 1
         hP.nRow = 1;
         hP.nCol = 1;

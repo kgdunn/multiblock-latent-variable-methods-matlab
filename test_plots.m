@@ -69,9 +69,6 @@ function test_basic_plots()
     plot(fqa_pca_ZY, {'scores'}, {'block', 1})  % t_2 scores for block 1
     plot(fqa_pca_ZY, {'scores'}, {'block', 2})  % t_2 scores for block 1
     
-    
-    
-    
     % Batch model plots
     tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
                  'J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
