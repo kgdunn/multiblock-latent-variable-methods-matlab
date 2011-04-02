@@ -1,21 +1,6 @@
 function test_plots(varargin)
 
-    FMC = load('datasets/FMC-full.mat');
-    
-    % Initial conditions
-    Z = block(FMC.Z);
-    Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
-
-    % Final quality attributes (FQAs)
-    Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
-    
-    X = block(FMC.X, 
-
-    %plot(fqa_pca_Y);               % All scores for overall block
-    h=plot(fqa_pca_Y, 'scores');
-    
-    
-    
+        
     test_plot_class()
     %test_basic_plots()
 end
@@ -31,7 +16,7 @@ function test_plot_class()
     Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
     
     % Let's start with a PCA on the Y-block, to understand the quality variables
-    fqa_pca_Y = lvm({'FQAs', Y}, 2);
+    fqa_pca_Y = lvm({'FQAs', Y}, 3);
 
     %plot(fqa_pca_Y);               % All scores for overall block
     h=plot(fqa_pca_Y, 'scores');

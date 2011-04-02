@@ -11,6 +11,7 @@ classdef lvmplot < handle
     properties
         hF = -1;            % Figure window
         hA = [];            % Vector of axes [nRow x nCol] (in subplot order)
+        hS = [];            % Vector of plot handles [nRow x nCol] (in subplot order) for data being shown
         hM = [];            % Vector of axis selector markers
         nA = NaN;           % Number of axes in plot
         nRow = NaN;         % Number of rows of axes
@@ -299,7 +300,7 @@ classdef lvmplot < handle
                 ctl.Style         = 'togglebutton';
                 ctl.Background    = self.opt.fig.backgd_colour;
                 ctl.Parent        = self.hF;
-                ctl.FontSize = 10;
+                ctl.FontSize = 6;
                 self.hM(i) = uicontrol(ctl, ...
                     'String', 'AA', ...
                     'ForegroundColor',[0 0 0], ...
@@ -309,24 +310,25 @@ classdef lvmplot < handle
                 set(self.hM(i), 'Units', 'Normalized')
                 
                 
-                % How many plot elements will there be?
+                 % How many plot elements will there be?
                 if self.dim == 0
-                    n = self.model.A;
+                    num = self.model.A;
                 else
                     if self.c_block > 0
-                        n = self.model.blocks{self.c_block}.shape(self.dim);
+                        num = self.model.blocks{self.c_block}.shape(self.dim);
                     else
                         % Superblock plots:
                         if self.dim == 1
-                            n = size(self.model.super.T, 1);
+                            num = size(self.model.super.T, 1);
                         elseif self.dim == 2;
-                            n = size(self.model.super.T, 2);
+                            num = size(self.model.super.T, 2);
                         end
                     end
                 end
-                vector = zeros(n, 1) .* NaN;
-                plot(h, vector, vector);
-                
+                vector = zeros(num, 1) .* NaN;
+                self.hS(self.index) = plot(h, vector, vector);
+                set(self.hS, 'tag', 'lvmplot_series')
+
                 series.x_type = {};        % Registration entry: what is on the x-axis; lookup in self.registered
                 series.y_type = {};        % Registration entry: what is on the y-axis; lookup in self.registered
                 series.x_num  = -1;        % Which entry from the dropdown in shown on the x-axis
@@ -351,19 +353,17 @@ classdef lvmplot < handle
         function [plottype, entry_num] = validate_plot(self, request, dim)
             % Validates the ``request``ed plot and sees if it exists in the
             % registered plot types for that ``dim``ension.
-            plottype = '';
-            entry_num = NaN;
-
             subset_idx = cell2mat(self.registered(:,3)) == dim;
             subset = self.registered(subset_idx, :);
             
-            for i = 1:numel(subset)
+            for i = 1:size(subset, 1)
                 if strcmpi(subset{i,1}, request{1})
                     plottype = subset(i,:);
                     entry_num = validate_plot_index(self, subset(i,:), request{2});
-                    break
+                    return
                 end
             end
+            error('lvmplot:validate_plot', 'Requested plot not found')
         end
         
         function entry = validate_plot_index(self, plot_entry, index)
@@ -378,6 +378,11 @@ classdef lvmplot < handle
                         entry = index;
                     end
                 case '<model>';
+                    if index == -1;
+                        entry = index;
+                    end
+                    
+                case '<order>'
                     if index == -1;
                         entry = index;
                     end
@@ -400,9 +405,6 @@ classdef lvmplot < handle
             if isnan(entry)
                 error('lvmplot:validate_plot_index', 'Invalid index supplied')
             end
-            
-            
-            
         end
         
         function add_text_labels(hA, x, y, labels)
@@ -439,35 +441,46 @@ classdef lvmplot < handle
             % dropdowns
             % Adds annotations to all plots
             for i = 1:numel(self.hA)
-                hAx = self.hA(i);
+                self.index = i;
+                hAx = self.gca;
+                
                 series = getappdata(hAx, 'SeriesData');
                 
                 hChild = get(hAx, 'Children');
                 for h = 1:numel(hChild)
                     if ishandle(hChild(h))
-                        delete(hChild(h))
+                        if ~strcmpi(get(hChild(h), 'Tag'), 'lvmplot_series')
+                            delete(hChild(h))
+                        end
                     end
                 end
                 
                 % Get the callback function
-                cb_annotate_x = series.x_type{4};
-                cb_annotate_y = series.y_type{4};
+                cb_update_x = series.x_type{4};
+                cb_update_y = series.y_type{4};
                 
                 % Call the plotting callbacks to do the work
-                cb_annotate_x(self, series);
-                cb_annotate_y(self, series);
+                cb_update_x(self, series);
+                cb_update_y(self, series);
             end
         end
         
         function update_annotations(self)
             % Adds annotations to all plots
             for i = 1:numel(self.hA)
-                hAx = self.hA(i);
+                self.index = i;
+                hAx = self.gca;
                 series = getappdata(hAx, 'SeriesData');
-                cb_annotate = series.x_type{8};                
+                cb_annotate_x = series.x_type{8};
+                cb_annotate_y = series.y_type{8};
                 
                 % Call the annotate callback to do the work
-                cb_annotate(self, series)
+                if ~isempty(cb_annotate_x)
+                    cb_annotate_x(self, series)
+                end
+                if ~isempty(cb_annotate_y)
+                    cb_annotate_y(self, series)
+                end
                 
                 extent = axis;            
                 hd = plot([0, 0], [-1E10, 1E10], 'k', 'linewidth', 2);
@@ -475,17 +488,32 @@ classdef lvmplot < handle
                 hd = plot([-1E50, 1E50], [0, 0], 'k', 'linewidth', 2);
                 set(hd, 'tag', 'hline', 'HandleVisibility', 'on');
 
-
                 xlim(extent(1:2))
                 ylim(extent(3:4)) 
             end
             
         end
-            
         
     end % end: methods (ordinary)
     
     methods (Static=true)
+        function hPlot = set_data(hAx, x_data, y_data)
+            % Sets the x_data and y_data in the current axes, ``hAx``            
+            
+            hPlot = findobj(hAx, 'Tag', 'lvmplot_series');
+            if ~isempty(hPlot)
+                if ~isempty(x_data)
+                    set(hPlot, 'XData', x_data);
+                end
+                if ~isempty(y_data)
+                    set(hPlot, 'YData', y_data);
+                end
+            else
+                set(ax, 'Nextplot', 'add');
+                hPlot = plot(ax, x_data, y_data);
+                set(hPlot, 'Tag', 'lvmplot_series')                
+            end            
+        end
         
     end % end: methods (static)
 end % end: ``classdef``
