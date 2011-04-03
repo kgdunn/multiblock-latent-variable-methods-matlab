@@ -4,6 +4,7 @@ function unit_tests(varargin)
     test_significant_figures()
     
     % PCA tests
+    test_syntax()
     Wold_article_PCA_test()
     PCA_no_missing_data()
     PCA_with_missing_data()
@@ -121,6 +122,13 @@ function test_significant_figures()
     %1.5412E-5 == 1.5414E-5 is True if sig_figs = 4, but False if sig_figs = 5
     %1.5412E+5 == 1.5414E+5 is True if sig_figs = 4, but False if sig_figs = 5
 return
+
+function test_syntax()
+    % Can create a PCA model with a block named 'Y'    
+    Y = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];    
+    PCA_model = lvm({'Y', Y}, 2);
+    assertTrue(strcmp(PCA_model.blocks{1}.name, 'Y'))
+    
 
 function Wold_article_PCA_test()
 %   Tests from the PCA paper by Wold, Esbensen and Geladi, 1987

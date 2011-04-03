@@ -2,13 +2,12 @@ function test_blocks(varargin)
     close all;
     
     test_basic_syntax();
-    test_exclude();
-    
     
     test_batch_blocks();
     test_labels();
     test_preprocessing();
     test_plotting();
+    test_exclude();
     disp('ALL TESTS FOR THE BLOCK OBJECT PASSED - if no errors were displayed.')
 end
 

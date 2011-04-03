@@ -655,7 +655,11 @@ classdef mbpls < mblvm
 end % end classdef
 
 function annotate_obs_predicted(ax, tag_name)
+    
     title(ax, ['Obs vs predicted: ', tag_name])
+    if findobj(ax, 'Tag', 'RMSEP_obs_pred')
+        return
+    end
     extent = axis;
     min_ex = min(extent([1,3]));
     max_ex = min(extent([2,4]));
@@ -667,9 +671,12 @@ function annotate_obs_predicted(ax, tag_name)
     set(hd, 'tag', 'hline', 'HandleVisibility', 'on')    
     hData = findobj(ax, 'Tag', 'lvmplot_series');
     x_data = get(hData, 'XData');
+    x_data(isnan(x_data)) = [];
     y_data = get(hData, 'YData');
+    y_data(isnan(y_data)) = [];    
     RMSEP = sqrt(mean((x_data - y_data).^2));
-    text(min_ex + 0.05*delta, max_ex - 0.05*delta, sprintf('RMSEP = %0.4g', RMSEP))
+    hText = text(min_ex + 0.05*delta, max_ex - 0.05*delta, sprintf('RMSEP = %0.4g', RMSEP));
+    set(hText, 'Tag', 'RMSEP_obs_pred');
 
     xlim([min_ex-0.1*delta, max_ex+0.1*delta])
     ylim([min_ex-0.1*delta, max_ex+0.1*delta])

@@ -130,11 +130,13 @@ classdef lvmplot < handle
                 'Position', [delta, h_obs-offset-2*(bheight+delta)+delta, w-2*delta, bheight], ...
                 'Callback', @(src,event)plot(self.model, 'SPE'));
             
-            uicontrol(ctl, ...
-                'String', 'Predictions',...
-                'Style', 'Pushbutton', ...
-                'Position', [delta, h_obs-offset-3*(bheight+delta)+delta, w-2*delta, bheight], ...
-                'Callback', @(src,event)plot(self.model, 'predictions'));
+            if self.model.M > 0
+                uicontrol(ctl, ...
+                    'String', 'Predictions',...
+                    'Style', 'Pushbutton', ...
+                    'Position', [delta, h_obs-offset-3*(bheight+delta)+delta, w-2*delta, bheight], ...
+                    'Callback', @(src,event)plot(self.model, 'predictions'));
+            end
             
             % Variable-based plots
             % -----------------------
@@ -145,11 +147,16 @@ classdef lvmplot < handle
                 'Position', [delta H-h_obs-delta-h_var w h_var]);
             
             ctl.Parent = pVar;
+            if self.model.M > 0
+                plot_str = 'Weights';
+            else
+                plot_str = 'Loadings';
+            end
             uicontrol(ctl, ...
-                'String', 'Loadings', ...
+                'String', plot_str, ...
                 'Style', 'Pushbutton', ...
                 'Position', [delta, h_var-offset-1*(bheight+delta)+delta, w-2*delta, bheight], ...
-                'Callback', @(src,event)plot(self.model, 'loadings'));
+                'Callback', @(src,event)plot(self.model, plot_str));
             
             uicontrol(ctl, ...
                 'String', 'VIP plots',...
@@ -339,22 +346,22 @@ classdef lvmplot < handle
 
         end
         
-        function set_plot(self, idx, dim, xaxis, yaxis)
+        function set_plot(self, idx, xaxis, yaxis)
             % Sets what is plotted on each axis for the current axis handle,
             % found by the ``idx`` into self.hA. The ``dim`` tells us which
             % dimension is being plotted.
             
             h = self.hA(idx);
             series = getappdata(h, 'SeriesData');
-            [series.x_type, series.x_num] = self.validate_plot(xaxis, dim);
-            [series.y_type, series.y_num] = self.validate_plot(yaxis, dim);
+            [series.x_type, series.x_num] = self.validate_plot(xaxis);
+            [series.y_type, series.y_num] = self.validate_plot(yaxis);
             setappdata(h, 'SeriesData', series)
         end
         
-        function [plottype, entry_num] = validate_plot(self, request, dim)
+        function [plottype, entry_num] = validate_plot(self, request)
             % Validates the ``request``ed plot and sees if it exists in the
             % registered plot types for that ``dim``ension.
-            subset_idx = cell2mat(self.registered(:,3)) == dim;
+            subset_idx = cell2mat(self.registered(:,3)) == self.dim;
             subset = self.registered(subset_idx, :);
             
             for i = 1:size(subset, 1)
@@ -487,7 +494,8 @@ classdef lvmplot < handle
                     cb_annotate_y(self, series)
                 end
                 
-                extent = axis;            
+                extent = axis;
+                set(hAx, 'Nextplot', 'add')
                 hd = plot([0, 0], [-1E10, 1E10], 'k', 'linewidth', 2);
                 set(hd, 'tag', 'vline', 'HandleVisibility', 'on');   
                 hd = plot([-1E50, 1E50], [0, 0], 'k', 'linewidth', 2);
@@ -554,6 +562,12 @@ end % end: ``classdef``
 function extent = get_good_limits(data, extent)
     % Finds good axis limits for the ``data`` for changing the axis
     % limits, ``extent``.
+    
+    % Make this function smarter with options for
+    %    'symmetrical' : i.e. symmetrical about zero (e.g. for loadings plot)
+    %    'equal'       (e.g. for loadings plot; for obs-pred plots)
+    %    'min_zero' (e.g. for SPE, T2, VIP plots')
+    %    'include_zero' (e.g. for score line plots)
    
     data = sort(data);    
     if data(end) > extent(2)        

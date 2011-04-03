@@ -16,10 +16,12 @@ function test_plot_class()
     Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
     
     % Let's start with a PCA on the Y-block, to understand the quality variables
-    fqa_pca_Y = lvm({'Z', Z, 'Y', Y}, 3);
-
+    %fqa_pca_Y = lvm({'Y', Y}, 2);    
     %plot(fqa_pca_Y);               % All scores for overall block
-    h=plot(fqa_pca_Y, 'predictions');
+    
+    fqa_pls_Y = lvm({'Z', Z, 'Y', Y}, 3);
+    plot(fqa_pls_Y);
+    plot(fqa_pca_Y, 'Loadings')
     
 end
 
@@ -52,12 +54,8 @@ function test_basic_plots()
     % We should see 2 clusters in the scores
     %plot(fqa_pca.T{1}(:,1), fqa_pca.T{1}(:,2),'.'), grid    
     plot(fqa_pca_Y, 'scores')               % All scores for overall block
-    plot(fqa_pca_Y, 'scores', {'block', 1}) % All scores for block 1
-    plot(fqa_pca_Y, 'scores', {'block', 'fqas'}) % All scores for block 1
-    plot(fqa_pca_Y, {'scores', 2}, {'block', 1})  % t_2 scores for block 1
     plot(fqa_pca_Y, 'loadings')
-    plot(fqa_pca_Y, {'loadings', 1})
-    plot(fqa_pca_Y, {'SPE'})
+    plot(fqa_pca_Y, 'SPE')
     plot(fqa_pca_Y, 'T2')
     plot(fqa_pca_Y, 'R2')
     
@@ -68,9 +66,6 @@ function test_basic_plots()
     plot(fqa_pca_ZY, 'scores')
     plot(fqa_pca_ZY, 'scores')   % All scores for overall block
     plot(fqa_pca_ZY, 'scores', {'block', 1})% All scores for block 1
-    plot(fqa_pca_ZY, {'scores', [2,3]}, {'block', 1})  % t_2 scores for block 1
-    plot(fqa_pca_ZY, {'scores'}, {'block', 1})  % t_2 scores for block 1
-    plot(fqa_pca_ZY, {'scores'}, {'block', 2})  % t_2 scores for block 1
     
     % Batch model plots
     tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
@@ -87,14 +82,7 @@ function test_basic_plots()
     plot(fqa_pca_X, 'scores')
     plot(fqa_pca_X, 'scores')   % All scores for overall block
     plot(fqa_pca_X, 'scores', {'block', 1})% All scores for block 1
-    plot(fqa_pca_X, {'scores', 2}, {'block', 1})  % t_2 scores for block 1
-    plot(fqa_pca_X, {'scores'}, {'block', 1})  % t_2 scores for block 1
-    plot(fqa_pca_X, {'scores'}, {'block', 2})  % t_2 scores for block 1
-    plot(fqa_pca_X, 'scores', {'block', 1}, {'batch', 38})
-    plot(fqa_pca_X, 'scores', {'block', 1}, {'batch', 38}, {'abc', 123})
     plot(fqa_pca_X, 'loadings')
-    plot(fqa_pca_X, {'loadings', 1})
-    plot(fqa_pca_X, {'SPE'})
     plot(fqa_pca_X, 'T2')
     plot(fqa_pca_X, 'R2')
     

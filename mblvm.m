@@ -890,6 +890,8 @@ classdef mblvm < handle
                     basic_plot__spe(h);                    
                 case 'predictions'
                     basic_plot__predictions(h);
+                case 'vip'
+                    basic_plot__VIP(h);
             end
             h.update_all_plots();
             h.update_annotations();
@@ -899,20 +901,6 @@ classdef mblvm < handle
                 varargout{i} = h;
             end
 
-
-%                     if ~isempty(value)
-%                         if ischar(value)
-%                             for b = 1:self.B
-%                                 if strcmpi(self.blocks{b}.name, value)
-%                                     popt.block = b;
-%                                 end
-%                             end
-%                         else
-%                             popt.block = uint32(value);
-%                         end
-%                     end
-
-       
 %             self.add_plot_footers(hFooters, popt.footer_string);
 %             self.add_plot_window_title(hHeaders, title_str)
         end % ``plot``
@@ -1021,7 +1009,7 @@ classdef mblvm < handle
             plt.more_type = 'a';
             plt.more_block = '';
             plt.callback = @self.loadings_plot;
-            plt.annotate = '';
+            plt.annotate = @self.loadings_plot_annotate;
             out = [out; plt];
             
             plt.name = 'VIP';
@@ -1031,7 +1019,7 @@ classdef mblvm < handle
             plt.more_type = '1:A';
             plt.more_block = '';
             plt.callback = @self.VIP_plot;
-            plt.annotate = @self.VIP_limits;
+            plt.annotate = @self.VIP_limits_annotate;
             out = [out; plt];
             
             plt.name = 'R2 (variable)';
@@ -1535,7 +1523,8 @@ classdef mblvm < handle
             n = hP.model.A;
             hP.set_data(ax, 1:n, []);
         end        
-        function order_dim0_annotate(varargin)
+        function order_dim0_annotate(hP, varargin)
+            ax = hP.gca();
             xlabel(ax, 'Component order')
         end
         
@@ -1548,7 +1537,8 @@ classdef mblvm < handle
             end
             hP.set_data(ax, 1:n, []);
         end        
-        function order_dim1_annotate(varargin)
+        function order_dim1_annotate(hP, varargin)
+            ax = hP.gca();
             xlabel(ax, 'Row order')
         end
         
@@ -1561,7 +1551,8 @@ classdef mblvm < handle
             end
             hP.set_data(ax, 1:n, []);
         end
-        function order_dim2_annotate(varargin)
+        function order_dim2_annotate(hP, varargin)
+            ax = hP.gca();
             xlabel(ax, 'Column order')
         end
         
@@ -1767,16 +1758,131 @@ classdef mblvm < handle
             ylim(extent(3:4)) 
         end
         
-        function loadings_plot(hP, varargin)
-            ax = hP.gca();
+        function [loadings_h, loadings_v] = get_loadings_data(hP, series)
+            % Correctly fetches the loadings data for the current block and dropdowns            
             block = hP.c_block;
-            t_h = series.x_num;
-            t_v = series.y_num;
-            disp(['Loadings plot'])
+            loadings_h = [];
+            
+            % Single block data sets (PCA and PLS)
+            if hP.model.B == 1
+                if series.x_num > 0
+                    loadings_h = hP.model.P{1}(:, series.x_num);
+                end
+                loadings_v = hP.model.P{1}(:, series.y_num);
+                return
+            end
+            
+            % Multiblock data sets: we also have superloadings
+            if block == 0
+                loadings_v = hP.model.super.P(:, series.y_num);
+            else
+                loadings_v = hP.model.P{block}(:, series.y_num);
+            end
+                
+            if series.x_num > 0
+                if block == 0
+                    loadings_h = hP.model.super.P(:, series.x_num); 
+                else
+                    loadings_h = hP.model.P{block}(:, series.y_num);                   
+                end
+            end
+        end        
+        function loadings_plot(hP, series)            
+            % Loadings plots for overall or per-block
+            ax = hP.gca();
+            [loadings_h, loadings_v] = hP.model.get_loadings_data(hP, series);
+            
+            % Bar plot of the single loading
+            if series.x_num <= 0
+                % We need a bar plot for the loadings
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hPlot
+                    if strcmpi(get(hPlot, 'Type'), 'line')
+                        delete(hPlot)
+                    end
+                end
+                hPlot = bar(ax, loadings_v);
+                set(hPlot, 'Tag', 'lvmplot_series');
+                return
+            end
+
+            % Scatter plot of the loadings            
+            hPlot = hP.set_data(ax, loadings_h, loadings_v);
+            set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
+        end
+        function loadings_plot_annotate(hP, series)
+            ax = hP.gca();            
+            
+            if series.x_num > 0 && series.y_num > 0                         
+                title(ax, 'Loadings plot')
+                grid on
+                xlabel(ax, ['p_', num2str(series.x_num)])
+                ylabel(ax, ['p_', num2str(series.y_num)])
+                
+            elseif series.y_num > 0                
+                title(ax, 'Loading bar plot')
+                grid on
+                ylabel(ax, ['p_', num2str(series.y_num)])
+            end
         end
         
-        
+        function VIP_data = get_VIP_data(hP, series)
+            % Correctly fetches the loadings data for the current block and dropdowns            
+            block = hP.c_block;
+            
+            % Single block data sets (PCA and PLS)
+            if hP.model.B == 1
+                VIP_data = hP.model.stats{1}.VIP_a(:, series.y_num);
+                return
+            end
+            
+            % Multiblock data sets: we also have superloadings
+            if block == 0
+                VIP_data = hP.model.super.P(:, series.y_num);
+            else
+                VIP_data = hP.model.P{block}(:, series.y_num);
+            end
+                
+            if series.x_num > 0
+                if block == 0
+                    VIP_data = hP.model.super.P(:, series.x_num); 
+                else
+                    VIP_data = hP.model.P{block}(:, series.y_num);                   
+                end
+            end
+        end        
+        function VIP_plot(hP, series)
+            ax = hP.gca();
+            VIP_data = hP.model.get_VIP_data(hP, series);
+            % Bar plot of the single loading
+            if series.x_num <= 0
+                % We need a bar plot for the loadings
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hPlot
+                    if strcmpi(get(hPlot, 'Type'), 'line')
+                        delete(hPlot)
+                    end
+                end
+                hPlot = bar(ax, VIP_data);
+                set(hPlot, 'Tag', 'lvmplot_series');
+            end
 
+        end
+        
+        function VIP_limits_annotate(hP, series)
+            ax = hP.gca();                        
+            if series.x_num > 0 && series.y_num > 0                         
+                title(ax, 'VIP plot')
+                grid on
+                xlabel(ax, ['p_', num2str(series.x_num)])
+                ylabel(ax, ['p_', num2str(series.y_num)])
+                
+            elseif series.y_num > 0                
+                title(ax, 'VIP bar plot')
+                grid on
+                ylabel(ax, ['VIP with A=', num2str(series.y_num)])
+            end
+        end
 
 %         function add_plot_footers(hFooters, footer_string)
 %             % Convert the cell string to a long char string
@@ -1917,21 +2023,21 @@ function basic_plot__scores(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, 1, {'Order', -1}, {'Scores', 1})
+        hP.set_plot(1, {'Order', -1}, {'Scores', 1})
     elseif hP.model.A == 2
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, 1, {'scores', 1}, {'scores', 2})        
+        hP.set_plot(1, {'scores', 1}, {'scores', 2})        
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
         hP.nCol = 2;
         hP.new_axis([1, 2, 3, 4]);
-        hP.set_plot(1, 1, {'Scores', 1}, {'scores', 2})  % t1-t2
-        hP.set_plot(2, 1, {'Scores', 3}, {'scores', 2})  % t3-t2
-        hP.set_plot(3, 1, {'Scores', 1}, {'scores', 3})  % t1-t3
-        hP.set_plot(4, 1, {'Order', -1},  {'Hot T2', hP.model.A})  % Hot_T2 using all components
+        hP.set_plot(1, {'Scores', 1}, {'scores', 2})  % t1-t2
+        hP.set_plot(2, {'Scores', 3}, {'scores', 2})  % t3-t2
+        hP.set_plot(3, {'Scores', 1}, {'scores', 3})  % t1-t3
+        hP.set_plot(4, {'Order', -1},  {'Hot T2', hP.model.A})  % Hot_T2 using all components
     end
 end % ``basic_plot__scores``
 
@@ -1945,21 +2051,21 @@ function basic_plot__loadings(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, 1, {'Order', -1}, {'Loadings', 1})
+        hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
     elseif hP.model.A == 2
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, 1, {'Loadings', 1}, {'Loadings', 2})
+        hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
         hP.nCol = 2;
         hP.new_axis([1, 2, 3, 4]);
-        hP.set_plot(1, 1, {'Loadings', 1}, {'Loadings', 2})  % t1-t2
-        hP.set_plot(2, 1, {'Loadings', 3}, {'Loadings', 2})  % t3-t2
-        hP.set_plot(3, 1, {'Loadings', 1}, {'Loadings', 3})  % t1-t3
-        hP.set_plot(4, 1, {'Order', -1},  {'VIP', hP.model.A})  % Hot_T2 using all components
+        hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})  % t1-t2
+        hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2})  % t3-t2
+        hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3})  % t1-t3
+        hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A})  % Hot_T2 using all components
     end
 end % ``basic_plot__loadings``
 
@@ -1973,7 +2079,7 @@ function basic_plot__spe(hP)
     hP.nRow = 1;
     hP.nCol = 1;
     hP.new_axis(1);
-    hP.set_plot(1, 1, {'Order', -1}, {'SPE', 1})
+    hP.set_plot(1, {'Order', -1}, {'SPE', 1})
 end % ``basic_plot__spe``
 
 function basic_plot__predictions(hP)
@@ -1987,8 +2093,15 @@ function basic_plot__predictions(hP)
     [hP.nRow hP.nCol] = hP.subplot_layout(M);
     hP.new_axis(1:M);
     for m = 1:M
-        hP.set_plot(m, 1, {'Observations', m}, {'Predictions', m})
+        hP.set_plot(m, {'Observations', m}, {'Predictions', m})
     end
-    
+end % ``basic_plot__predictions``
 
-end % ``basic_plot__spe``
+function basic_plot__VIP(hP)
+    % These are variable-based plots
+    hP.nRow = 1;
+    hP.nCol = 1;
+    hP.dim = 2;
+    hP.new_axis(1);
+    hP.set_plot(1, {'Order', -1}, {'VIP', hP.model.A})
+end % ``basic_plot__VIP``

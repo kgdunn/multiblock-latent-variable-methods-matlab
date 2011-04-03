@@ -43,7 +43,7 @@ function self = lvm(blocks, varargin)
                 if not(ischar(block_name))
                     error('lvm:lvm', 'Block name must be a character string.') 
                 end
-                if strcmpi(block_name, 'y')
+                if strcmpi(block_name, 'y') && (numel(blocks) > 2)
                     model_type = 'PLS';
                 end
             else 
