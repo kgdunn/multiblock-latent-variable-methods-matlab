@@ -66,4 +66,3 @@ i = find(count==0);
 
 y = sum(x,dim);
 y(i) = NaN;
-% $Id: nansum.m,v 1.2 2005/06/13 12:14:38 glaescher Exp glaescher $

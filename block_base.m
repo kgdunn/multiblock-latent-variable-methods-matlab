@@ -411,13 +411,10 @@ classdef block_base < handle
             %
             % [data, pp] = self.preprocess()
             %
-            %
             % Returns the ``other_block`` in preprocessed form, from the given
             % preprocessing structure, ``pp``:
             %
             % other_pp = self.preprocess(other_block, pp)
-            
-            
             
             % We'd like to preprocess the ``other`` block using settings 
             % from the current block.
@@ -470,7 +467,7 @@ classdef block_base < handle
             block_data.data = block_data.data - repmat(mean_center, self.N, 1);
             block_data.data = block_data.data .* repmat(scaling, self.N, 1);
 
-            % Store the preprocessing vectors for later on
+            % Return the preprocessing vectors
             if nargout > 1
                 PP = struct;
                 PP.mean_center = mean_center;
@@ -483,66 +480,17 @@ classdef block_base < handle
             out = ssq(self.data, varargin{:});
         end
         
-%         function self = un_preprocess(self, varargin)
-%             % UNdoes preprocessing for a block.
-%             %
-%             % Currently the only preprocessing model supported is to mean center
-%             % and scale.
-%             
-%             % We'd like to preprocess the ``other`` block using settings 
-%             % from the current block.
-%             if nargin==2 && self.is_preprocessed
-%                 other = varargin{1};
-%                 if ~isa(other, 'block')
-%                     error('The new data must be a ``block`` instance.');
-%                 end
-%                 % Don't worry about preprocessing empty blocks.
-%                 if ~isempty(other)
-%                     mean_center = self.PP.mean_center;
-%                     scaling = self.PP.scaling;
-%                     if ~other.is_preprocessed                    
-%                         other.data = other.data - repmat(mean_center, other.N, 1);
-%                         other.data = other.data .* repmat(scaling, other.N, 1);
-%                     end
-%                 end                
-%                 other.is_preprocessed = true;
-%                 
-%                 % Will scaling introduce missing values?
-%                 if any(isnan(scaling))
-%                     other.has_missing = true;
-%                 end
-%                 self = other;
-%                 return
-%             end
-%             
-%             % Apply the preprocesing to the training data
-%             if not(self.is_preprocessed)
-%                 
-%             
-%                 % Centering based on the mean
-%                 mean_center = nanmean(self.data, 1);
-%                 scaling = nanstd(self.data, 1);
-% 
-%                 % Replace zero entries with NaN: this is handled later on with scaling
-%                 % This will create missing data, so we need to set the flag
-%                 % correctly
-%                 if any(scaling < sqrt(eps))
-%                     scaling(scaling < sqrt(eps)) = NaN;
-%                     self.has_missing = true;
-%                 end                
-%                 scaling = 1./scaling;
-%             
-%             
-%                 self.data = self.data - repmat(mean_center, self.N, 1);
-%                 self.data = self.data .* repmat(scaling, self.N, 1);
-% 
-%                 % Store the preprocessing vectors for later on
-%                 self.PP.mean_center = mean_center;
-%                 self.PP.scaling = scaling;  
-% 
-%                 self.is_preprocessed = true;
-%             end
-%         end
+        function out = un_preprocess(self, data, pp)
+            % UNdoes preprocessing for a block.
+            %
+            % Currently the only preprocessing model supported is to mean center
+            % and scale.
+            if isempty(data)
+                data = self.data;
+            end
+            out = data ./ repmat(pp.scaling, self.N, 1);
+           	out = out + repmat(pp.mean_center, self.N, 1);
+        end
          
     function [self, other] = exclude(self, dim, which)
         % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 

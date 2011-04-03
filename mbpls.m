@@ -7,7 +7,8 @@
 classdef mbpls < mblvm
     properties (SetAccess = protected)
         Y = [];
-        Yhat = [];
+        Y_copy = [];  % A copy of the Y-block before any calculations
+        Y_hat = [];    % Predictions of the Y-block
         YPP = [];
     end
         
@@ -30,8 +31,9 @@ classdef mbpls < mblvm
             varargin{1} = blocks_given;
             self = self@mblvm(varargin{:});  
             self.Y = Y_block;
-            self.Yhat = copy(Y_block);
-            self.Yhat.data = self.Yhat.data .* 0;
+            self.Y_copy = copy(Y_block);
+            self.Y_hat = copy(Y_block);
+            self.Y_hat.data = self.Y_hat.data .* 0;
             self.M = shape(self.Y, 2);
             
         end % ``mbpls``        
@@ -175,7 +177,7 @@ classdef mbpls < mblvm
                 
                 % Make current predictions of Y using all available PCs
                 Y_hat_update = t_a * c_a';
-                self.Yhat.data = self.Yhat.data + Y_hat_update;
+                self.Y_hat.data = self.Y_hat.data + Y_hat_update;
                 self.Y.data = self.Y.data - Y_hat_update;
                 ssq_Y_after = ssq(self.Y.data, 1)';
                 self.super.stats.R2Yk_a(:,a) = 1 - ssq_Y_after ./ self.super.stats.ssq_Y_before';
@@ -401,7 +403,7 @@ classdef mbpls < mblvm
             plt.dim = 1;
             plt.more_text = 'of variable';
             plt.more_type = '<label>';
-            plt.more_block = '';
+            plt.more_block = 'Y';
             plt.callback = @self.predictions_plot;
             plt.annotate = @self.predictions_annotate;
             out = [out; plt];
@@ -411,9 +413,9 @@ classdef mbpls < mblvm
             plt.dim = 1;
             plt.more_text = 'of variable';
             plt.more_type = '<label>';
-            plt.more_block = '';
+            plt.more_block = 'Y';
             plt.callback = @self.observed_plot;
-            plt.annotate = '';
+            plt.annotate = @self.observed_plot_annotate;
             out = [out; plt];
             
             % Dimension 2 (columns) plots
@@ -423,16 +425,30 @@ classdef mbpls < mblvm
             plt.dim = 2;
             plt.more_text = 'for variable';
             plt.more_type = '<label>';
-            plt.more_block = '<Y>';
+            plt.more_block = 'Y';
             plt.callback = @self.coefficient_plot;
-            plt.annotate = '';
+            plt.annotate = @self.coefficient_plot_annotate;
             out = [out; plt];
         end
         
+        function out = get_predictions(self, varargin)
+            % Gets the prediction matrix of the data in the model building
+            % using ``varargin{1}`` components.
+            if nargin>1
+                using_A = varargin{1};
+            else
+                using_A = self.A;
+            end
+            
+            if using_A == self.A            
+                out = self.Y_hat.un_preprocess([], self.YPP);
+            end
+            
+        end
     end % end methods (ordinary)
     
     % These methods don't require a class instance
-    methods(Static)
+    methods(Static=true)
         function [t_a, p_a, c_a, u_a, w_a, itern] = single_block_PLS(X, Y, self, a, has_missing)
             % Extracts a PCA component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
@@ -525,6 +541,136 @@ classdef mbpls < mblvm
             end
             
         end
+        
+        
+        
+        function observed_plot(hP, series)
+            % Score plots for overall or block scores
+            
+            ax = hP.gca();
+            if strcmpi(series.current, 'x')
+                idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                idx = series.y_num;
+            end       
+            
+            plotdata = hP.model.Y_copy.data(:, idx);            
+            
+            if strcmpi(series.current, 'x')
+                hPlot = hP.set_data(ax, plotdata, []);
+            elseif strcmpi(series.current, 'y')
+                hPlot = hP.set_data(ax, [], plotdata);
+            end
+            
+            % If an ordered plot, connect the points, else just show dots
+            if strcmpi(series.x_type{1}, 'Order')
+                set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
+            else
+                set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
+            end
+        end
+        function observed_plot_annotate(hP, series)
+            ax = hP.gca();
+            if strcmpi(series.current, 'x')
+                idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                idx = series.y_num;
+            end   
+            labels = hP.model.Y.labels{2};            
+            label_str = ['Observed: ', labels{idx}];
+            if strcmpi(series.current, 'x')
+                xlabel(ax, label_str)
+            elseif strcmpi(series.current, 'y')
+                ylabel(ax, label_str)
+            end
+            
+            x_ax = series.x_type{1};
+            y_ax = series.y_type{1};
+            if strcmpi(x_ax, 'Observations') && strcmpi(y_ax, 'Predictions')
+                annotate_obs_predicted(hP.gca, labels{idx})
+            end
+            
+            if series.x_num < 0 && series.y_num > 0
+                title('Observations of: ', labels{idx})
+            end
+            grid on
+        end
+        
+        function predictions_plot(hP, series)
+            ax = hP.gca();
+            if strcmpi(series.current, 'x')
+                idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                idx = series.y_num;
+            end   
+            labels = hP.model.Y.labels{2};            
+            label_str = ['Predicted: ', labels{idx}];                
+            if strcmpi(series.current, 'x')
+                xlabel(ax, label_str)
+            elseif strcmpi(series.current, 'y')
+                ylabel(ax, label_str)
+            end
+                        
+            plotdata = hP.model.get_predictions();
+            plotdata = plotdata(:, idx);
+            
+            if strcmpi(series.current, 'x')
+                hPlot = hP.set_data(ax, plotdata, []);
+            elseif strcmpi(series.current, 'y')
+                hPlot = hP.set_data(ax, [], plotdata);
+            end
+            if strcmpi(series.x_type{1}, 'Order')
+                set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
+            else
+                set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
+            end
+        end
+        
+        function predictions_annotate(hP, series)
+            ax = hP.gca();
+            if strcmpi(series.current, 'x')
+                idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                idx = series.y_num;
+            end   
+            labels = hP.model.Y.labels{2};            
+            label_str = ['Predicted: ', labels{idx}];
+            if strcmpi(series.current, 'x')
+                xlabel(ax, label_str)
+            elseif strcmpi(series.current, 'y')
+                ylabel(ax, label_str)
+            end
+                        
+            x_ax = series.x_type{1};
+            y_ax = series.y_type{1};
+            if strcmpi(x_ax, 'Observations') && strcmpi(y_ax, 'Predictions')
+                annotate_obs_predicted(hP.gca, labels{idx})
+            end
+            if series.x_num < 0 && series.y_num > 0
+                title('Predictions of: ', labels{idx})
+            end
+        end
     end % end methods (static)
     
 end % end classdef
+
+function annotate_obs_predicted(ax, tag_name)
+    title(ax, ['Obs vs predicted: ', tag_name])
+    extent = axis;
+    min_ex = min(extent([1,3]));
+    max_ex = min(extent([2,4]));
+    delta = (max_ex - min_ex);
+    min_ex_l = min_ex - delta*1.5;
+    max_ex_l = max_ex + delta*1.5;
+    set(ax, 'NextPlot', 'add')
+    hd = plot(ax, [min_ex_l, max_ex_l], [min_ex_l, max_ex_l], 'k', 'linewidth', 2);
+    set(hd, 'tag', 'hline', 'HandleVisibility', 'on')    
+    hData = findobj(ax, 'Tag', 'lvmplot_series');
+    x_data = get(hData, 'XData');
+    y_data = get(hData, 'YData');
+    RMSEP = sqrt(mean((x_data - y_data).^2));
+    text(min_ex + 0.05*delta, max_ex - 0.05*delta, sprintf('RMSEP = %0.4g', RMSEP))
+
+    xlim([min_ex-0.1*delta, max_ex+0.1*delta])
+    ylim([min_ex-0.1*delta, max_ex+0.1*delta])
+end

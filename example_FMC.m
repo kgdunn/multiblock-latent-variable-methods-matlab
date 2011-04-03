@@ -71,7 +71,7 @@ Y.exclude(1, bad_batch);
 X.data(bad_batch, :) = [];
 X.batch_raw(bad_batch, :) = [];
 
-A_mon = 2;
+A_mon = 3;
 mon = lvm({'Z', Z, 'X', X, 'y', Y}, A_mon);
 
 % SPEs are in disagreement: too high

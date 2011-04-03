@@ -887,7 +887,9 @@ classdef mblvm < handle
                 case 'loadings'
                     basic_plot__loadings(h);
                 case 'spe'
-                    basic_plot__spe(h);
+                    basic_plot__spe(h);                    
+                case 'predictions'
+                    basic_plot__predictions(h);
             end
             h.update_all_plots();
             h.update_annotations();
@@ -935,8 +937,7 @@ classdef mblvm < handle
             plt = struct;  
             
             % Dimension 0 (component) plots
-            % =========================
-            
+            % =========================            
             plt.name = 'Order';
             plt.weight = 0;
             plt.dim = 0;
@@ -945,8 +946,7 @@ classdef mblvm < handle
             plt.more_block = '';
             plt.annotate = @self.order_dim0_annotate;
             plt.callback = @self.order_dim0_plot;
-            out = [out; plt];
-            
+            out = [out; plt];            
             
             plt.name = 'R2 per component';
             plt.weight = 60;
@@ -961,8 +961,7 @@ classdef mblvm < handle
             % plt.name = 'Eigenvalues'; 
             
             % Dimension 1 (rows) plots
-            % =========================
-            
+            % =========================            
             plt.name = 'Order';
             plt.weight = 0;
             plt.dim = 1;
@@ -971,8 +970,7 @@ classdef mblvm < handle
             plt.more_block = '';
             plt.annotate = @self.order_dim1_annotate;
             plt.callback = @self.order_dim1_plot;
-            out = [out; plt];
-            
+            out = [out; plt];            
             
             plt.name = 'Scores';   % t-scores
             plt.weight = 60;
@@ -981,10 +979,8 @@ classdef mblvm < handle
             plt.more_type = 'a';
             plt.more_block = '';
             plt.callback = @self.score_plot;
-            plt.annotate = @self.score_limits_annotate;
-            
-            out = [out; plt];
-            
+            plt.annotate = @self.score_limits_annotate;            
+            out = [out; plt];            
             
             plt.name = 'Hot T2';  % Hotelling's T2
             plt.weight = 40;
@@ -993,7 +989,7 @@ classdef mblvm < handle
             plt.more_type = '1:A';
             plt.more_block = '';
             plt.callback = @self.hot_T2_plot;
-            plt.annotate = @self.hot_T2_limits;
+            plt.annotate = @self.hot_T2_limits_annotate;
             out = [out; plt];
             
             plt.name = 'SPE';
@@ -1003,7 +999,7 @@ classdef mblvm < handle
             plt.more_type = '1:A';
             plt.more_block = '';
             plt.callback = @self.spe_plot;
-            plt.annotate = @self.spe_limits;
+            plt.annotate = @self.spe_limits_annotate;
             out = [out; plt];
             
             % Dimension 2 (columns) plots
@@ -1540,7 +1536,7 @@ classdef mblvm < handle
             hP.set_data(ax, 1:n, []);
         end        
         function order_dim0_annotate(varargin)
-            xlabel('Component order')
+            xlabel(ax, 'Component order')
         end
         
         function order_dim1_plot(hP, varargin)
@@ -1553,7 +1549,7 @@ classdef mblvm < handle
             hP.set_data(ax, 1:n, []);
         end        
         function order_dim1_annotate(varargin)
-            xlabel('Row order')
+            xlabel(ax, 'Row order')
         end
         
         function order_dim2_plot(hP, varargin)
@@ -1566,7 +1562,7 @@ classdef mblvm < handle
             hP.set_data(ax, 1:n, []);
         end
         function order_dim2_annotate(varargin)
-            xlabel('Column order')
+            xlabel(ax, 'Column order')
         end
         
         function [scores_h, scores_v] = get_score_data(hP, series)
@@ -1602,17 +1598,18 @@ classdef mblvm < handle
             end
             
         end        
-        
         function score_plot(hP, series)
             % Score plots for overall or block scores
             
             ax = hP.gca();
             [scores_h, scores_v] = hP.model.get_score_data(hP, series);
             
+            
             % Line plot of the vertical entity
             if series.x_num <= 0
                 hPlot = hP.set_data(ax, scores_h.data, scores_v.data);
                 set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
+                %set(ax, 'YLim'
                 return
             end
             
@@ -1620,34 +1617,7 @@ classdef mblvm < handle
             hPlot = hP.set_data(ax, scores_h.data, scores_v.data);
             set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
             
-        end
-        
-        function hot_T2_plot(hP, series)
-            ax = hP.gca();
-            block = hP.c_block;
-            t_h = series.x_num;
-            t_v = series.y_num;
-            disp(['scatter plot of T2'])
-        end
-        function hot_T2_limits(hP, series)
-        end
-        
-        function spe_plot(hP, varargin)
-            ax = hP.gca();
-            block = hP.c_block;
-            t_h = series.x_num;
-            t_v = series.y_num;
-            disp(['SPE plot'])
-        end
-        
-        function loadings_plot(hP, varargin)
-            ax = hP.gca();
-            block = hP.c_block;
-            t_h = series.x_num;
-            t_v = series.y_num;
-            disp(['Loadings plot'])
-        end
-        
+        end       
         function score_limits_annotate(hP, series)
             ax = hP.gca();            
             t_h = series.x_num;
@@ -1661,10 +1631,12 @@ classdef mblvm < handle
                 set(ax, 'NextPlot', 'add')
                 ellipse_coords = ellipse_coordinates([scores_h.data scores_v.data], scores_h.limit);
                 plot(ax, ellipse_coords(:,1), ellipse_coords(:,2), 'r--', 'linewidth', 1)            
-                title('Score plot')
+                title(ax, 'Score plot')
                 grid on
-                xlabel(['t_', num2str(t_h)])
-                ylabel(['t_', num2str(t_v)])
+                xlabel(ax, ['t_', num2str(t_h)])
+                ylabel(ax, ['t_', num2str(t_v)])
+                
+            % Add univariate score limits
             elseif t_v > 0
                 set(ax, 'NextPlot', 'add')
                 extent = axis;  
@@ -1672,24 +1644,140 @@ classdef mblvm < handle
                 set(hd, 'tag', 'hLimit', 'HandleVisibility', 'on');
                 hd = plot([-1E50, 1E50], [-scores_v.limit, -scores_v.limit], 'r-', 'linewidth', 1);
                 set(hd, 'tag', 'hLimit', 'HandleVisibility', 'on');
-                title('Score line plot')
+                title(ax, 'Score line plot')
                 grid on
-                ylabel(['t_', num2str(t_v)])
+                ylabel(ax, ['t_', num2str(t_v)])
                 xlim(extent(1:2))
                 ylim(extent(3:4)) 
                 
             end
         end
+        
+        function hot_T2_plot(hP, series)
+            ax = hP.gca();
+            block = hP.c_block;
+            if strcmpi(series.current, 'x')
+                t_idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                t_idx = series.y_num;
+            end       
+            
+            if block == 0
+                plotdata = hP.model.super.T2(:, t_idx);
+            else
+                plotdata = hP.model.stats{block}.T2(:, t_idx);
+            end
+            
+            if strcmpi(series.current, 'x')
+                hPlot = hP.set_data(ax, plotdata, []);
+            elseif strcmpi(series.current, 'y')
+                hPlot = hP.set_data(ax, [], plotdata);
+            end
+            set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
+        end
+        function hot_T2_limits_annotate(hP, series)
+            ax = hP.gca();
+            block = hP.c_block;
+            if strcmpi(series.current, 'x')
+                t_idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                t_idx = series.y_num;
+            end                
+            
+            if block == 0
+                limit = hP.model.super.lim.T2(t_idx);
+            else
+                limit = hP.model.lim{block}.T2(t_idx);
+            end
+            
+            % Which axis to add the limit to?
+            set(ax, 'NextPlot', 'add')
+            extent = axis;
+            if strcmpi(series.current, 'x')
+                hd = plot([limit, limit], [-1E10, 1E10], 'r-', 'linewidth', 1);
+                xlabel(ax ,'Hotelling''s T^2')
+            elseif strcmpi(series.current, 'y')
+                hd = plot([-1E10, 1E10], [limit, limit], 'r-', 'linewidth', 1);                
+                ylabel(ax, 'Hotelling''s T^2')
+            end
+            set(hd, 'tag', 'hLimit', 'HandleVisibility', 'on');
+            
+            if series.x_num < 0 && series.y_num > 0
+                title(ax, 'Hotelling''s T^2 plot')
+            end
+            grid on            
+            xlim(extent(1:2))
+            ylim(extent(3:4)) 
+        end
+        
+        function spe_plot(hP, series)
+            ax = hP.gca();
+            block = hP.c_block;
+            if strcmpi(series.current, 'x')
+                idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                idx = series.y_num;
+            end       
+            
+            if block == 0
+                plotdata = hP.model.super.SPE(:, idx);
+            else
+                plotdata = hP.model.stats{block}.SPE(:, idx);
+            end
+            
+            if strcmpi(series.current, 'x')
+                hPlot = hP.set_data(ax, plotdata, []);
+            elseif strcmpi(series.current, 'y')
+                hPlot = hP.set_data(ax, [], plotdata);
+            end
+            set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
+        end
+        function spe_limits_annotate(hP, series)
+            ax = hP.gca();
+            block = hP.c_block;
+            if strcmpi(series.current, 'x')
+                idx = series.x_num;
+            elseif strcmpi(series.current, 'y')
+                idx = series.y_num;
+            end                
+            
+            if block == 0
+                limit = hP.model.super.lim.SPE(idx);
+            else
+                limit = hP.model.lim{block}.SPE(idx);
+            end
+            
+            % Which axis to add the limit to?
+            set(ax, 'NextPlot', 'add')
+            extent = axis;
+            if strcmpi(series.current, 'x')
+                hd = plot([limit, limit], [-1E10, 1E10], 'r-', 'linewidth', 1);
+                xlabel(ax, 'Squared prediction error (SPE)')
+            elseif strcmpi(series.current, 'y')
+                hd = plot([-1E10, 1E10], [limit, limit], 'r-', 'linewidth', 1);                
+                ylabel(ax, 'SPE')
+            end
+            set(hd, 'tag', 'hLimit', 'HandleVisibility', 'on');
+            
+            if series.x_num < 0 && series.y_num > 0
+                title(ax, 'Squared prediction error (SPE)')
+            end
+            grid on            
+            xlim(extent(1:2))
+            ylim(extent(3:4)) 
+        end
+        
+        function loadings_plot(hP, varargin)
+            ax = hP.gca();
+            block = hP.c_block;
+            t_h = series.x_num;
+            t_v = series.y_num;
+            disp(['Loadings plot'])
+        end
+        
+        
 
 
-%         
-%         function add_plot_window_title(hHeaders, text_to_add)
-%             for k = 1:numel(hHeaders)
-%                 hF = get(hHeaders(k), 'Parent');
-%                 set(hF, 'Name', text_to_add);
-%             end
-%         end
-%         
 %         function add_plot_footers(hFooters, footer_string)
 %             % Convert the cell string to a long char string
 %             foot = footer_string{1};
@@ -1848,34 +1936,59 @@ function basic_plot__scores(hP)
 end % ``basic_plot__scores``
 
 function basic_plot__loadings(hP)
-    % Show a basic set of loadings plots.  The plot layout is a function of how
-    % many components are in the model.
+    % Show a basic set of loadings plots.
 
-    %popt.footer_string = {title_str, popt.footer_string{:}};
+    % These are variable-based plots
+    hP.dim = 2;
     
     if hP.model.A == 1
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        plot_loadings(hP, 0, 1)
+        hP.set_plot(1, 1, {'Order', -1}, {'Loadings', 1})
     elseif hP.model.A == 2
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        plot_loadings(hP, 1, 2);
+        hP.set_plot(1, 1, {'Loadings', 1}, {'Loadings', 2})
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
         hP.nCol = 2;
         hP.new_axis([1, 2, 3, 4]);
-        plot_loadings(hP, 1, 2);
-        plot_loadings(hP, 3, 2);
-        plot_loadings(hP, 1, 3);
-        plot_VIP     (hP);
+        hP.set_plot(1, 1, {'Loadings', 1}, {'Loadings', 2})  % t1-t2
+        hP.set_plot(2, 1, {'Loadings', 3}, {'Loadings', 2})  % t3-t2
+        hP.set_plot(3, 1, {'Loadings', 1}, {'Loadings', 3})  % t1-t3
+        hP.set_plot(4, 1, {'Order', -1},  {'VIP', hP.model.A})  % Hot_T2 using all components
     end
 end % ``basic_plot__loadings``
 
 function basic_plot__spe(hP)
+    % These are observation-based plots
+    hP.dim = 1;
+    
+    % TODO(KGD): add the ability to plot data from multiple blocks
+    % i.e. click plot, then change dropdown: will only change plot in that
+    % subplot
+    hP.nRow = 1;
+    hP.nCol = 1;
+    hP.new_axis(1);
+    hP.set_plot(1, 1, {'Order', -1}, {'SPE', 1})
+end % ``basic_plot__spe``
 
+function basic_plot__predictions(hP)
+    % These are observation-based plots
+    hP.dim = 1;
+    
+    % TODO(KGD): add the ability to plot data from multiple blocks
+    % i.e. click plot, then change dropdown: will only change plot in that
+    % subplot
+    M = min(hP.model.M, 6);
+    [hP.nRow hP.nCol] = hP.subplot_layout(M);
+    hP.new_axis(1:M);
+    for m = 1:M
+        hP.set_plot(m, 1, {'Observations', m}, {'Predictions', m})
+    end
+    
 
 end % ``basic_plot__spe``

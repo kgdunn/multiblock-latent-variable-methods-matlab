@@ -215,10 +215,11 @@ classdef lvmplot < handle
             % Footer
             % -------
             self.hFoot = uicontrol(Txt, ...
-                             'Position',[0.02, 0.005, 0.96 0.04], ...
+                             'Position',[0.02, 0.00, 0.96 0.03], ...
                              'ForegroundColor',[0 0 0], 'String', '', ...
                              'HorizontalAlignment', 'left');
-                         
+            set(self.hFoot, 'Units', 'pixels');
+            
             % Block dropdown
                          
             % Add a contribution toolbar icon
@@ -387,15 +388,15 @@ classdef lvmplot < handle
                         entry = index;
                     end
                     
-                case 'Variable';
+                case '<label>';
                     % See which dimension we are plotting in and see if we can
                     % index into that dimension
-                    block = self.c_block;
                     
-                    if block >= 1  % we cannot show variables from the superblock
-                        plot_dim = plot_entry{3};
-                        shape = self.model.blocks{block}.shape;
-                        if index <= shape(plot_dim)
+                    % TODO(KGD): For now we can only show variables from the 
+                    % Y-block
+                    if strcmp(plot_entry(:,7), 'Y')
+                        shape = self.model.Y.shape(2);
+                        if index <= shape
                             entry = index;
                         end
                     end
@@ -460,7 +461,9 @@ classdef lvmplot < handle
                 cb_update_y = series.y_type{4};
                 
                 % Call the plotting callbacks to do the work
+                series.current = 'x';
                 cb_update_x(self, series);
+                series.current = 'y';
                 cb_update_y(self, series);
             end
         end
@@ -476,9 +479,11 @@ classdef lvmplot < handle
                 
                 % Call the annotate callback to do the work
                 if ~isempty(cb_annotate_x)
+                    series.current = 'x';
                     cb_annotate_x(self, series)
                 end
                 if ~isempty(cb_annotate_y)
+                    series.current = 'y';
                     cb_annotate_y(self, series)
                 end
                 
@@ -504,20 +509,62 @@ classdef lvmplot < handle
             if ~isempty(hPlot)
                 if ~isempty(x_data)
                     set(hPlot, 'XData', x_data);
+                    set(hAx, 'XLim', get_good_limits(x_data, get(hAx, 'XLim')))
                 end
                 if ~isempty(y_data)
                     set(hPlot, 'YData', y_data);
+                    set(hAx, 'YLim', get_good_limits(y_data, get(hAx, 'YLim')))
                 end
             else
-                set(ax, 'Nextplot', 'add');
-                hPlot = plot(ax, x_data, y_data);
+                set(hAx, 'Nextplot', 'add');
+                hPlot = plot(hAx, x_data, y_data);
                 set(hPlot, 'Tag', 'lvmplot_series')                
             end            
+        end
+        
+        function [nrow, ncol] = subplot_layout(nplots) 
+            % Determines the best layout for ``nplots``.  
+            % TODO(KGD): give the figure handle so that it can take a minimum
+            % plot size into account
+            switch nplots
+                case 1
+                    layout = [1, 1];
+                case 2
+                    layout = [1, 2];
+                case 3
+                    layout = [1, 3];
+                case 4
+                    layout = [2, 2];
+                case {5, 6}
+                    layout = [2, 3];
+                case {7, 8}
+                    layout = [2, 4];
+                case {9, 10}
+                    layout = [2, 5];
+                otherwise
+                    layout = [2, 6];
+            end
+            nrow = layout(1);
+            ncol = layout(2);
         end
         
     end % end: methods (static)
 end % end: ``classdef``
 
+function extent = get_good_limits(data, extent)
+    % Finds good axis limits for the ``data`` for changing the axis
+    % limits, ``extent``.
+   
+    data = sort(data);    
+    if data(end) > extent(2)        
+        extent(2) = data(end) + (data(end) - data(1))*0.05;
+    end
+    if data(1) < extent(1)
+        extent(1) = data(1) - (data(end) - data(1))*0.05;
+    end
+    
+end
+        
 function mouseclick_callback(varargin)
     disp(get(varargin{1}, 'UserData'))
 end

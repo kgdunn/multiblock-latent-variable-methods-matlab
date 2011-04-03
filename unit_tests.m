@@ -359,7 +359,7 @@ function PLS_no_missing_data()
     Y_hat = exp_m.observations{2}.data(:, Y_hat_col);
     %_hat_calc = PLS..data_pred;
     %Y_hat_PP = PLS.blocks{2}.preprocess(block(Y_hat_calc));
-    assertEAE(PLS.Yhat.data, Y_hat, 2);
+    assertEAE(PLS.Y_hat.data, Y_hat, 2);
     
     % W-Loadings
     loadings_col = 1:6;

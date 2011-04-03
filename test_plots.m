@@ -16,10 +16,10 @@ function test_plot_class()
     Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
     
     % Let's start with a PCA on the Y-block, to understand the quality variables
-    fqa_pca_Y = lvm({'FQAs', Y}, 3);
+    fqa_pca_Y = lvm({'Z', Z, 'Y', Y}, 3);
 
     %plot(fqa_pca_Y);               % All scores for overall block
-    h=plot(fqa_pca_Y, 'scores');
+    h=plot(fqa_pca_Y, 'predictions');
     
 end
 
