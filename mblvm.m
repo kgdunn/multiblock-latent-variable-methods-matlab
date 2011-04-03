@@ -190,7 +190,7 @@ classdef mblvm < handle
             
             if isempty(self.data)
                 self.data = ones(self.N, sum(self.K)) .* NaN;
-                self.has_missing = false;            
+                self.has_missing = self.has_missing;            
                 for b = 1:self.B
                     self.data(:, self.b_iter(b)) = self.blocks{b}.data .* self.block_scaling(b);
                     if self.blocks{b}.has_missing

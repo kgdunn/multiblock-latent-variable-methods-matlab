@@ -11,6 +11,8 @@ function test_blocks(varargin)
     
     % Add tests to verify batch exclusion of tags and batches (time-dimension
     % not supported yet; to add still)
+    % Exclude rows that happen to have missing data, does the "has_missing"
+    % flag change ?
     
     disp('ALL TESTS FOR THE BLOCK OBJECT PASSED - if no errors were displayed.')
 end

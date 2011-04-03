@@ -19,13 +19,6 @@ fontsize =14;
 
 FMC = load('datasets/FMC.mat');
 
-% Initial conditions block: operations
-% -------------------------
-Zop = block(FMC.Zop);
-Zop.add_labels(1, FMC.batch_names);
-Zop.add_labels(2, FMC.Zop_names)   % you can always add labels later on 
-%plot(Zop) 
-
 % Initial conditions block: chemistry
 % -------------------------
 Zchem = block(FMC.Zchem);
@@ -33,6 +26,16 @@ Zchem.add_labels(1, FMC.batch_names);
 Zchem.add_labels(2, FMC.Zchem_names);
 missing_chemistry = [12, 13, 14, 15, 28, 29, 30, 31, 32, 33, 34, 35, 53];
 Zchem = Zchem.exclude(1, missing_chemistry);
+
+% Initial conditions block: operations
+% -------------------------
+Zop = block(FMC.Zop);
+Zop.add_labels(1, FMC.batch_names);
+Zop.add_labels(2, FMC.Zop_names)   % you can always add labels later on 
+Zop = Zop.exclude(1, missing_chemistry);
+%plot(Zop) 
+
+
 %plot(Zchem)
 
 % Batch data block (pre-aligned)
@@ -41,20 +44,19 @@ X = block(FMC.X, 'X: batch data',...                     % name of the block
                  {'batch_tag_names', FMC.Xnames}, ...    % trajectory names
                  {'batch_names', FMC.batch_names});      % batch names
 X = X.exclude(1, missing_chemistry);
-temp = X.exclude(2, [2, 5]);
 %plot(X, {'layout', [2, 3]})
 
 % Final quality attributes (FQAs)
 % --------------------------------
 % Add labels when creating the block
 Y = block(FMC.Y, {'col_labels', FMC.Ynames}, {'row_labels', FMC.batch_names}); 
-Y.name = 'My name';
+Y = Y.exclude(1, missing_chemistry);
 %plot(Y, {'layout', [2, 6]})
 
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 3 components
-fqa_pca = lvm({'FQAs', Y}, 1);
+fqa_pca = lvm({'FQAs', Y}, 2);
 %plot(fqa_pca)
 
 % There seem to be 2 clusters in the FQA space.  Let's take a look at
@@ -63,10 +65,12 @@ fqa_pca = lvm({'FQAs', Y}, 1);
 
 
 % Understand the effect of chemistry on the Y's
-Y_copy = Y.copy();
-Y_copy.exclude(1, missing_chemistry);
-pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y_copy}, 1);
+pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
+plot(pls_chemistry)
 
+% Understand the effect of operating conditions on the Y's
+pls_operating = lvm({'Z-timing', Zop, 'Y', Y}, 2);
+plot(pls_operating)
 
 % Create monitoring model
 % bad_batch = [3, 5, 6, 7, 34:71];

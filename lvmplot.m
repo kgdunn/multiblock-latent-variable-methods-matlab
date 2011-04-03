@@ -555,11 +555,8 @@ classdef lvmplot < handle
             axis_extent = axis;
             max_range = axis_extent(4) - axis_extent(3); %max(max(y_data),  - extent(3));
             delta = max_range * 0.02;
-            if numel(x_data) > 50
-                fontweight = 'normal';
-            else
-                fontweight = 'bold';
-            end
+            fontweight = 'normal';
+            
             for n = 1:numel(x_data)
                  hText = text(x_data(n), y_data(n)+delta, strtrim(labels{n}), 'Rotation', 0);
                  set(hText, 'FontSize', 12, 'FontWeight', fontweight, ...

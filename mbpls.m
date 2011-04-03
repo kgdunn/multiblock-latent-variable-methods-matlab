@@ -35,6 +35,8 @@ classdef mbpls < mblvm
             self.Y_hat = copy(Y_block);
             self.Y_hat.data = self.Y_hat.data .* 0;
             self.M = shape(self.Y, 2);
+            self.has_missing = self.has_missing | self.Y.has_missing;
+            
             
         end % ``mbpls``        
         
@@ -112,7 +114,7 @@ classdef mbpls < mblvm
                 if all(ssq_Y_before < self.opt.tolerance)
                     warning('mbpls:calc_model', 'There is no variance left in the Y-data')
                 end 
-                                 
+                         
                 % Converge onto a single component
                 [t_a, p_a, c_a, u_a, w_a, itern] = mbpls.single_block_PLS(self.data, self.Y.data, self, a, self.has_missing); 
                 

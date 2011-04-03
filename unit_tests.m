@@ -13,6 +13,14 @@ function unit_tests(varargin)
     PCA_cross_validation_no_missing()
     MBPCA_tests()
     
+    % Missing data tests
+    % * All of X is missing
+    % * All of Y is missing
+    % * Some/one complete column in X is missing
+    % * Some/one complete column in Y is missing
+    % * Some missing in X, not in Y
+    % * Some missing in Y, not in X
+    
     % PLS tests
     basic_PLS_test()
     PLS_no_missing_data()
