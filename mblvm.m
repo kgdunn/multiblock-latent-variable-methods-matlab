@@ -1856,14 +1856,18 @@ classdef mblvm < handle
                         delete(hPlot)
                     end
                 end
-                hPlot = bar(ax, VIP_data);
+                hPlot = bar(ax, VIP_data, 'FaceColor', [0.25, 0.5, 1]);
+%                 hPatch = findobj(hBar, 'Type', 'patch');
+%             set(hPatch, )
                 set(hPlot, 'Tag', 'lvmplot_series');
             end
 
         end
         
         function VIP_limits_annotate(hP, series)
-            ax = hP.gca();                        
+            ax = hP.gca();
+            hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            
             if series.x_num > 0 && series.y_num > 0                         
                 title(ax, 'VIP plot')
                 grid on
@@ -1881,10 +1885,9 @@ classdef mblvm < handle
                         x_names{b} = hP.model.blocks{b}.name;
                     end                    
                 else
-                    x_names = hP.model.blocks{block}.labels{hP.dim};
+                    x_names = hP.model.blocks{1}.labels{hP.dim};
                 end
-                set(ax, 'XTickLabel', x_names)
-            
+                hP.annotate_barplot(hBar, x_names)
             end
         end
 
@@ -2015,7 +2018,6 @@ function ellipse_coords = ellipse_coordinates(scores, T2_limit_alpha)
     ellipse_coords = (counter_rotate * [x(:) y(:)]')';
     
 end
-
 
 function basic_plot__scores(hP)
     % Show a basic set of score plots.

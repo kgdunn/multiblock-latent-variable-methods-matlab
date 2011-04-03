@@ -556,6 +556,34 @@ classdef lvmplot < handle
             ncol = layout(2);
         end
         
+        function annotate_barplot(hBar, labels)
+            % Adds vertical ``labels`` to bar plot series, ``hBar``
+            hAx = get(hBar, 'Parent');            
+            set(hAx, 'XTickLabel', {})
+            x_data = get(hBar, 'XData');
+            y_data = get(hBar, 'YData');
+            if numel(x_data) ~= numel(labels)
+                error('lvmplot:annotate_barplot', 'Incorrect number of labels supplied')
+            end
+            set(hAx, 'XLim', [x_data(1)-1, x_data(end)+1])
+            axis_extent = axis;
+            max_range = axis_extent(4) - axis_extent(3); %max(max(y_data),  - extent(3));
+            delta = max_range * 0.03;
+            if numel(x_data) > 50
+                fontweight = 'normal';
+            else
+                fontweight = 'bold';
+            end
+            for n = 1:numel(x_data)
+                 hText = text(x_data(n), y_data(n)+delta, labels{n}, 'Rotation', 90);
+                 set(hText, 'FontSize', 12, 'FontWeight', fontweight)
+                 t_extent = get(hText, 'Extent');
+                 if (t_extent(2) + t_extent(4)) > axis_extent(4)
+                     set(hText, 'Position', [n, y_data(n)-delta-t_extent(4), 0])
+                 end
+            end
+            
+        end
     end % end: methods (static)
 end % end: ``classdef``
 
