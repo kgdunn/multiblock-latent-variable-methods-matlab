@@ -21,7 +21,7 @@ function test_plot_class()
     
     fqa_pls_Y = lvm({'Z', Z, 'Y', Y}, 3);
     plot(fqa_pls_Y);
-    plot(fqa_pca_Y, 'Loadings')
+    plot(fqa_pls_Y, 'Loadings')
     
 end
 

@@ -1783,7 +1783,7 @@ classdef mblvm < handle
                 if block == 0
                     loadings_h = hP.model.super.P(:, series.x_num); 
                 else
-                    loadings_h = hP.model.P{block}(:, series.y_num);                   
+                    loadings_h = hP.model.P{block}(:, series.x_num);                   
                 end
             end
         end        
@@ -1838,18 +1838,11 @@ classdef mblvm < handle
             
             % Multiblock data sets: we also have superloadings
             if block == 0
-                VIP_data = hP.model.super.P(:, series.y_num);
+                VIP_data = hP.model.super.stats.VIP(:, series.y_num);                
             else
-                VIP_data = hP.model.P{block}(:, series.y_num);
+                VIP_data = hP.model.stats{block}.VIP_a(:, series.y_num);
             end
                 
-            if series.x_num > 0
-                if block == 0
-                    VIP_data = hP.model.super.P(:, series.x_num); 
-                else
-                    VIP_data = hP.model.P{block}(:, series.y_num);                   
-                end
-            end
         end        
         function VIP_plot(hP, series)
             ax = hP.gca();
@@ -1859,7 +1852,7 @@ classdef mblvm < handle
                 % We need a bar plot for the loadings
                 hPlot = findobj(ax, 'Tag', 'lvmplot_series');
                 if hPlot
-                    if strcmpi(get(hPlot, 'Type'), 'line')
+                    if ishandle(hPlot)
                         delete(hPlot)
                     end
                 end
@@ -1874,13 +1867,24 @@ classdef mblvm < handle
             if series.x_num > 0 && series.y_num > 0                         
                 title(ax, 'VIP plot')
                 grid on
-                xlabel(ax, ['p_', num2str(series.x_num)])
-                ylabel(ax, ['p_', num2str(series.y_num)])
+                xlabel(ax, ['VIP with A=', num2str(series.x_num)])
+                ylabel(ax, ['VIP with A=', num2str(series.y_num)])
                 
             elseif series.y_num > 0                
                 title(ax, 'VIP bar plot')
                 grid on
                 ylabel(ax, ['VIP with A=', num2str(series.y_num)])
+                block = hP.c_block;
+                if block == 0 && hP.model.B> 1
+                    x_names = cell(hP.model.B, 1);
+                    for b = 1:hP.model.B
+                        x_names{b} = hP.model.blocks{b}.name;
+                    end                    
+                else
+                    x_names = hP.model.blocks{block}.labels{hP.dim};
+                end
+                set(ax, 'XTickLabel', x_names)
+            
             end
         end
 
