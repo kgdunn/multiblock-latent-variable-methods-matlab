@@ -259,12 +259,12 @@ classdef mblvm < handle
             % Super-level statistics. NOTE: the superlevel statistics will
             % agree with the block level statistics and limits if there is
             % only a single block.
-            self.super.lim.SPE(a) = self.spe_limits(self.super.SPE(:,a), siglevel, sum(self.K));
+            self.super.lim.SPE(a) = self.spe_limits(self.super.SPE(:,a), siglevel);
             self.super.lim.T2(a) = self.T2_limits(self.super.T(:,1:a), siglevel, a);
             self.super.lim.t(a) = self.score_limits(self.super.T(:, a), siglevel);
             
             for b = 1:self.B
-                self.lim{b}.SPE(a) = self.spe_limits(self.stats{b}.SPE(:,a), siglevel, self.K(b));
+                self.lim{b}.SPE(a) = self.spe_limits(self.stats{b}.SPE(:,a), siglevel);
                 self.lim{b}.T2(a) = self.T2_limits(self.T{b}(:, 1:a), siglevel, a);
                 self.lim{b}.t(a) = self.score_limits(self.T{b}(:, a), siglevel);
             end 
@@ -450,9 +450,9 @@ classdef mblvm < handle
                         end
 
                         % Calculate SPE time-varying limits
-                        % Our SPE definition = sqrt(e'e / K), where K = number of
-                        % entries in vector ``e``.  In the SPE_j case that is the
-                        % number of tags.
+                        % Our SPE definition = e'e, where e is the sum of 
+                        % squares in the row, not counting missing data.  
+                        % 
                         % Apply smoothing window here: see Nomikos thesis, p 66.
                         % ``w`` should be a function of how "jumpy" the SPE plot
                         % looks.  Right now, we set ``w`` proportional
@@ -462,10 +462,10 @@ classdef mblvm < handle
                             start_idx = max(1, j-w);
                             end_idx = min(self.blocks{b}.J, j+w);
                             SPE_values = SPE_j_temp(:, start_idx:end_idx);
-                            self.lim{b}.SPE_j(j) = self.spe_limits(SPE_values, siglevel, self.blocks{b}.nTags, true);
+                            self.lim{b}.SPE_j(j) = self.spe_limits(SPE_values, siglevel);
                         end   
                         % N x J matrix assigned
-                        self.stats{b}.SPE_j = sqrt(SPE_j_temp ./ self.blocks{b}.nTags);
+                        self.stats{b}.SPE_j = SPE_j_temp;
                         %self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
                         
                     end % ``if: a batch block ?
@@ -1450,25 +1450,14 @@ classdef mblvm < handle
 
         end
         
-        function limits = spe_limits(values, levels, ncol, pure_error)
+        function limits = spe_limits(values, levels)
             % Calculates the SPE limit(s) at the given ``levels`` [0, 1]
-            % where SPE was calculated over ``ncol`` entries.
             %
-            % NOTE: our SPE values = sqrt( e*e^T / K )
-            %       where e = row vector of residuals from the model
-            %       and K = number of columns (length of vector e)
-            %
-            % The SPE limit is defined for a vector ``e``, so we need to undo
-            % our SPE transformation, calculate the SPE limit, then transform
-            % the SPE limit back.  That's why this function requires ``ncol``,
-            % which is the same as K in the above equation.
-            
+            % NOTE: our SPE values = e*e^T where e = row vector of residuals
+            %       from the model
+           
             % Then inputs were e'e (not sqrt(e'e/K))
-            if nargin == 4 && pure_error == true
-                values = values(:);
-            else            
-                values = values(:).^2 .* ncol;
-            end
+            values = values(:);
             if all(values) < sqrt(eps)
                 limits = 0.0;
                 return
@@ -1479,8 +1468,6 @@ classdef mblvm < handle
             chi2_DOF = (2.0*avg_SPE^2)/var_SPE;
             limits = chi2_mult * mblvm.chi2inv(levels, chi2_DOF);
             
-            limits = sqrt(limits ./ ncol);
-
             % For batch blocks: calculate instantaneous SPE using a window
             % of width = 2w+1 (default value for w=2).
             % This allows for (2w+1)*N observations to be used to calculate

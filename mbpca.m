@@ -126,7 +126,7 @@ classdef mbpca < mblvm
                         self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - sum(self.stats{b}.R2b_a(1,1:a-1), 2);
                     end
                     
-                    self.stats{b}.SPE(:,a) = sqrt(row_ssq ./ numel(idx));
+                    self.stats{b}.SPE(:,a) = row_ssq;
                 end
                 
                 % TODO(KGD): sort out R2, SPE  and VIP calculations for each
@@ -144,7 +144,7 @@ classdef mbpca < mblvm
                 % Model summary SPE (not the superblock's SPE!), merely the
                 % overall SPE from the merged model
                 row_ssq_deflated = ssq(self.data, 2);
-                self.super.SPE(:,a) = sqrt(row_ssq_deflated ./ sum(self.K));
+                self.super.SPE(:,a) = row_ssq_deflated;
                 
                 % Model summary T2 (not the superblock's T2!), merely the
                 % overall T2 from the merged model
@@ -222,11 +222,11 @@ classdef mbpca < mblvm
             for b = 1:self.B
                 block_variance = ssq(new{b}.data, 2);
                 overall_variance = overall_variance + block_variance;
-                state.stats.SPE{b} = sqrt(block_variance ./ self.K(b));
+                state.stats.SPE{b} = block_variance;
             end
             state.stats.super.R2(:,1) = 1 - overall_variance ./state.stats.initial_ssq_total;
             
-            state.stats.super.SPE(:,1) = sqrt(overall_variance ./ sum(self.K));
+            state.stats.super.SPE(:,1) = overall_variance;
             state.stats.super.T2(:,1) = mblvm.mahalanobis_distance(state.T_super, self.super.S);
             
             
