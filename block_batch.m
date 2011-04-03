@@ -73,24 +73,11 @@ classdef block_batch < block_base
                     'specified %d batches.  This is not consistent with the data provided.'], ...
                     N_init, nBatches)
             end
-
-            % Unfold the data:
-            % Unfolded order is to have all tags at time 1, then all the 
-            % tags at time 2, and so on, up till time step J.
-            % So we write that X = K*J (K tags, at J time steps).
-
-            self.batch_raw = cell(nBatches,1);
-            self.data = zeros(nBatches, self.J * self.nTags);
-            for n = 1:nBatches
-                startRow = (n-1) * self.J+1;
-                endRow = startRow - 1 + self.J;
-                self.batch_raw{n} = given_data(startRow:endRow,:);
-                temp = self.batch_raw{n}';
-                self.data(n, :) = temp(:)';
-            end
-            %self.N = nBatches;                
-            %self.K = self.nTags * self.J;
             
+            % Unfold the data from standard form into latent variable form            
+            [self.batch_raw, self.data] = self.standard_form_to_latent_variable_form(given_data, nBatches);
+            
+                        
             % Missing data handling
             self.mmap = false;            
             missing_map = ~isnan(self.data);   % 0=missing, 1=present
@@ -104,6 +91,25 @@ classdef block_batch < block_base
                 self.name_type = 'given';
             end
             
+        end
+        
+        function [cell_form, data_form] = standard_form_to_latent_variable_form(self, given_data, nBatches)
+            % Unfold the data from standard form into latent variable form
+            % Unfolded order is to have all tags at time 1, then all the 
+            % tags at time 2, and so on, up till time step J.
+            % So we write that X = K*J (K tags, at J time steps).
+            
+            % The ``cell_form`` is convenient for batch plotting and excluding
+            % batches later on.  The ``data_form`` is for LVM.
+            cell_form =  cell(nBatches,1);
+            data_form = zeros(nBatches, self.J * self.nTags);
+            for n = 1:nBatches
+                startRow = (n-1) * self.J+1;
+                endRow = startRow - 1 + self.J;
+                cell_form{n} = given_data(startRow:endRow,:);
+                temp = cell_form{n}';
+                data_form(n, :) = temp(:)';
+            end
         end
         
         function out = get_auto_name(self)
@@ -131,10 +137,98 @@ classdef block_batch < block_base
             end
         end
         
-        function self = exclude(self, dim, which)
+        function [self, other] = exclude(self, dim, which)
+            % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
+            % given by entries in the vector ``which``.
+            %
+            % The excluded entries are returned as a new block in ``other``.
+            % ``other`` will retain all properties originally in ``self``.
+            %
+            % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
+            %
+            % NOTE: at this time, you cannot exclude a variable from a batch
+            % block.  To do that, exclude the variable in the raw data, before
+            % creating the block.
+
+
+            exc_s = struct; 
+            exc_s.type = '()';
+
+            rem_s = struct; 
+            rem_s.type = '()';
+
+            if dim == 1 
+                if any(which>self.N)
+                    error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')
+                end
+                exc_s.subs = {which, ':'};
+                remain_idx = 1:self.N;
+                remain_idx(which) = [];
+                rem_s.subs = {remain_idx, ':'};
+            end
+            if dim == 2 
+                if any(which>self.nTags)
+                    error('block:exclude', 'Entries to exclude exceed the size (columns) of the block.')
+                end            
+                exc_s.subs = {':', which};
+                remain_idx = 1:self.nTags;
+                remain_idx(which) = [];
+                rem_s.subs = {':', remain_idx};
+            end
+
+            other = self.copy();
+            if dim == 1
+                self.batch_raw = subsref(self.batch_raw, rem_s);
+                other.batch_raw = subsref(other.batch_raw, exc_s);            
+                self.data = subsref(self.data, rem_s);
+                other.data = subsref(other.data, exc_s);
+            end
+            if dim == 2
+                temp = (subsref(self.batch_raw{1}, rem_s))';
+                temp = temp(:)';
+                new_K_self = numel(temp);
+                
+                temp = (subsref(other.batch_raw{1}, exc_s))';
+                temp = temp(:)';
+                new_K_other = numel(temp);
+                    
+                nBatches = self.N;
+                self.data = zeros(nBatches, new_K_self) .* NaN;
+                other.data = zeros(nBatches, new_K_other) .* NaN;
+                for n = 1:nBatches
+                    self.batch_raw{n} = subsref(self.batch_raw{n}, rem_s);
+                    temp = self.batch_raw{n}';
+                    self.data(n,:) = temp(:)';
+                    
+                    other.batch_raw{n} = subsref(other.batch_raw{n}, exc_s);     
+                    temp = other.batch_raw{n}';
+                    other.data(n,:) = temp(:)';
+                end
+                
+                self.nTags = numel(remain_idx);
+                other.nTags = numel(which);
+            end
+            
+            tagnames = self.labels(dim,:);
+            exc_tag = struct;
+            exc_tag.type = '()';
+            exc_tag.subs = {which};
+            rem_tag = struct;
+            rem_tag.type = '()';
+            rem_tag.subs = {remain_idx};
+            for entry = 1:numel(tagnames)
+                tags = tagnames{entry};
+                if not(isempty(tags))
+                    self.labels{dim, entry} = subsref(tags, rem_tag);
+                    other.labels{dim, entry} = subsref(tags, exc_tag);
+                end
+            end        
+        end
+        
+        %function self = exclude(self, dim, which)
             
             %if dim == 2
-            error('block_batch:exclude', 'Excluding from batch blocks is not currently supported.')
+        %    error('block_batch:exclude', 'Excluding from batch blocks is not currently supported.')
             %end
             
 %             exc_s = struct; 
@@ -200,7 +294,7 @@ classdef block_batch < block_base
 %             for n = 1:numel(remain)
 %                 self.raw_data{n} = self_raw_data{remain(n)};
 %             end
-        end
+        %end
         
         function varargout = plot(self, varargin)
             % X = randn(50,4);

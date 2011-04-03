@@ -8,7 +8,7 @@ classdef mbpls < mblvm
     properties (SetAccess = protected)
         Y = [];
         Y_copy = [];  % A copy of the Y-block before any calculations
-        Y_hat = [];    % Predictions of the Y-block
+        Y_hat = [];   % Predictions of the Y-block
         YPP = [];
     end
         
@@ -38,6 +38,17 @@ classdef mbpls < mblvm
             
         end % ``mbpls``        
         
+        % Another painful example of MATLAB's poor OOP. Cannot redefine a 
+        % getter method on a superclass variable, ``N`` in this case.
+        %
+        %function N = get.N(self)
+        %    N = size(self.blocks{1}.data, 1);
+        %    for b = 1:self.B
+        %        assert(N == self.blocks{b}.N);
+        %    end
+        %    assert(N == self.Y.N)
+        %end
+        
         % Superclass abstract method implementation
         function self = expand_storage(self, varargin)
             if numel(self.YPP) == 0
@@ -64,6 +75,12 @@ classdef mbpls < mblvm
             %  
             % We assume the data are merged and preprocessed already.
             % Must also calculate all summary statistics for each block.
+            
+            % First check that the number of samples is constant throughout 
+            % all blocks.  ``self.N`` checks consistency between all X-blocks
+            if self.N ~= self.Y.N
+                error('mbpls:calc_model', 'Inconsistent number of observations in Y-block')
+            end
             
             % Perform ordinary missing data PLS on the merged block of data
             if not(isempty(self.Y.mmap)) > 1 && any(sum(self.Y.mmap, 2) == 0)

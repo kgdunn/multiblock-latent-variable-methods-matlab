@@ -63,6 +63,8 @@ classdef lvmplot < handle
             self.opt.fig.add_menu = true;
             self.opt.fig.default_visibility = 'off';
             self.opt.add_footer = true;
+            self.opt.show_labels = true;
+            self.opt.bar.facecolor = [0.25, 0.5, 1];
         end
         
         function out = get.gca(self)
@@ -536,6 +538,36 @@ classdef lvmplot < handle
             
         end
         
+        function label_scatterplot(self, hPlot, labels)
+            % Add labels to a scatter plot series, given by ``hPlot`` and
+            % labels in cell array ``labels``
+            if ~self.opt.show_labels
+                return
+            end
+            
+            %hAx = get(hPlot, 'Parent');
+            x_data = get(hPlot, 'XData');
+            y_data = get(hPlot, 'YData');
+            if numel(x_data) ~= numel(labels)
+                error('lvmplot:label_scatterplot', 'Incorrect number of labels supplied')
+            end
+            
+            axis_extent = axis;
+            max_range = axis_extent(4) - axis_extent(3); %max(max(y_data),  - extent(3));
+            delta = max_range * 0.02;
+            if numel(x_data) > 50
+                fontweight = 'normal';
+            else
+                fontweight = 'bold';
+            end
+            for n = 1:numel(x_data)
+                 hText = text(x_data(n), y_data(n)+delta, strtrim(labels{n}), 'Rotation', 0);
+                 set(hText, 'FontSize', 12, 'FontWeight', fontweight, ...
+                     'HorizontalAlignment', 'center')                 
+            end
+            
+        end % ``label_scatterplot``
+        
     end % end: methods (ordinary)
     
     methods (Static=true)
@@ -610,9 +642,10 @@ classdef lvmplot < handle
                  if (t_extent(2) + t_extent(4)) > axis_extent(4)
                      set(hText, 'Position', [n, y_data(n)-delta-t_extent(4), 0])
                  end
-            end
-            
-        end
+            end            
+        end %``annotate_barplot``
+        
+        
     end % end: methods (static)
 end % end: ``classdef``
 

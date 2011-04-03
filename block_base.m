@@ -111,7 +111,7 @@ classdef block_base < handle
             end
         end
         
-        function size(self)
+        function size(self) %#ok<MANU>
             error('block_base:size', 'Use the ``shape(...)`` function to obtain the shape of a block object.');
         end
         
@@ -492,72 +492,71 @@ classdef block_base < handle
            	out = out + repmat(pp.mean_center, self.N, 1);
         end
          
-    function [self, other] = exclude(self, dim, which)
-        % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
-        % given by entries in the vector ``which``.
-        %
-        % The excluded entries are returned as a new block in ``other``.
-        % ``other`` will retain all properties originally in ``self``.
-        %
-        % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
-        %
-        % NOTE: at this time, you cannot exclude a variable from a batch
-        % block.  To do that, exclude the variable in the raw data, before
-        % creating the block.
-        
+        function [self, other] = exclude(self, dim, which)
+            % Excludes rows (``dim``=1) or columns (``dim``=2) from the block 
+            % given by entries in the vector ``which``.
+            %
+            % The excluded entries are returned as a new block in ``other``.
+            % ``other`` will retain all properties originally in ``self``.
+            %
+            % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
+            %
+            % NOTE: at this time, you cannot exclude a variable from a batch
+            % block.  To do that, exclude the variable in the raw data, before
+            % creating the block.
 
-        exc_s = struct; 
-        exc_s.type = '()';
-        
-        rem_s = struct; 
-        rem_s.type = '()';
-        
-        if dim == 1 
-            if any(which>self.N)
-                error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')
-            end
-            exc_s.subs = {which, ':'};
-            remain_idx = 1:self.N;
-            remain_idx(which) = [];
-            rem_s.subs = {remain_idx, ':'};
-        end
-        if dim == 2 
-            if any(which>self.K)
-                error('block:exclude', 'Entries to exclude exceed the size (columns) of the block.')
-            end            
-            exc_s.subs = {':', which};
-            remain_idx = 1:self.K;
-            remain_idx(which) = [];
-            rem_s.subs = {':', remain_idx};
-        end
-        
-        other = self.copy();
-        
-        self.data = subsref(self.data, rem_s);
-        other.data = subsref(other.data, exc_s);
-        if numel(self.mmap) > 1
-            self.mmap = subsref(self.mmap, rem_s);
-            other.mmap = subsref(other.mmap, exc_s);
-        end
-        
-        tagnames = self.labels(dim,:);
-        exc_tag = struct;
-        exc_tag.type = '()';
-        exc_tag.subs = {which};
-        rem_tag = struct;
-        rem_tag.type = '()';
-        rem_tag.subs = {remain_idx};
-        for entry = 1:numel(tagnames)
-            tags = tagnames{entry};
-            if not(isempty(tags))
-                self.labels{dim, entry} = subsref(tags, rem_tag);
-                other.labels{dim, entry} = subsref(tags, exc_tag);
-            end
-        end        
-    end
 
- 
-    end % end methods (ordinary)
+            exc_s = struct; 
+            exc_s.type = '()';
+
+            rem_s = struct; 
+            rem_s.type = '()';
+
+            if dim == 1 
+                if any(which>self.N)
+                    error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')
+                end
+                exc_s.subs = {which, ':'};
+                remain_idx = 1:self.N;
+                remain_idx(which) = [];
+                rem_s.subs = {remain_idx, ':'};
+            end
+            if dim == 2 
+                if any(which>self.K)
+                    error('block:exclude', 'Entries to exclude exceed the size (columns) of the block.')
+                end            
+                exc_s.subs = {':', which};
+                remain_idx = 1:self.K;
+                remain_idx(which) = [];
+                rem_s.subs = {':', remain_idx};
+            end
+
+            other = self.copy();
+
+            self.data = subsref(self.data, rem_s);
+            other.data = subsref(other.data, exc_s);
+            if numel(self.mmap) > 1
+                self.mmap = subsref(self.mmap, rem_s);
+                other.mmap = subsref(other.mmap, exc_s);
+            end
+
+            tagnames = self.labels(dim,:);
+            exc_tag = struct;
+            exc_tag.type = '()';
+            exc_tag.subs = {which};
+            rem_tag = struct;
+            rem_tag.type = '()';
+            rem_tag.subs = {remain_idx};
+            for entry = 1:numel(tagnames)
+                tags = tagnames{entry};
+                if not(isempty(tags))
+                    self.labels{dim, entry} = subsref(tags, rem_tag);
+                    other.labels{dim, entry} = subsref(tags, exc_tag);
+                end
+            end        
+        end
+
+     end % end methods (ordinary)
     
     % Subclasses may not redefine these methods
     methods (Sealed=true)

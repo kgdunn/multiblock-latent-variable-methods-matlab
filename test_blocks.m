@@ -8,6 +8,10 @@ function test_blocks(varargin)
     test_preprocessing();
     test_plotting();
     test_exclude();
+    
+    % Add tests to verify batch exclusion of tags and batches (time-dimension
+    % not supported yet; to add still)
+    
     disp('ALL TESTS FOR THE BLOCK OBJECT PASSED - if no errors were displayed.')
 end
 

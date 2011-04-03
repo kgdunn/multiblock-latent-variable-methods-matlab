@@ -17,64 +17,76 @@ show_plots = false;
 special_plots = false;
 fontsize =14;
 
-FMC = load('datasets/FMC-full.mat');
+FMC = load('datasets/FMC.mat');
 
-% Initial conditions block
+% Initial conditions block: operations
 % -------------------------
-Z = block(FMC.Z);
-Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
-%plot(Z) 
+Zop = block(FMC.Zop);
+Zop.add_labels(1, FMC.batch_names);
+Zop.add_labels(2, FMC.Zop_names)   % you can always add labels later on 
+%plot(Zop) 
+
+% Initial conditions block: chemistry
+% -------------------------
+Zchem = block(FMC.Zchem);
+Zchem.add_labels(1, FMC.batch_names);
+Zchem.add_labels(2, FMC.Zchem_names);
+missing_chemistry = [12, 13, 14, 15, 28, 29, 30, 31, 32, 33, 34, 35, 53];
+Zchem = Zchem.exclude(1, missing_chemistry);
+%plot(Zchem)
 
 % Batch data block (pre-aligned)
 % ------------------------------
-tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
-             'J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
-         
-X = block(FMC.X, 'X: batch data',...                       % name of the block
-                            {'batch_tag_names', tag_names}, ... % tag names
-                            {'batch_names', 1:71}); 
+X = block(FMC.X, 'X: batch data',...                     % name of the block
+                 {'batch_tag_names', FMC.Xnames}, ...    % trajectory names
+                 {'batch_names', FMC.batch_names});      % batch names
+X = X.exclude(1, missing_chemistry);
+temp = X.exclude(2, [2, 5]);
 %plot(X, {'layout', [2, 3]})
 
 % Final quality attributes (FQAs)
 % --------------------------------
-Y = block(FMC.Y, {'col_labels', FMC.Ynames}); % Add labels when creating the block
+% Add labels when creating the block
+Y = block(FMC.Y, {'col_labels', FMC.Ynames}, {'row_labels', FMC.batch_names}); 
+Y.name = 'My name';
 %plot(Y, {'layout', [2, 6]})
 
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 3 components
-fqa_pca = lvm({'FQAs', Y}, 2);
-plot(fqa_pca)
-% hF = figure('Color', [1, 1, 1]);
-% plot(fqa_pca.stats{1}.SPE(:,2))
-% hold on
-% lim = fqa_pca.lim{1}.SPE(:,2);
-% plot([0 71], [lim, lim], 'r')
-% axis tight
-% grid
-%plot(fqa_pca.T{1}(:,1), fqa_pca.T{1}(:,2),'.'), grid
+fqa_pca = lvm({'FQAs', Y}, 1);
+%plot(fqa_pca)
 
 % There seem to be 2 clusters in the FQA space.  Let's take a look at
 % contributions between points 
 
+
+
+% Understand the effect of chemistry on the Y's
+Y_copy = Y.copy();
+Y_copy.exclude(1, missing_chemistry);
+pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y_copy}, 1);
+
+
 % Create monitoring model
-bad_batch = [3, 5, 6, 7, 34:71];
-
-Z.exclude(1, bad_batch);
-Z.exclude(2, [1:8]);
-Zcopy.exclude(2, [1:8]);
-Y.exclude(1, bad_batch);
-X.data(bad_batch, :) = [];
-X.batch_raw(bad_batch, :) = [];
-
-A_mon = 3;
-mon = lvm({'Z', Z, 'X', X, 'y', Y}, A_mon);
+% bad_batch = [3, 5, 6, 7, 34:71];
+% 
+% Z.exclude(1, bad_batch);
+% Z.exclude(2, [1:8]);
+% Zcopy.exclude(2, [1:8]);
+% Y.exclude(1, bad_batch);
+% X.data(bad_batch, :) = [];
+% X.batch_raw(bad_batch, :) = [];
+% 
+% A_mon = 3;
+% mon = lvm({'Z', Z, 'X', X, 'y', Y}, A_mon);
 
 % SPEs are in disagreement: too high
 % Scores for existing batches are offset slightly, or a lot in some cases
 
 
-N = mon.N;
+
+%N = mon.N;
 if special_plots
     % Score plot
     hF = figure('Color', [1, 1, 1]);
@@ -123,9 +135,6 @@ if special_plots
         text(hS, n+N,   out.stats.SPE{A_mon}+0.1, num2str(n))
         set(hS_lim, 'XData', [0 N+n])
     end
-
-
-
 end
 
 

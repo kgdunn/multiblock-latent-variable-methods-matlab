@@ -197,17 +197,16 @@ function Wold_article_PCA_test()
     %assertEAE(PCA_model_2.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
     %assertEAE(PCA_model_2.super.T2(:,2), [1.33333, 1.33333, 1.33333]', 4)
     
-    % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
-    % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
+    % ProSensus Multivariate defines SPE = e'*e, same as us.
     ProMV_values = [0.366107, 0.877964, 0.110178];
-    ProMV_values = sqrt(ProMV_values ./ 4);
+    %ProMV_values = sqrt(ProMV_values ./ 4);
     assertEAE(PCA_model_1.super.SPE(:,1), ProMV_values', 4)
     assertEAE(PCA_model_2.super.SPE(:,1), ProMV_values', 4)    
     assertEAE(PCA_model_2.super.SPE(:,2), [0, 0, 0]', 4)
     
     % Statistical limits
     assertEAE(PCA_model_1.super.lim.T2, 24.684, 3)
-    assertEAE(PCA_model_1.super.lim.SPE, sqrt(1.2236/4), 4)
+    assertEAE(PCA_model_1.super.lim.SPE, 1.2236, 4)
     assertEAE(PCA_model_1.super.lim.t, 7.8432, 4)
     
     
@@ -252,11 +251,8 @@ function Wold_article_PCA_test()
     %assertEAE(X_new_1.stats.super.T2(:,1), [0.792655, 0.036726, 1.1706]', 4)
     %assertEAE(X_new_2.stats.super.T2(:,1), [1.33333, 1.33333, 1.33333]', 4)
     
-    % ProSensus Multivariate defines SPE = e'*e, where as we define it as 
-    % sqrt(e'*e / K).  The values here have been scaled to undo this effect.
+    % ProSensus Multivariate defines SPE = e'*e, same as us 
     ProMV_values = [0.366107, 0.877964, 0.110178];
-    ProMV_values = sqrt(ProMV_values ./ 4);
-    
     assertEAE(X_new_1.stats.SPE{1}, ProMV_values', 4)
     assertEAE(X_new_1.stats.super.SPE(:,1), ProMV_values', 4)
     assertEAE(X_new_2.stats.SPE{1}, [0, 0, 0]', 4)
@@ -467,28 +463,28 @@ function PCA_batch_data()
 return
 
 function PLS_batch_data()    
-    fprintf('Batch PLS test (FMC data set): ');
-
-    FMC = load('datasets/FMC.mat');
-
-    % Initial conditions block
-    Z = block(FMC.Z);
-    Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
-    
-    % Batch data block (pre-aligned)
-    tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
-                 'J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
-
-    X = block(FMC.batchSPCData, 'X block',...                       % name of the block
-                                {'batch_tag_names', tag_names}, ... % tag names
-                                {'batch_names', FMC.Xnames}); 
-
-    % Final quality attributes (FQAs)
-    Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
-    
-    model = lvm({'Z', Z, 'X', X, 'y', Y}, 2);
-    
-    fprintf('OK\n');
+%     fprintf('Batch PLS test (FMC data set): ');
+% 
+%     FMC = load('datasets/FMC.mat');
+% 
+%     % Initial conditions block
+%     Z = block(FMC.Z);
+%     Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
+%     
+%     % Batch data block (pre-aligned)
+%     tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
+%                  'J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
+% 
+%     X = block(FMC.batchSPCData, 'X block',...                       % name of the block
+%                                 {'batch_tag_names', tag_names}, ... % tag names
+%                                 {'batch_names', FMC.Xnames}); 
+% 
+%     % Final quality attributes (FQAs)
+%     Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
+%     
+%     model = lvm({'Z', Z, 'X', X, 'y', Y}, 2);
+%     
+%     fprintf('OK\n');
     
     % TODO(KGD): compare values with the Technometrics paper (55 batches, 10
     % tags, 100 time steps). As on page 45, 46, 47, 48 (table)

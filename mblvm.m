@@ -285,7 +285,6 @@ classdef mblvm < handle
             else
                 given_A = 0;
             end
-
             requested_A = max([self.opt.min_lv, 0, given_A]);
             
             % TODO: handle the case where the model is shrunk or grown to 
@@ -1042,6 +1041,36 @@ classdef mblvm < handle
              
             extra = register_plots_post(self);
             out = [out; extra];
+        end % ``register_plots``
+        
+        function out = get_labels(self, dim, req_block)
+            % Finds the labels for the given ``dim``ension and the optional
+            % ``block`` number
+            out = [];
+            if nargin == 1
+                req_block = 0;
+            end
+            
+            if dim == 1 && req_block == 0 
+            % search through all blocks to find these labels
+                for b = 1:self.B
+                    if ~isempty(self.blocks{b}.labels{dim})
+                        out = self.blocks{b}.labels{dim};
+                        return
+                    end
+                end
+            else
+                if req_block ~= 0
+                    
+                    out = self.blocks{req_block}.labels{dim};
+                else
+                    block_names = cell(self.B, 1);            
+                    for b = 1:self.B
+                        block_names{b} = self.blocks{b}.name;
+                    end
+                    out = block_names;
+                end
+            end            
         end
     end % end: methods (sealed)
     
@@ -1620,6 +1649,12 @@ classdef mblvm < handle
                 xlabel(ax, ['t_', num2str(t_h)])
                 ylabel(ax, ['t_', num2str(t_v)])
                 
+                % Create a balanced view by making the limits symmetrical
+                extent = axis;  
+                extent(1:2) = max(abs(extent(1:2))) .* [-1 1];
+                extent(3:4) = max(abs(extent(3:4))) .* [-1 1];
+                set(ax, 'XLim', extent(1:2), 'YLim', extent(3:4))
+                
             % Add univariate score limits
             elseif t_v > 0
                 set(ax, 'NextPlot', 'add')
@@ -1635,6 +1670,10 @@ classdef mblvm < handle
                 ylim(extent(3:4)) 
                 
             end
+                        
+            hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+            labels = hP.model.get_labels(hP.dim, hP.c_block);
+            hP.label_scatterplot(hPlot, labels);
         end
         
         function hot_T2_plot(hP, series)
@@ -1692,6 +1731,10 @@ classdef mblvm < handle
             grid on            
             xlim(extent(1:2))
             ylim(extent(3:4)) 
+            
+            hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+            labels = hP.model.get_labels(hP.dim, hP.c_block);
+            hP.label_scatterplot(hPlot, labels);
         end
         
         function spe_plot(hP, series)
@@ -1749,6 +1792,10 @@ classdef mblvm < handle
             grid on            
             xlim(extent(1:2))
             ylim(extent(3:4)) 
+            
+            hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+            labels = hP.model.get_labels(hP.dim, hP.c_block);
+            hP.label_scatterplot(hPlot, labels);
         end
         
         function [loadings_h, loadings_v] = get_loadings_data(hP, series)
@@ -1794,7 +1841,7 @@ classdef mblvm < handle
                         delete(hPlot)
                     end
                 end
-                hPlot = bar(ax, loadings_v);
+                hPlot = bar(ax, loadings_v, 'FaceColor', hP.opt.bar.facecolor);
                 set(hPlot, 'Tag', 'lvmplot_series');
                 return
             end
@@ -1811,11 +1858,26 @@ classdef mblvm < handle
                 grid on
                 xlabel(ax, ['p_', num2str(series.x_num)])
                 ylabel(ax, ['p_', num2str(series.y_num)])
-                
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
+                else
+                    labels = hP.model.get_labels(hP.dim, 1);
+                end
+                hP.label_scatterplot(hPlot, labels);
+            
             elseif series.y_num > 0                
                 title(ax, 'Loading bar plot')
                 grid on
                 ylabel(ax, ['p_', num2str(series.y_num)])
+                
+                hBar = findobj(ax, 'Tag', 'lvmplot_series');
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
+                else
+                    labels = hP.model.get_labels(hP.dim, 1);
+                end
+                hP.annotate_barplot(hBar, labels)
             end
         end
         
@@ -1849,11 +1911,11 @@ classdef mblvm < handle
                         delete(hPlot)
                     end
                 end
-                hPlot = bar(ax, VIP_data, 'FaceColor', [0.25, 0.5, 1]);
+                hPlot = bar(ax, VIP_data, 'FaceColor', hP.opt.bar.facecolor);
                 set(hPlot, 'Tag', 'lvmplot_series');
             end
 
-        end        
+        end         
         function VIP_limits_annotate(hP, series)
             ax = hP.gca();
             hBar = findobj(ax, 'Tag', 'lvmplot_series');
@@ -1868,16 +1930,21 @@ classdef mblvm < handle
                 title(ax, 'VIP bar plot')
                 grid on
                 ylabel(ax, ['VIP with A=', num2str(series.y_num)])
-                block = hP.c_block;
-                if block == 0 && hP.model.B> 1
-                    x_names = cell(hP.model.B, 1);
-                    for b = 1:hP.model.B
-                        x_names{b} = hP.model.blocks{b}.name;
-                    end                    
+                
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
                 else
-                    x_names = hP.model.blocks{1}.labels{hP.dim};
+                    labels = hP.model.get_labels(hP.dim, 1);
                 end
-                hP.annotate_barplot(hBar, x_names)
+%                 if hP.c_block == 0 && hP.model.B > 1
+%                     x_names = cell(hP.model.B, 1);
+%                     for b = 1:hP.model.B
+%                         x_names{b} = hP.model.blocks{b}.name;
+%                     end                    
+%                 else
+%                     x_names = hP.model.blocks{1}.labels{hP.dim};
+%                 end
+                hP.annotate_barplot(hBar, labels)
             end
         end
 
