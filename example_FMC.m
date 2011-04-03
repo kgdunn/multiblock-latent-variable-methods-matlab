@@ -6,10 +6,12 @@
 % 
 % References:
 % 
-% [1] http://dx.doi.org/10.1021/ie0300023, "Troubleshooting of an Industrial 
-%                                  Batch Process Using Multivariate Methods"
-% [2] http://dx.doi.org/10.1016/B978-044452701-1.00108-3, "Batch process 
-%                                                         modeling and MSPC"
+% [1] http://dx.doi.org/10.1021/ie0300023, 
+%      "Troubleshooting of an Industrial Batch Process Using Multivariate Methods"
+% [2] http://dx.doi.org/10.1016/B978-044452701-1.00108-3, 
+%      "Batch process modeling and MSPC"
+% [3] http://digitalcommons.mcmaster.ca/opendissertations/1596/
+%      "Batch Process Improvement Using Latent Variable Methods"
 
 show_plots = false;
 special_plots = false;
@@ -18,46 +20,40 @@ fontsize =14;
 FMC = load('datasets/FMC-full.mat');
 
 % Initial conditions block
+% -------------------------
 Z = block(FMC.Z);
-Zcopy = copy(Z);
 Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
-if show_plots
-    plot(Z) %#ok<*UNRCH>
-end
+%plot(Z) 
 
 % Batch data block (pre-aligned)
+% ------------------------------
 tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator', ...
              'J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
          
-X = block(FMC.X, 'X block',...                       % name of the block
+X = block(FMC.X, 'X: batch data',...                       % name of the block
                             {'batch_tag_names', tag_names}, ... % tag names
                             {'batch_names', 1:71}); 
-Xcopy = copy(X);
-if show_plots
-    plot(X, {'layout', [2, 3]})
-end
+%plot(X, {'layout', [2, 3]})
 
 % Final quality attributes (FQAs)
-Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block
-Ycopy = copy(Y);
-if show_plots
-    plot(Y, {'layout', [2, 6]})
-end
+% --------------------------------
+Y = block(FMC.Y, {'col_labels', FMC.Ynames}); % Add labels when creating the block
+%plot(Y, {'layout', [2, 6]})
 
-if special_plots
-    % Let's start with a PCA on the Y-block, to understand the quality variables
-    % We will use 3 components
-    fqa_pca = lvm({'FQAs', Y}, 2);
-    hF = figure('Color', [1, 1, 1]);
-    plot(fqa_pca.stats{1}.SPE(:,2))
-    hold on
-    lim = fqa_pca.lim{1}.SPE(:,2);
-    plot([0 71], [lim, lim], 'r')
-    axis tight
-    grid
 
-    plot(fqa_pca.T{1}(:,1), fqa_pca.T{1}(:,2),'.'), grid
-end
+% Let's start with a PCA on the Y-block, to understand the quality variables
+% We will use 3 components
+fqa_pca = lvm({'FQAs', Y}, 2);
+plot(fqa_pca)
+% hF = figure('Color', [1, 1, 1]);
+% plot(fqa_pca.stats{1}.SPE(:,2))
+% hold on
+% lim = fqa_pca.lim{1}.SPE(:,2);
+% plot([0 71], [lim, lim], 'r')
+% axis tight
+% grid
+%plot(fqa_pca.T{1}(:,1), fqa_pca.T{1}(:,2),'.'), grid
+
 % There seem to be 2 clusters in the FQA space.  Let's take a look at
 % contributions between points 
 

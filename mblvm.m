@@ -890,8 +890,14 @@ classdef mblvm < handle
                     basic_plot__spe(h);                    
                 case 'predictions'
                     basic_plot__predictions(h);
+                case 'coefficient'
+                    basic_plot__coefficients(h);
                 case 'vip'
                     basic_plot__VIP(h);
+                case 'r2-variable'
+                    basic_plot_R2_variable(h);
+                case 'r2-component'
+                    basic_plot_R2_component(h);
             end
             h.update_all_plots();
             h.update_annotations();
@@ -936,7 +942,7 @@ classdef mblvm < handle
             plt.callback = @self.order_dim0_plot;
             out = [out; plt];            
             
-            plt.name = 'R2 per component';
+            plt.name = 'R2 (per component)';
             plt.weight = 60;
             plt.dim = 0;
             plt.more_text = '';
@@ -1022,7 +1028,7 @@ classdef mblvm < handle
             plt.annotate = @self.VIP_limits_annotate;
             out = [out; plt];
             
-            plt.name = 'R2 (variable)';
+            plt.name = 'R2 (per variable)';
             plt.weight = 50;
             plt.dim = 2;
             plt.more_text = 'using  components';
@@ -1857,13 +1863,10 @@ classdef mblvm < handle
                     end
                 end
                 hPlot = bar(ax, VIP_data, 'FaceColor', [0.25, 0.5, 1]);
-%                 hPatch = findobj(hBar, 'Type', 'patch');
-%             set(hPatch, )
                 set(hPlot, 'Tag', 'lvmplot_series');
             end
 
-        end
-        
+        end        
         function VIP_limits_annotate(hP, series)
             ax = hP.gca();
             hBar = findobj(ax, 'Tag', 'lvmplot_series');
@@ -2111,3 +2114,21 @@ function basic_plot__VIP(hP)
     hP.new_axis(1);
     hP.set_plot(1, {'Order', -1}, {'VIP', hP.model.A})
 end % ``basic_plot__VIP``
+
+function basic_plot_R2_variable(hP)
+    % These are variable-based plots
+    hP.nRow = 1;
+    hP.nCol = 1;
+    hP.dim = 2;
+    hP.new_axis(1);
+    hP.set_plot(1, {'Order', -1}, {'R2 (per variable)', hP.model.A})
+end % ``basic_plot_R2_variable``
+
+function basic_plot_R2_component(hP)
+    % These are model (component)-based plots
+    hP.nRow = 1;
+    hP.nCol = 1;
+    hP.dim = 0;
+    hP.new_axis(1);
+    hP.set_plot(1, {'Order', -1}, {'R2 (per component)', hP.model.A})
+end % ``basic_plot_R2_variable``
