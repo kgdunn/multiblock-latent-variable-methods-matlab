@@ -896,6 +896,8 @@ classdef mblvm < handle
                     basic_plot_R2_variable(h);
                 case 'r2-component'
                     basic_plot_R2_component(h);
+                case 'r2-y-variable'
+                    basic_plot_R2_Y_variable(h)
             end
             h.update_all_plots();
             h.update_annotations();
@@ -1026,6 +1028,7 @@ classdef mblvm < handle
             plt.annotate = @self.VIP_limits_annotate;
             out = [out; plt];
             
+            % KGD: why is this under the mblvm class: shouldn't it be in PLS?
             plt.name = 'Coefficient';
             plt.weight = 40;
             plt.dim = 2;
@@ -2120,7 +2123,12 @@ classdef mblvm < handle
             
             % Multiblock data sets: we also have superblock VIPs
             if block == 0
-                R2_data = hP.model.super.stats.R2(:, 1:series.y_num);
+                R2_data = zeros(hP.model.B,series.y_num);
+                for b = 1:hP.model.B
+                    R2_data(b,:) = hP.model.stats{b}.R2Xb_a;
+                end
+                % Wrong variable: this is the overal block R2X, per component
+                %R2_data = hP.model.super.stats.R2X(:, 1:series.y_num);
             else
                 R2_data = hP.model.stats{block}.R2Xk_a(:, 1:series.y_num);
                 if isa(hP.model.blocks{block}, 'block_batch')
@@ -2182,7 +2190,7 @@ classdef mblvm < handle
                 else
                     hPlot = bar(ax, R2_data, 'stacked', 'FaceColor', [1,1,1]);
                     set(hPlot, 'Tag', 'lvmplot_series');
-                    set(ax, 'YLim', hP.get_good_limits(R2_data, get(ax, 'YLim'), 'zero'))
+                    set(ax, 'YLim', [0.0, 1.0])
                 end
                 set(hPlot, 'Tag', 'lvmplot_series');
                 
@@ -2219,7 +2227,7 @@ classdef mblvm < handle
                 end
                 if hP.c_block>0
                     if ~isa(hP.model.blocks{hP.c_block}, 'block_batch')
-                        hP.annotate_barplot(hBar, labels)
+                        hP.annotate_barplot(hBar, labels, 'stacked')
                     end
                 elseif hP.c_block==0
                     hP.annotate_barplot(hBar, labels, 'stacked')
@@ -2480,6 +2488,15 @@ function basic_plot_R2_variable(hP)
     hP.new_axis(1);
     hP.set_plot(1, {'Order', -1}, {'R2 (per variable)', hP.model.A});
 end % ``basic_plot_R2_variable``
+
+function basic_plot_R2_Y_variable(hP)
+    % These are variable-based plots
+    hP.nRow = 1;
+    hP.nCol = 1;
+    hP.dim = 2;
+    hP.new_axis(1);
+    hP.set_plot(1, {'Order', -1}, {'R2-Y-variable', hP.model.A});
+end % ``basic_plot_R2_Y_variable``
 
 function basic_plot_R2_component(hP)
     % These are model (component)-based plots

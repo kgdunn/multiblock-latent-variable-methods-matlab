@@ -456,6 +456,17 @@ classdef mbpls < mblvm
             plt.callback = @self.weight_plot;
             plt.annotate = @self.weight_plot_annotate;
             out = [out; plt];
+            
+            plt.name = 'R2-Y-variable';
+            plt.weight = 30;
+            plt.dim = 2;
+            plt.more_text = ': of component';
+            plt.more_type = 'a';
+            plt.more_block = '';
+            plt.callback = @self.R2_per_Y_variable_plot;
+            plt.annotate = @self.R2_per_Y_variable_plot_annotate;
+            out = [out; plt];
+            
         end
         
         function out = get_predictions(self, varargin)
@@ -679,6 +690,45 @@ classdef mbpls < mblvm
         end
         function weight_plot_annotate(hP, series)
         end
+        
+        function R2_per_Y_variable_plot(hP, series)
+            ax = hP.gca();
+            hP.hDropdown.setEnabled(false)
+            R2_data = hP.model.super.stats.R2Yk_a(:, 1:series.y_num);
+            if series.x_num <= 0
+                
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hPlot
+                    if ishandle(hPlot)
+                        delete(hPlot)
+                    end
+                end
+                hPlot = bar(ax, R2_data, 'stacked', 'FaceColor', [1,1,1]);
+                set(hPlot, 'Tag', 'lvmplot_series');
+                set(ax, 'YLim', [0.0, 1.0])
+            end
+        end
+        function R2_per_Y_variable_plot_annotate(hP, series)
+            ax = hP.gca();
+            hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            
+            if series.x_num > 0 && series.y_num > 0                         
+                title(ax, 'R2 plot for Y-variables')
+                grid on
+                xlabel(ax, ['R2 with A=', num2str(series.x_num)])
+                ylabel(ax, ['R2 with A=', num2str(series.y_num)])
+                
+            elseif series.y_num > 0                
+                title(ax, 'R2 bar plot for Y-variables')
+                grid on
+                ylabel(ax, ['R2 for Y-variables with A=', num2str(series.y_num)])
+                
+                labels = hP.model.Y.labels{2};
+                hP.annotate_barplot(hBar, labels, 'stacked')
+            end
+        end
+        
+        
     end % end methods (static)
     
 end % end classdef

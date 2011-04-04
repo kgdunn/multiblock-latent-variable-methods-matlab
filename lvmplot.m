@@ -13,6 +13,7 @@ classdef lvmplot < handle
         hA = [];            % Vector of axes [nRow x nCol] (in subplot order)
         hS = [];            % Vector of plot handles [nRow x nCol] (in subplot order) for data being shown
         hM = [];            % Vector of axis selector markers
+        hDropdown = [];     % Java dropdown
         nA = NaN;           % Number of axes in plot
         nRow = NaN;         % Number of rows of axes
         nCol = NaN;         % Number of columns of axes
@@ -84,7 +85,7 @@ classdef lvmplot < handle
             delta = 5;
             bheight = 30;
             if self.model.M > 0
-                H = H + 2 * (bheight+delta);
+                H = H + 3 * (bheight+delta);
             end
             hQuick = figure(...
                 'ButtondownFcn'    ,'', ...
@@ -154,7 +155,7 @@ classdef lvmplot < handle
             % -----------------------
             if self.model.M > 0
                 plot_str = 'Weights';
-                nbuttons = 4;
+                nbuttons = 5;
             else
                 plot_str = 'Loadings';
                 nbuttons = 3;
@@ -186,6 +187,12 @@ classdef lvmplot < handle
                     'Style', 'Pushbutton', ...
                     'Position', [delta, h_var-offset-idx*(bheight+delta)+delta, w-2*delta, bheight], ...
                     'Callback', @(src,event)plot(self.model, 'Coefficient'));
+                idx = idx + 1;
+                uicontrol(ctl, ...
+                    'String', 'R2 (per Y-variable)',...
+                    'Style', 'Pushbutton', ...
+                    'Position', [delta, h_var-offset-idx*(bheight+delta)+delta, w-2*delta, bheight], ...
+                    'Callback', @(src,event)plot(self.model, 'R2-Y-variable'));
                 idx = idx + 1;
             end
             
@@ -286,13 +293,14 @@ classdef lvmplot < handle
                     block_names{b+1} = self.model.blocks{b}.name;
                 end
                 block_names{1} = 'Overall';
-                jCombo = javax.swing.JComboBox(block_names);
-                jCombo = handle(jCombo, 'CallbackProperties');
-                set(jCombo, 'ActionPerformedCallback', @dropdown_block_selector);
-                jToolbar(1).add(jCombo,0); %5th position, after printer icon
+                dropdown = javax.swing.JComboBox(block_names);
+                self.hDropdown = handle(dropdown, 'CallbackProperties');
+                set(self.hDropdown, 'ActionPerformedCallback', @dropdown_block_selector);
+                jToolbar(1).add(self.hDropdown,0); %5th position, after printer icon
                 jToolbar(1).repaint;
                 jToolbar(1).revalidate;
-                jCombo.name = num2str(self.hF); % so we can get access to ``self`` later
+                self.hDropdown.name = num2str(self.hF); % so we can get access to ``self`` later
+                
             end
             self.c_block = 0;  % The default block is the superblock
             
@@ -689,6 +697,7 @@ classdef lvmplot < handle
                 point = (axis_extent(4) - axis_extent(3))*0.05 + axis_extent(3);
                 y_data = ones(size(x_data)) .* point;
             end
+            set(hAx, 'XTick', [])
             
             for n = 1:numel(x_data)
                 hText = text(x_data(n), y_data(n)+delta, labels{n}, 'Rotation', 90);

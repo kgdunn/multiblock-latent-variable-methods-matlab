@@ -26,6 +26,7 @@ Zchem.add_labels(1, FMC.batch_names);
 Zchem.add_labels(2, FMC.Zchem_names);
 missing_chemistry = [12, 13, 14, 15, 28, 29, 30, 31, 32, 33, 34, 35, 53];
 Zchem = Zchem.exclude(1, missing_chemistry);
+%plot(Zchem)
 
 % Initial conditions block: operations
 % -------------------------
@@ -36,7 +37,6 @@ Zop = Zop.exclude(1, missing_chemistry);
 %plot(Zop) 
 
 
-%plot(Zchem)
 
 % Batch data block (pre-aligned)
 % ------------------------------
@@ -56,14 +56,14 @@ Y = Y.exclude(1, missing_chemistry);
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 3 components
-cqa_pca = lvm({'CQAs', Y}, 2);
-plot(cqa_pca)
+%cqa_pca = lvm({'CQAs', Y}, 2);
+%plot(cqa_pca)
 
 % There seem to be 2 clusters in the CQA space.  Let's take a look at
 % contributions between points 
 
-batchPCA = lvm({'Trajectories', X},3);
-plot(batchPCA)
+%batchPCA = lvm({'Trajectories', X},3);
+%plot(batchPCA)
 
 % Understand the effect of chemistry on the Y's
 %pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
@@ -74,13 +74,13 @@ plot(batchPCA)
 %plot(pls_operating)
 
 % Multiblock PLS model
-%pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 2);
-%plot(pls_mb)
+pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
+plot(pls_mb)
 
 
 % Batch MB PLS model
-%batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
-%plot(batch_mbpls)
+batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
+plot(batch_mbpls)
 
 
 % Create monitoring model
