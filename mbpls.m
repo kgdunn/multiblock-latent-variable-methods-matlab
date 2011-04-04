@@ -446,6 +446,16 @@ classdef mbpls < mblvm
             plt.callback = @self.coefficient_plot;
             plt.annotate = @self.coefficient_plot_annotate;
             out = [out; plt];
+            
+            plt.name = 'Weights';
+            plt.weight = 30;
+            plt.dim = 2;
+            plt.more_text = ': of component';
+            plt.more_type = 'a';
+            plt.more_block = '';
+            plt.callback = @self.weight_plot;
+            plt.annotate = @self.weight_plot_annotate;
+            out = [out; plt];
         end
         
         function out = get_predictions(self, varargin)
@@ -663,6 +673,11 @@ classdef mbpls < mblvm
             if series.x_num < 0 && series.y_num > 0
                 title('Predictions of: ', labels{idx})
             end
+        end
+        
+        function weight_plot(hP, series)
+        end
+        function weight_plot_annotate(hP, series)
         end
     end % end methods (static)
     

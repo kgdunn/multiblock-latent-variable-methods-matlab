@@ -46,7 +46,7 @@ X = block(FMC.X, 'X: batch data',...                     % name of the block
 X = X.exclude(1, missing_chemistry);
 %plot(X, {'layout', [2, 3]})
 
-% Final quality attributes (FQAs)
+% Final quality attributes (CQAs)
 % --------------------------------
 % Add labels when creating the block
 Y = block(FMC.Y, {'col_labels', FMC.Ynames}, {'row_labels', FMC.batch_names}); 
@@ -56,13 +56,14 @@ Y = Y.exclude(1, missing_chemistry);
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 3 components
-%fqa_pca = lvm({'FQAs', Y}, 2);
-%plot(fqa_pca)
+%cqa_pca = lvm({'CQAs', Y}, 2);
+%plot(cqa_pca)
 
-% There seem to be 2 clusters in the FQA space.  Let's take a look at
+% There seem to be 2 clusters in the CQA space.  Let's take a look at
 % contributions between points 
 
-
+batchPCA = lvm({'Trajectories', X},3);
+plot(batchPCA)
 
 % Understand the effect of chemistry on the Y's
 %pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
@@ -78,8 +79,8 @@ Y = Y.exclude(1, missing_chemistry);
 
 
 % Batch MB PLS model
-batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
-plot(batch_mbpls)
+%batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
+%plot(batch_mbpls)
 
 
 % Create monitoring model

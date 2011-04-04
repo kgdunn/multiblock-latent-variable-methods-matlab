@@ -349,7 +349,7 @@ classdef lvmplot < handle
                 set(self.hM(i), 'Units', 'Normalized')
                 
                 
-                 % How many plot elements will there be?
+                % How many plot elements will there be?
                 if self.dim == 0
                     num = self.model.A;
                 else
@@ -663,7 +663,10 @@ classdef lvmplot < handle
             x_data = get(hBar, 'XData');
             y_data = get(hBar, 'YData');
             if numel(x_data) ~= numel(labels)
-                error('lvmplot:annotate_barplot', 'Incorrect number of labels supplied')
+                % TODO(KGD): this occurs with batch blocks
+                % Figure out a way to elegantly deal with batck blocks
+                return
+                %error('lvmplot:annotate_barplot', 'Incorrect number of labels supplied')
             end
             set(hAx, 'XLim', [x_data(1)-1, x_data(end)+1])
             axis_extent = axis;
@@ -711,6 +714,7 @@ classdef lvmplot < handle
             for k=1:nTags
                 tick(k) = nSamples*k;
             end
+            set(hAx, 'LineWidth', 1);
 
             for k=1:nTags
                 text(round((k-1)*nSamples+round(nSamples/2)), ...

@@ -1584,7 +1584,7 @@ classdef mblvm < handle
         end
         function order_dim2_annotate(hP, varargin)
             ax = hP.gca();
-            xlabel(ax, 'Column order')
+            xlabel(ax, 'Column order', 'FontSize', 15);
         end
         
         function [scores_h, scores_v] = get_score_data(hP, series)
@@ -1807,17 +1807,25 @@ classdef mblvm < handle
             hP.label_scatterplot(hPlot, labels);
         end
         
-        function [loadings_h, loadings_v] = get_loadings_data(hP, series)
-            % Correctly fetches the loadings data for the current block and dropdowns            
+        function [loadings_h, loadings_v, batchblock] = get_loadings_data(hP, series)
+            % Correctly fetches the loadings data for the current block and dropdowns  \
+            % Ugly hack to get batch blocks shown            
             block = hP.c_block;
-            loadings_h = [];
+            batchblock = [];
+            loadings_h.data = [];
             
             % Single block data sets (PCA and PLS)
             if hP.model.B == 1
                 if series.x_num > 0
                     loadings_h = hP.model.P{1}(:, series.x_num);
+                    if isa(hP.model.blocks{1}, 'block_batch')
+                        batchblock = hP.model.blocks{1};
+                    end
                 end
                 loadings_v = hP.model.P{1}(:, series.y_num);
+                if isa(hP.model.blocks{1}, 'block_batch')
+                    batchblock = hP.model.blocks{1};
+                end
                 return
             end
             
@@ -1826,20 +1834,26 @@ classdef mblvm < handle
                 loadings_v = hP.model.super.P(:, series.y_num);
             else
                 loadings_v = hP.model.P{block}(:, series.y_num);
+                if isa(hP.model.blocks{block}, 'block_batch')
+                    batchblock = hP.model.blocks{block};
+                end
             end
                 
             if series.x_num > 0
                 if block == 0
                     loadings_h = hP.model.super.P(:, series.x_num); 
                 else
-                    loadings_h = hP.model.P{block}(:, series.x_num);                   
+                    loadings_h = hP.model.P{block}(:, series.x_num);
+                    if isa(hP.model.blocks{block}, 'block_batch')
+                        batchblock = hP.model.blocks{block};
+                    end
                 end
             end
         end        
         function loadings_plot(hP, series)            
             % Loadings plots for overall or per-block
             ax = hP.gca();
-            [loadings_h, loadings_v] = hP.model.get_loadings_data(hP, series);
+            [loadings_h, loadings_v, batchblock] = hP.model.get_loadings_data(hP, series);
             
             % Bar plot of the single loading
             if series.x_num <= 0
@@ -1852,6 +1866,15 @@ classdef mblvm < handle
                 end
                 hPlot = bar(ax, loadings_v, 'FaceColor', hP.opt.bar.facecolor);
                 set(hPlot, 'Tag', 'lvmplot_series');
+                
+                
+                % Batch plots are shown differently
+                % TODO(KGD): figure a better way to deal with batch blocks
+                if ~isempty(batchblock)
+                    hP.annotate_batch_trajectory_plots(ax, hPlot, batchblock)
+                end
+                
+                
                 return
             end
 
@@ -1860,8 +1883,11 @@ classdef mblvm < handle
             set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
         end
         function loadings_plot_annotate(hP, series)
-            ax = hP.gca();            
-            
+            ax = hP.gca();
+            hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            if isempty(hBar)
+                return
+            end
             if series.x_num > 0 && series.y_num > 0                         
                 title(ax, 'Loadings plot')
                 grid on
@@ -1876,7 +1902,7 @@ classdef mblvm < handle
                 hP.label_scatterplot(hPlot, labels);
             
             elseif series.y_num > 0                
-                title(ax, 'Loading bar plot')
+                title(ax, 'Loading bar plot', 'FontSize', 15);
                 grid on
                 ylabel(ax, ['p_', num2str(series.y_num)])
                 
@@ -1890,27 +1916,34 @@ classdef mblvm < handle
             end
         end
         
-        function VIP_data = get_VIP_data(hP, series)
+        function [VIP_data, batchblock] = get_VIP_data(hP, series)
             % Correctly fetches the VIP data for the current block and dropdowns            
             block = hP.c_block;
+            batchblock = [];
             
             % Single block data sets (PCA and PLS)
             if hP.model.B == 1
                 VIP_data = hP.model.stats{1}.VIP_a(:, series.y_num);
+                if isa(hP.model.blocks{1}, 'block_batch')
+                    batchblock = hP.model.blocks{1};
+                end
                 return
             end
             
             % Multiblock data sets: we also have superblock VIPs
             if block == 0
-                VIP_data = hP.model.super.stats.VIP(:, series.y_num);                
+                VIP_data = hP.model.super.stats.VIP(:, series.y_num);
             else
                 VIP_data = hP.model.stats{block}.VIP_a(:, series.y_num);
+                if isa(hP.model.blocks{block}, 'block_batch')
+                    batchblock = hP.model.blocks{1};
+                end
             end
                 
         end        
         function VIP_plot(hP, series)
             ax = hP.gca();
-            VIP_data = hP.model.get_VIP_data(hP, series);
+            [VIP_data, batchblock] = hP.model.get_VIP_data(hP, series);
             % Bar plot of the single VIP
             if series.x_num <= 0
                 % We need a bar plot for the VIPs
@@ -1926,8 +1959,8 @@ classdef mblvm < handle
                 set(ax, 'YLim', hP.get_good_limits(VIP_data, get(ax, 'YLim'), 'zero'))
                 
                 % Batch plots are shown differently
-                if hP.c_block>0 && isa(hP.model.blocks{hP.c_block}, 'block_batch')
-                    hP.annotate_batch_trajectory_plots(ax, hPlot, hP.model.blocks{hP.c_block})
+                if ~isempty(batchblock)
+                    hP.annotate_batch_trajectory_plots(ax, hPlot, batchblock)
                 end
             end
         end         
@@ -2010,6 +2043,20 @@ classdef mblvm < handle
                 hPlot = bar(ax, coeff_data);%, 'FaceColor', hP.opt.bar.facecolor);
                 set(hPlot, 'Tag', 'lvmplot_series');
                 set(ax, 'YLim', hP.get_good_limits(coeff_data, get(ax, 'YLim'), 'zero'))
+                
+                % Batch plots are shown differently
+                if hP.c_block>0 && isa(hP.model.blocks{hP.c_block}, 'block_batch')
+                    if numel(hPlot)>1
+                        hChild = get(ax, 'Children');
+                        delete(hChild)
+                        text(sum(get(ax, 'XLim'))/2, sum(get(ax, 'YLim'))/2, ...
+                            'Coefficient plots not currently available for batch blocks.', ...
+                            'Color', [0.8 0.2 0.3], 'FontSize', 16, ...
+                            'HorizontalAlignment', 'center')
+                        return
+                    end
+                    %hP.annotate_batch_trajectory_plots(ax, hPlot, hP.model.blocks{hP.c_block})
+                end
             end
         end
         function coefficient_annotate(hP, series)
@@ -2224,19 +2271,35 @@ function basic_plot__loadings(hP)
         hP.new_axis(1);
         hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
     elseif hP.model.A == 2
-        hP.nRow = 1;
-        hP.nCol = 1;
-        hP.new_axis(1);
-        hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})
+        if hP.model.B == 1 && isa(hP.model.blocks{1}, 'block_batch')
+            hP.nRow = 2;
+            hP.nCol = 1;
+            hP.new_axis([1 2]);
+            hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
+            hP.set_plot(1, {'Order', -1}, {'Loadings', 2})
+        else
+            hP.nRow = 1;
+            hP.nCol = 1;
+            hP.new_axis(1);
+            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})
+        end
     elseif hP.model.A >= 3
-        % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
-        hP.nRow = 2;
-        hP.nCol = 2;
-        hP.new_axis([1, 2, 3, 4]);
-        hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})  % t1-t2
-        hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2})  % t3-t2
-        hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3})  % t1-t3
-        hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A})  % Hot_T2 using all components
+        if hP.model.B == 1 && isa(hP.model.blocks{1}, 'block_batch')
+            hP.nRow = 2;
+            hP.nCol = 1;
+            hP.new_axis([1 2]);
+            hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
+            hP.set_plot(2, {'Order', -1}, {'Loadings', 2})
+        else
+            % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
+            hP.nRow = 2;
+            hP.nCol = 2;
+            hP.new_axis([1, 2, 3, 4]);
+            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})  % t1-t2
+            hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2})  % t3-t2
+            hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3})  % t1-t3
+            hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A})  % Hot_T2 using all components
+        end
     end
 end % ``basic_plot__loadings``
 
