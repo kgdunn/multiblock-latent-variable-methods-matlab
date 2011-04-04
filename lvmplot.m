@@ -565,28 +565,70 @@ classdef lvmplot < handle
             
         end % ``label_scatterplot``
         
-    end % end: methods (ordinary)
-    
-    methods (Static=true)
-        function hPlot = set_data(hAx, x_data, y_data)
+        function extent = get_good_limits(self, data, extent, varargin) %#ok<MANU>
+            % Finds good axis limits for the ``data`` for changing the axis
+            % limits, ``extent``.
+            
+            % Make this function smarter with options for
+            %    'symmetrical' : i.e. symmetrical about zero (e.g. for loadings plot)
+            %    'equal'       (e.g. for loadings plot; for obs-pred plots)
+            %    'min_zero' (e.g. for SPE, T2, VIP plots')
+            %    'include_zero' (e.g. for score line plots)
+            
+            data = sort(data(:));
+            range = data(end)-data(1);
+            actual_range = extent(2) - extent(1);
+            if actual_range > 1.4*range
+                delta = 0.08*range;
+                extent(1) = data(1)-delta;
+                extent(2) = data(end)+delta;
+                if nargin==4
+                    options = varargin{1};
+
+                    switch lower(options)
+                        case 'zero'
+                            extent(1) = min(0.0, extent(1));
+                    end
+                end
+            end
+            if data(end) > extent(2)
+                extent(2) = data(end) + (data(end) - data(1))*0.05;
+            end
+            if data(1) < extent(1)
+                extent(1) = data(1) - (data(end) - data(1))*0.05;
+            end
+        end % ``get_good_limits``
+        
+        function hPlot = set_data(self, hAx, x_data, y_data)
             % Sets the x_data and y_data in the current axes, ``hAx``            
             
             hPlot = findobj(hAx, 'Tag', 'lvmplot_series');
             if ~isempty(hPlot)
                 if ~isempty(x_data)
                     set(hPlot, 'XData', x_data);
-                    set(hAx, 'XLim', get_good_limits(x_data, get(hAx, 'XLim')))
+                    set(hAx, 'XLim', self.get_good_limits(x_data, get(hAx, 'XLim')))
                 end
                 if ~isempty(y_data)
                     set(hPlot, 'YData', y_data);
-                    set(hAx, 'YLim', get_good_limits(y_data, get(hAx, 'YLim')))
+                    set(hAx, 'YLim', self.get_good_limits(y_data, get(hAx, 'YLim')))
                 end
             else
                 set(hAx, 'Nextplot', 'add');
-                hPlot = plot(hAx, x_data, y_data);
+                if isempty(y_data)
+                    hPlot = plot(hAx, x_data, x_data.*NaN);
+                elseif isempty(x_data)
+                    hPlot = plot(hAx, y_data.*NaN, y_data);
+                else
+                    hPlot = plot(hAx, x_data, y_data);
+                end
                 set(hPlot, 'Tag', 'lvmplot_series')                
             end            
         end
+        
+    end % end: methods (ordinary)
+    
+    methods (Static=true)
+        
         
         function [nrow, ncol] = subplot_layout(nplots) 
             % Determines the best layout for ``nplots``.  
@@ -642,32 +684,56 @@ classdef lvmplot < handle
             end            
         end %``annotate_barplot``
         
+        function annotate_batch_trajectory_plots(hAx, hBar, batch_block)
+            % Annotates a batch-like trajectory plot in the axis ``hAx``
+            % given the series handle, ``hBar`` and the corresponding batch
+            % block from which it came, ``batch_block`` (used for dimensioning)
+            hP = get(get(hAx, 'Parent'), 'UserData');
+            self = hP;
+            data = get(hBar, 'YData');
+            set(hAx, 'Xlim', self.get_good_limits(get(hBar, 'XData'), get(hAx, 'XLim')))
+            set(hAx, 'Ylim', self.get_good_limits(data, get(hAx, 'YLim'), 'zero'))
+            nSamples = batch_block.J;     % Number of samples per tag
+            nTags = batch_block.nTags;    % Number of tags in the batch data
+            
+            % Reshape the data in the bar plot to variable based order
+            data = reshape(data, nTags, nSamples)';
+            cum_area = sum(abs(data));
+            set(hBar, 'YData', data(:), 'FaceColor', hP.opt.bar.facecolor, ...
+                                        'EdgeColor', hP.opt.bar.facecolor);
+                                    
+            tagNames = batch_block.labels{2};
+            
+            x_r = xlim;
+            y_r = ylim;
+            xlim([x_r(1,1) nSamples*nTags]);
+            tick = zeros(nTags,1);
+            for k=1:nTags
+                tick(k) = nSamples*k;
+            end
+
+            for k=1:nTags
+                text(round((k-1)*nSamples+round(nSamples/2)), ...
+                    diff(y_r)*0.9 + y_r(1),strtrim(tagNames(k,:)), ...
+                    'FontWeight','bold','HorizontalAlignment','center');
+                text(round((k-1)*nSamples+round(nSamples/2)), ...
+                    diff(y_r)*0.05 + y_r(1), sprintf('%.1f',cum_area(k)), ...
+                    'FontWeight','bold','HorizontalAlignment','center');
+            end
+
+            set(hAx,'XTick',tick);
+            set(hAx,'XTickLabel',[]);
+            set(hAx,'Xgrid','On');
+            xlabel('Batch time repeated for each variable');            
+            
+        end % ``annotate_batch_trajectory_plots``
+        
         
     end % end: methods (static)
 end % end: ``classdef``
-
-function extent = get_good_limits(data, extent)
-    % Finds good axis limits for the ``data`` for changing the axis
-    % limits, ``extent``.
-    
-    % Make this function smarter with options for
-    %    'symmetrical' : i.e. symmetrical about zero (e.g. for loadings plot)
-    %    'equal'       (e.g. for loadings plot; for obs-pred plots)
-    %    'min_zero' (e.g. for SPE, T2, VIP plots')
-    %    'include_zero' (e.g. for score line plots)
-   
-    data = sort(data);    
-    if data(end) > extent(2)        
-        extent(2) = data(end) + (data(end) - data(1))*0.05;
-    end
-    if data(1) < extent(1)
-        extent(1) = data(1) - (data(end) - data(1))*0.05;
-    end
-    
-end
-        
+      
 function mouseclick_callback(varargin)
-    disp(get(varargin{1}, 'UserData'))
+    %disp(get(varargin{1}, 'UserData'))
 end
 
 function dropdown_block_selector(hCombo, varargin)

@@ -873,8 +873,7 @@ classdef mblvm < handle
                 return
             else
                 show_what = varargin{1};
-                h = lvmplot(self, show_what);
-                
+                h = lvmplot(self, show_what);                
             end
             
             % Start a new figure window
@@ -890,7 +889,7 @@ classdef mblvm < handle
                 case 'predictions'
                     basic_plot__predictions(h);
                 case 'coefficient'
-                    basic_plot__coefficients(h);
+                    basic_plot__coefficient(h);
                 case 'vip'
                     basic_plot__VIP(h);
                 case 'r2-variable'
@@ -1025,6 +1024,16 @@ classdef mblvm < handle
             plt.more_block = '';
             plt.callback = @self.VIP_plot;
             plt.annotate = @self.VIP_limits_annotate;
+            out = [out; plt];
+            
+            plt.name = 'Coefficient';
+            plt.weight = 40;
+            plt.dim = 2;
+            plt.more_text = 'using  components';
+            plt.more_type = '1:A';
+            plt.more_block = '';
+            plt.callback = @self.coefficient_plot;
+            plt.annotate = @self.coefficient_annotate;
             out = [out; plt];
             
             plt.name = 'R2 (per variable)';
@@ -1882,7 +1891,7 @@ classdef mblvm < handle
         end
         
         function VIP_data = get_VIP_data(hP, series)
-            % Correctly fetches the loadings data for the current block and dropdowns            
+            % Correctly fetches the VIP data for the current block and dropdowns            
             block = hP.c_block;
             
             % Single block data sets (PCA and PLS)
@@ -1891,7 +1900,7 @@ classdef mblvm < handle
                 return
             end
             
-            % Multiblock data sets: we also have superloadings
+            % Multiblock data sets: we also have superblock VIPs
             if block == 0
                 VIP_data = hP.model.super.stats.VIP(:, series.y_num);                
             else
@@ -1902,9 +1911,9 @@ classdef mblvm < handle
         function VIP_plot(hP, series)
             ax = hP.gca();
             VIP_data = hP.model.get_VIP_data(hP, series);
-            % Bar plot of the single loading
+            % Bar plot of the single VIP
             if series.x_num <= 0
-                % We need a bar plot for the loadings
+                % We need a bar plot for the VIPs
                 hPlot = findobj(ax, 'Tag', 'lvmplot_series');
                 if hPlot
                     if ishandle(hPlot)
@@ -1913,8 +1922,14 @@ classdef mblvm < handle
                 end
                 hPlot = bar(ax, VIP_data, 'FaceColor', hP.opt.bar.facecolor);
                 set(hPlot, 'Tag', 'lvmplot_series');
+                
+                set(ax, 'YLim', hP.get_good_limits(VIP_data, get(ax, 'YLim'), 'zero'))
+                
+                % Batch plots are shown differently
+                if hP.c_block>0 && isa(hP.model.blocks{hP.c_block}, 'block_batch')
+                    hP.annotate_batch_trajectory_plots(ax, hPlot, hP.model.blocks{hP.c_block})
+                end
             end
-
         end         
         function VIP_limits_annotate(hP, series)
             ax = hP.gca();
@@ -1936,18 +1951,111 @@ classdef mblvm < handle
                 else
                     labels = hP.model.get_labels(hP.dim, 1);
                 end
-%                 if hP.c_block == 0 && hP.model.B > 1
-%                     x_names = cell(hP.model.B, 1);
-%                     for b = 1:hP.model.B
-%                         x_names{b} = hP.model.blocks{b}.name;
-%                     end                    
-%                 else
-%                     x_names = hP.model.blocks{1}.labels{hP.dim};
-%                 end
-                hP.annotate_barplot(hBar, labels)
+                if hP.c_block>0
+                    if ~isa(hP.model.blocks{hP.c_block}, 'block_batch')
+                        hP.annotate_barplot(hBar, labels)
+                    end
+                elseif hP.c_block==0
+                    hP.annotate_barplot(hBar, labels)
+                end
             end
         end
 
+        % These should actually be in the PLS function
+        function coeff_data = get_coefficient_data(hP, series)
+            % Correctly fetches the coefficient data for the current block and dropdowns            
+            
+            % Single block data sets (PCA and PLS)
+            if hP.model.B == 1
+                subW = hP.model.W{1}(:, 1:series.y_num);
+                subP = hP.model.P{1}(:, 1:series.y_num);
+                subC = hP.model.super.C(:, 1:series.y_num);
+                coeff_data = subW * inv(subP' * subW) * subC';
+                return
+            end
+            
+            block = hP.c_block;
+            
+            % Multiblock data sets: we also have superblock VIPs
+            if block == 0
+                coeff_data = [];                
+            else
+                subW = hP.model.W{block}(:, 1:series.y_num);
+                subP = hP.model.P{block}(:, 1:series.y_num);
+                subC = hP.model.super.C(:, 1:series.y_num);
+                coeff_data = subW * inv(subP' * subW) * subC';
+            end                
+        end
+        function coefficient_plot(hP, series)
+            ax = hP.gca();
+            coeff_data = hP.model.get_coefficient_data(hP, series);
+            if isempty(coeff_data)
+                hChild = get(ax, 'Children');
+                delete(hChild)
+                text(sum(get(ax, 'XLim'))/2, sum(get(ax, 'YLim'))/2, ...
+                    'Coefficient plots not defined for the overall block', ...
+                    'Color', [0.8 0.2 0.3], 'FontSize', 16, ...
+                    'HorizontalAlignment', 'center')
+                return
+            end
+            % Bar plot of the single coefficient
+            if series.x_num <= 0
+                % We need a bar plot for the coefficient plot
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hPlot
+                    if ishandle(hPlot)
+                        delete(hPlot)
+                    end
+                end
+                hPlot = bar(ax, coeff_data);%, 'FaceColor', hP.opt.bar.facecolor);
+                set(hPlot, 'Tag', 'lvmplot_series');
+                set(ax, 'YLim', hP.get_good_limits(coeff_data, get(ax, 'YLim'), 'zero'))
+            end
+        end
+        function coefficient_annotate(hP, series)
+            ax = hP.gca();
+            hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            if isempty(hBar)
+                return
+            end
+            if series.x_num > 0 && series.y_num > 0                         
+                title(ax, 'Coefficient plot')
+                grid on
+                xlabel(ax, ['Coefficient plot with A=', num2str(series.x_num)])
+                ylabel(ax, ['Coefficient plot with A=', num2str(series.y_num)])
+                
+            elseif series.y_num > 0                
+                title(ax, 'Coefficient bar plot')
+                grid off
+                ylabel(ax, ['Coefficient plot with A=', num2str(series.y_num)])
+                
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
+                else
+                    labels = hP.model.get_labels(hP.dim, 1);
+                end
+                
+                breaks = get(hBar(1), 'XData');
+                extent = axis;
+                hold(ax, 'on')
+                for n = 1:numel(breaks)-1
+                    point = sum(breaks(n:n+1))/2.0;
+                    plot([point point], extent(3:4), '-.', 'Color', [0.5 0.5 0.5])
+                    
+                end
+                
+                top = 0.95*extent(4);
+                set(ax, 'XTickLabel', {})
+                for n = 1:numel(breaks)
+                     text(breaks(n), top, strtrim(labels{n}), 'Rotation', 0,...
+                         'FontSize', 10, 'HorizontalAlignment', 'center');
+                end
+                set(ax, 'TickLength', [0 0], 'XLim', [breaks(1)-0.5 breaks(end)+0.5])
+
+
+            end
+        end
+        
 %         function add_plot_footers(hFooters, footer_string)
 %             % Convert the cell string to a long char string
 %             foot = footer_string{1};
@@ -2167,6 +2275,15 @@ function basic_plot__VIP(hP)
     hP.dim = 2;
     hP.new_axis(1);
     hP.set_plot(1, {'Order', -1}, {'VIP', hP.model.A})
+end % ``basic_plot__VIP``
+
+function basic_plot__coefficient(hP)
+    % These are variable-based plots
+    hP.nRow = 1;
+    hP.nCol = 1;
+    hP.dim = 2;
+    hP.new_axis(1);
+    hP.set_plot(1, {'Order', -1}, {'Coefficient', hP.model.A})
 end % ``basic_plot__VIP``
 
 function basic_plot_R2_variable(hP)

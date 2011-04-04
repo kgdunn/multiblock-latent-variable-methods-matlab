@@ -56,7 +56,7 @@ Y = Y.exclude(1, missing_chemistry);
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 3 components
-fqa_pca = lvm({'FQAs', Y}, 2);
+%fqa_pca = lvm({'FQAs', Y}, 2);
 %plot(fqa_pca)
 
 % There seem to be 2 clusters in the FQA space.  Let's take a look at
@@ -65,12 +65,22 @@ fqa_pca = lvm({'FQAs', Y}, 2);
 
 
 % Understand the effect of chemistry on the Y's
-pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
-plot(pls_chemistry)
+%pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
+%plot(pls_chemistry)
 
 % Understand the effect of operating conditions on the Y's
-pls_operating = lvm({'Z-timing', Zop, 'Y', Y}, 2);
-plot(pls_operating)
+%pls_operating = lvm({'Z-timing', Zop, 'Y', Y}, 2);
+%plot(pls_operating)
+
+% Multiblock PLS model
+%pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 2);
+%plot(pls_mb)
+
+
+% Batch MB PLS model
+batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
+plot(batch_mbpls)
+
 
 % Create monitoring model
 % bad_batch = [3, 5, 6, 7, 34:71];

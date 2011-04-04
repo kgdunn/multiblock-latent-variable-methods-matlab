@@ -559,8 +559,6 @@ classdef mbpls < mblvm
             
         end
         
-        
-        
         function observed_plot(hP, series)
             % Score plots for overall or block scores
             
@@ -642,7 +640,6 @@ classdef mbpls < mblvm
                 set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
             end
         end
-        
         function predictions_annotate(hP, series)
             ax = hP.gca();
             if strcmpi(series.current, 'x')
