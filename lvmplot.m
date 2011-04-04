@@ -175,7 +175,7 @@ classdef lvmplot < handle
             idx = idx + 1;
             
             uicontrol(ctl, ...
-                'String', 'VIP plots',...
+                'String', 'VIP plot',...
                 'Style', 'Pushbutton', ...
                 'Position', [delta, h_var-offset-idx*(bheight+delta)+delta, w-2*delta, bheight], ...
                 'Callback', @(src,event)plot(self.model, 'VIP'));
@@ -572,7 +572,7 @@ classdef lvmplot < handle
             % Make this function smarter with options for
             %    'symmetrical' : i.e. symmetrical about zero (e.g. for loadings plot)
             %    'equal'       (e.g. for loadings plot; for obs-pred plots)
-            %    'min_zero' (e.g. for SPE, T2, VIP plots')
+            %    'min_zero' (e.g. for SPE, T2, VIP plot')
             %    'include_zero' (e.g. for score line plots)
             
             data = sort(data(:));
@@ -701,6 +701,7 @@ classdef lvmplot < handle
             
             % Reshape the data in the bar plot to variable based order
             data = reshape(data, nTags, nSamples)';
+            data(isnan(data)) = 0.0;
             cum_area = sum(abs(data));
             set(hBar, 'YData', data(:), 'FaceColor', hP.opt.bar.facecolor, ...
                                         'EdgeColor', hP.opt.bar.facecolor);

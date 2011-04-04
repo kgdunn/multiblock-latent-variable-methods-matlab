@@ -657,7 +657,7 @@ classdef mblvm < handle
                     self.stats{b}.SPE_j = [];
 
                     self.stats{b}.start_SS_col = [];
-                    self.stats{b}.R2Xk_a = [];  % not cumulative !                    
+                    self.stats{b}.R2k_a = [];  % not cumulative !                    
                     self.stats{b}.col_ssq_prior = [];
                     self.stats{b}.R2b_a = [];
                     self.stats{b}.SSQ_exp = [];
@@ -704,7 +704,7 @@ classdef mblvm < handle
                 
                 % R^2 for every variable in the block, per component (not cumulative)
                 % K(b) x A
-                self.stats{b}.R2Xk_a = zeroexp([dblock.K, A], self.stats{b}.R2Xk_a);
+                self.stats{b}.R2k_a = zeroexp([dblock.K, A], self.stats{b}.R2k_a);
                 
                 % R^2 for every variable in the Y-block, per component (not cumulative)
                 % M x A
@@ -1042,7 +1042,8 @@ classdef mblvm < handle
             plt.more_text = 'using  components';
             plt.more_type = '1:A';
             plt.more_block = '';
-            plt.callback = @self.R2_plot;
+            plt.callback = @self.R2_per_variable_plot;
+            plt.annotate = @self.R2_per_variable_plot_annotate;
             out = [out; plt];
             
             % plt.name = 'Centering';
@@ -1860,7 +1861,7 @@ classdef mblvm < handle
                 % We need a bar plot for the loadings
                 hPlot = findobj(ax, 'Tag', 'lvmplot_series');
                 if hPlot
-                    if strcmpi(get(hPlot, 'Type'), 'line')
+                    if ishandle(hPlot)
                         delete(hPlot)
                     end
                 end
@@ -1936,7 +1937,7 @@ classdef mblvm < handle
             else
                 VIP_data = hP.model.stats{block}.VIP_a(:, series.y_num);
                 if isa(hP.model.blocks{block}, 'block_batch')
-                    batchblock = hP.model.blocks{1};
+                    batchblock = hP.model.blocks{block};
                 end
             end
                 
@@ -2103,6 +2104,84 @@ classdef mblvm < handle
             end
         end
         
+        function [R2_data, batchblock] = get_R2_per_variable_data(hP, series)
+            % Correctly fetches the R2 data for the current block and dropdowns            
+            block = hP.c_block;
+            batchblock = [];
+            
+            % Single block data sets (PCA and PLS)
+            if hP.model.B == 1
+                R2_data = hP.model.stats{1}.R2k_a(:, series.y_num);
+                if isa(hP.model.blocks{1}, 'block_batch')
+                    batchblock = hP.model.blocks{1};
+                end
+                return
+            end
+            
+            % Multiblock data sets: we also have superblock VIPs
+            if block == 0
+                R2_data = hP.model.super.stats.R2(:, series.y_num);
+            else
+                R2_data = hP.model.stats{block}.R2k_a(:, series.y_num);
+                if isa(hP.model.blocks{block}, 'block_batch')
+                    batchblock = hP.model.blocks{block};
+                end
+            end
+                
+        end 
+        function R2_per_variable_plot(hP, series)
+            ax = hP.gca();
+            [R2_data, batchblock] = hP.model.get_R2_per_variable_data(hP, series);
+            if series.x_num <= 0
+                
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hPlot
+                    if ishandle(hPlot)
+                        delete(hPlot)
+                    end
+                end
+                
+                
+                hPlot = bar(ax, R2_data, 'FaceColor', hP.opt.bar.facecolor);
+                set(hPlot, 'Tag', 'lvmplot_series');
+                
+                set(ax, 'YLim', hP.get_good_limits(R2_data, get(ax, 'YLim'), 'zero'))
+                
+                % Batch plots are shown differently
+                if ~isempty(batchblock)
+                    hP.annotate_batch_trajectory_plots(ax, hPlot, batchblock)
+                end
+            end
+        end
+        function R2_per_variable_plot_annotate(hP, series)
+            ax = hP.gca();
+            hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            
+            if series.x_num > 0 && series.y_num > 0                         
+                title(ax, 'R2 plot')
+                grid on
+                xlabel(ax, ['R2 with A=', num2str(series.x_num)])
+                ylabel(ax, ['R2 with A=', num2str(series.y_num)])
+                
+            elseif series.y_num > 0                
+                title(ax, 'R2 bar plot')
+                grid on
+                ylabel(ax, ['R2 with A=', num2str(series.y_num)])
+                
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
+                else
+                    labels = hP.model.get_labels(hP.dim, 1);
+                end
+                if hP.c_block>0
+                    if ~isa(hP.model.blocks{hP.c_block}, 'block_batch')
+                        hP.annotate_barplot(hBar, labels)
+                    end
+                elseif hP.c_block==0
+                    hP.annotate_barplot(hBar, labels)
+                end
+            end
+        end
 %         function add_plot_footers(hFooters, footer_string)
 %             % Convert the cell string to a long char string
 %             foot = footer_string{1};
