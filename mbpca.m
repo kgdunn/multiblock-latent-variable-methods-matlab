@@ -171,7 +171,6 @@ classdef mbpca < mblvm
             % Calculates the monitoring limits for a batch blocks in the model
 
         end % ``calc_model_post``
-        
     
         % Superclass abstract method implementation
         function state = apply_model(self, new, state) 

@@ -2320,21 +2320,21 @@ function basic_plot__scores(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, {'Order', -1}, {'Scores', 1})
+        hP.set_plot(1, {'Order', -1}, {'Scores', 1});
     elseif hP.model.A == 2
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, {'scores', 1}, {'scores', 2})        
+        hP.set_plot(1, {'scores', 1}, {'scores', 2});
     elseif hP.model.A >= 3
         % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
         hP.nRow = 2;
         hP.nCol = 2;
         hP.new_axis([1, 2, 3, 4]);
-        hP.set_plot(1, {'Scores', 1}, {'scores', 2})  % t1-t2
-        hP.set_plot(2, {'Scores', 3}, {'scores', 2})  % t3-t2
-        hP.set_plot(3, {'Scores', 1}, {'scores', 3})  % t1-t3
-        hP.set_plot(4, {'Order', -1},  {'Hot T2', hP.model.A})  % Hot_T2 using all components
+        hP.set_plot(1, {'Scores', 1}, {'scores', 2});  % t1-t2
+        hP.set_plot(2, {'Scores', 3}, {'scores', 2});  % t3-t2
+        hP.set_plot(3, {'Scores', 1}, {'scores', 3});  % t1-t3
+        hP.set_plot(4, {'Order', -1},  {'Hot T2', hP.model.A});  % Hot_T2 using all components
     end
 end % ``basic_plot__scores``
 
@@ -2348,36 +2348,36 @@ function basic_plot__loadings(hP)
         hP.nRow = 1;
         hP.nCol = 1;
         hP.new_axis(1);
-        hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
+        hP.set_plot(1, {'Order', -1}, {'Loadings', 1});
     elseif hP.model.A == 2
         if hP.model.B == 1 && isa(hP.model.blocks{1}, 'block_batch')
             hP.nRow = 2;
             hP.nCol = 1;
             hP.new_axis([1 2]);
-            hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
-            hP.set_plot(1, {'Order', -1}, {'Loadings', 2})
+            hP.set_plot(1, {'Order', -1}, {'Loadings', 1});
+            hP.set_plot(1, {'Order', -1}, {'Loadings', 2});
         else
             hP.nRow = 1;
             hP.nCol = 1;
             hP.new_axis(1);
-            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})
+            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2});
         end
     elseif hP.model.A >= 3
         if hP.model.B == 1 && isa(hP.model.blocks{1}, 'block_batch')
             hP.nRow = 2;
             hP.nCol = 1;
             hP.new_axis([1 2]);
-            hP.set_plot(1, {'Order', -1}, {'Loadings', 1})
-            hP.set_plot(2, {'Order', -1}, {'Loadings', 2})
+            hP.set_plot(1, {'Order', -1}, {'Loadings', 1});
+            hP.set_plot(2, {'Order', -1}, {'Loadings', 2});
         else
             % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
             hP.nRow = 2;
             hP.nCol = 2;
             hP.new_axis([1, 2, 3, 4]);
-            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2})  % t1-t2
-            hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2})  % t3-t2
-            hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3})  % t1-t3
-            hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A})  % Hot_T2 using all components
+            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2});  % t1-t2
+            hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2});  % t3-t2
+            hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3});  % t1-t3
+            hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A});  % Hot_T2 using all components
         end
     end
 end % ``basic_plot__loadings``
@@ -2392,7 +2392,7 @@ function basic_plot__spe(hP)
     hP.nRow = 1;
     hP.nCol = 1;
     hP.new_axis(1);
-    hP.set_plot(1, {'Order', -1}, {'SPE', 1})
+    hP.set_plot(1, {'Order', -1}, {'SPE', 1});
 end % ``basic_plot__spe``
 
 function basic_plot__predictions(hP)
@@ -2406,7 +2406,7 @@ function basic_plot__predictions(hP)
     [hP.nRow hP.nCol] = hP.subplot_layout(M);
     hP.new_axis(1:M);
     for m = 1:M
-        hP.set_plot(m, {'Observations', m}, {'Predictions', m})
+        hP.set_plot(m, {'Observations', m}, {'Predictions', m});
     end
 end % ``basic_plot__predictions``
 
@@ -2416,7 +2416,7 @@ function basic_plot__VIP(hP)
     hP.nCol = 1;
     hP.dim = 2;
     hP.new_axis(1);
-    hP.set_plot(1, {'Order', -1}, {'VIP', hP.model.A})
+    hP.set_plot(1, {'Order', -1}, {'VIP', hP.model.A});
 end % ``basic_plot__VIP``
 
 function basic_plot__coefficient(hP)
@@ -2425,7 +2425,7 @@ function basic_plot__coefficient(hP)
     hP.nCol = 1;
     hP.dim = 2;
     hP.new_axis(1);
-    hP.set_plot(1, {'Order', -1}, {'Coefficient', hP.model.A})
+    hP.set_plot(1, {'Order', -1}, {'Coefficient', hP.model.A});
 end % ``basic_plot__VIP``
 
 function basic_plot_R2_variable(hP)
@@ -2434,7 +2434,7 @@ function basic_plot_R2_variable(hP)
     hP.nCol = 1;
     hP.dim = 2;
     hP.new_axis(1);
-    hP.set_plot(1, {'Order', -1}, {'R2 (per variable)', hP.model.A})
+    hP.set_plot(1, {'Order', -1}, {'R2 (per variable)', hP.model.A});
 end % ``basic_plot_R2_variable``
 
 function basic_plot_R2_component(hP)
@@ -2443,5 +2443,5 @@ function basic_plot_R2_component(hP)
     hP.nCol = 1;
     hP.dim = 0;
     hP.new_axis(1);
-    hP.set_plot(1, {'Order', -1}, {'R2 (per component)', hP.model.A})
+    hP.set_plot(1, {'Order', -1}, {'R2 (per component)', hP.model.A});
 end % ``basic_plot_R2_variable``

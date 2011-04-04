@@ -386,7 +386,7 @@ classdef lvmplot < handle
             series = getappdata(h, 'SeriesData');
             [series.x_type, series.x_num] = self.validate_plot(xaxis);
             [series.y_type, series.y_num] = self.validate_plot(yaxis);
-            setappdata(h, 'SeriesData', series)
+            setappdata(h, 'SeriesData', series);
         end
         
         function [plottype, entry_num] = validate_plot(self, request)
