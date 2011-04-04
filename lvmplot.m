@@ -80,7 +80,7 @@ classdef lvmplot < handle
             % Quick plot figure
             
             W = 250;
-            H = 300;
+            H = 300 - 55;
             delta = 5;
             bheight = 30;
             if self.model.M > 0
@@ -197,18 +197,18 @@ classdef lvmplot < handle
             
             % Component-based plots
             % -----------------------
-            nbuttons = 1;
-            h_cmp = nbuttons*(bheight + delta) + offset;
-            ctl.Parent = hQuick;
-            pCmp = uipanel(ctl, 'Title', 'Component-based plots', ...
-                'Position', [delta H-h_obs-delta-h_var-delta-h_cmp w h_cmp]);
-            
-            ctl.Parent = pCmp;
-            uicontrol(ctl, ...
-                'String', 'R2 (per component)', ...
-                'Style', 'Pushbutton', ...
-                'Position', [delta, h_cmp-offset-1*(bheight+delta)+delta, w-2*delta, bheight], ...
-                'Callback', @(src,event)plot(self.model, 'R2-component'));
+%             nbuttons = 1;
+%             h_cmp = nbuttons*(bheight + delta) + offset;
+%             ctl.Parent = hQuick;
+%             pCmp = uipanel(ctl, 'Title', 'Component-based plots', ...
+%                 'Position', [delta H-h_obs-delta-h_var-delta-h_cmp w h_cmp]);
+%             
+%             ctl.Parent = pCmp;
+%             uicontrol(ctl, ...
+%                 'String', 'R2 (per component)', ...
+%                 'Style', 'Pushbutton', ...
+%                 'Position', [delta, h_cmp-offset-1*(bheight+delta)+delta, w-2*delta, bheight], ...
+%                 'Callback', @(src,event)plot(self.model, 'R2-component'));
             
            
             
@@ -657,9 +657,16 @@ classdef lvmplot < handle
             ncol = layout(2);
         end
         
-        function annotate_barplot(hBar, labels)
+        function annotate_barplot(hBar, labels, varargin)
             % Adds vertical ``labels`` to bar plot series, ``hBar``
-            hAx = get(hBar, 'Parent');            
+            isstacked = false; 
+            if nargin==3
+                if strcmp( varargin{1}, 'stacked')
+                    isstacked=true;
+                    hBar = hBar(1);
+                end
+            end
+            hAx = get(hBar, 'Parent');
             set(hAx, 'XTickLabel', {})
             x_data = get(hBar, 'XData');
             y_data = get(hBar, 'YData');
@@ -678,13 +685,18 @@ classdef lvmplot < handle
             else
                 fontweight = 'bold';
             end
+            if isstacked                
+                point = (axis_extent(4) - axis_extent(3))*0.05 + axis_extent(3);
+                y_data = ones(size(x_data)) .* point;
+            end
+            
             for n = 1:numel(x_data)
-                 hText = text(x_data(n), y_data(n)+delta, labels{n}, 'Rotation', 90);
-                 set(hText, 'FontSize', 12, 'FontWeight', fontweight)
-                 t_extent = get(hText, 'Extent');
-                 if (t_extent(2) + t_extent(4)) > axis_extent(4)
-                     set(hText, 'Position', [n, y_data(n)-delta-t_extent(4), 0])
-                 end
+                hText = text(x_data(n), y_data(n)+delta, labels{n}, 'Rotation', 90);
+                set(hText, 'FontSize', 12, 'FontWeight', fontweight)
+                t_extent = get(hText, 'Extent');
+                if (t_extent(2) + t_extent(4)) > axis_extent(4)
+                    set(hText, 'Position', [n, y_data(n)-delta-t_extent(4), 0])
+                end
             end            
         end %``annotate_barplot``
         

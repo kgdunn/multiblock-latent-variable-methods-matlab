@@ -2180,6 +2180,8 @@ classdef mblvm < handle
                     title('R2 per variable, per component');
                     set(hPlot, 'UserData', 'dont_annotate')
                 else
+                    hPlot = bar(ax, R2_data, 'stacked', 'FaceColor', [1,1,1]);
+                    set(hPlot, 'Tag', 'lvmplot_series');
                     set(ax, 'YLim', hP.get_good_limits(R2_data, get(ax, 'YLim'), 'zero'))
                 end
                 set(hPlot, 'Tag', 'lvmplot_series');
@@ -2220,7 +2222,7 @@ classdef mblvm < handle
                         hP.annotate_barplot(hBar, labels)
                     end
                 elseif hP.c_block==0
-                    hP.annotate_barplot(hBar, labels)
+                    hP.annotate_barplot(hBar, labels, 'stacked')
                 end
             end
         end
