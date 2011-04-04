@@ -176,8 +176,8 @@ function Wold_article_PCA_test()
     
     
     % R2 values, given on page 43
-    R2b_a = PCA_model_2.stats{1}.R2b_a;
-    assertEAE(R2b_a, [0.831, 0.169], 2)
+    R2Xb_a = PCA_model_2.stats{1}.R2Xb_a;
+    assertEAE(R2Xb_a, [0.831, 0.169], 2)
 
     % SS values, on page 43
     SS_X = ssq(PCA_model_2.data, 1);
@@ -321,8 +321,8 @@ function PCA_no_missing_data()
     
     % R2-per variable(k)-per component(a)
     R2_col = 4:5;
-    R2k_a = exp_m.variables{1}.data(:, R2_col);
-    assertEAE(PCA.stats{1}.R2k_a, R2k_a, 4);  
+    R2Xk_a = exp_m.variables{1}.data(:, R2_col);
+    assertEAE(PCA.stats{1}.R2Xk_a, R2Xk_a, 4);  
     
 return
 
@@ -460,7 +460,7 @@ function PCA_batch_data()
     
     expected = load('tests/SBR-expected.mat');
     
-    assertEAE([.17085, .100531], batch_PCA.stats{1}.R2b_a, 5)
+    assertEAE([.17085, .100531], batch_PCA.stats{1}.R2Xb_a, 5)
     assertEAE(expected.t, batch_PCA.T{1}, 2, true)
     assertEAE(expected.p, batch_PCA.P{1}, 2, true)
     
@@ -919,10 +919,10 @@ function MBPCA_tests()
     assertEAE(mbmodel.super.stats.R2X,  stats_PCA.R2X_overall, 14)
     
     % Compare block R2 values for block 1 and 2
-    assertEAE(mbmodel.stats{1}.R2b_a,  stats_MB.R2X{1}, 5)
-    assertEAE(mbmodel.stats{1}.R2b_a,  stats_PCA.R2X{1}, 5)
-    assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 5)
-    assertEAE(mbmodel.stats{2}.R2b_a,  stats_PCA.R2X{2}, 5)
+    assertEAE(mbmodel.stats{1}.R2Xb_a,  stats_MB.R2X{1}, 5)
+    assertEAE(mbmodel.stats{1}.R2Xb_a,  stats_PCA.R2X{1}, 5)
+    assertEAE(mbmodel.stats{2}.R2Xb_a,  stats_MB.R2X{2}, 5)
+    assertEAE(mbmodel.stats{2}.R2Xb_a,  stats_PCA.R2X{2}, 5)
     
     
     % TODO(KGD): test on new/same data and ensure the apply() function works
@@ -1279,10 +1279,10 @@ function MBPLS_tests()
     assertEAE(mbmodel.super.stats.R2Y,  stats_PLS.R2Y_overall, 8)
     
     % Compare block R2 values for block 1 and 2
-    assertEAE(mbmodel.stats{1}.R2b_a,  stats_MB.R2X{1}, 8)
-    assertEAE(mbmodel.stats{1}.R2b_a,  stats_PLS.R2X{1},8)
-    assertEAE(mbmodel.stats{2}.R2b_a,  stats_MB.R2X{2}, 8)
-    assertEAE(mbmodel.stats{2}.R2b_a,  stats_PLS.R2X{2},8)
+    assertEAE(mbmodel.stats{1}.R2Xb_a,  stats_MB.R2X{1}, 8)
+    assertEAE(mbmodel.stats{1}.R2Xb_a,  stats_PLS.R2X{1},8)
+    assertEAE(mbmodel.stats{2}.R2Xb_a,  stats_MB.R2X{2}, 8)
+    assertEAE(mbmodel.stats{2}.R2Xb_a,  stats_PLS.R2X{2},8)
 
     % TODO(KGD): compare block loadings, SPE and T2 value, variable-based R2
     % TODO(KGD): test on new/same data and ensure the apply() function works

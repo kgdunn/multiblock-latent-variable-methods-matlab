@@ -118,12 +118,12 @@ classdef mbpca < mblvm
                     ssq_cumul = ssq_cumul + sum(col_ssq);
                     ssq_before = ssq_before + sum(self.stats{b}.start_SS_col);
                     
-                    self.stats{b}.R2k_a(:,a) = 1 - col_ssq ./ self.stats{b}.start_SS_col';
-                    self.stats{b}.R2b_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
+                    self.stats{b}.R2Xk_a(:,a) = 1 - col_ssq ./ self.stats{b}.start_SS_col';
+                    self.stats{b}.R2Xb_a(1,a) = 1 - sum(col_ssq) / sum(self.stats{b}.start_SS_col);
                     self.stats{b}.SSQ_exp(1,a) = sum(col_ssq);
                     if a>1
-                        self.stats{b}.R2k_a(:,a) = self.stats{b}.R2k_a(:,a) - sum(self.stats{b}.R2k_a(:,1:a-1), 2);
-                        self.stats{b}.R2b_a(1,a) = self.stats{b}.R2b_a(1,a) - sum(self.stats{b}.R2b_a(1,1:a-1), 2);
+                        self.stats{b}.R2Xk_a(:,a) = self.stats{b}.R2Xk_a(:,a) - sum(self.stats{b}.R2Xk_a(:,1:a-1), 2);
+                        self.stats{b}.R2Xb_a(1,a) = self.stats{b}.R2Xb_a(1,a) - sum(self.stats{b}.R2Xb_a(1,1:a-1), 2);
                     end
                     
                     self.stats{b}.SPE(:,a) = row_ssq;
@@ -270,7 +270,7 @@ classdef mbpca < mblvm
                 fprintf_args = zeros(1, 2+self.B);
                 fprintf_args(1:2) =  [a, self.super.stats.R2X(a)*100];
                 for b = 1:self.B
-                    fprintf_args(2+b) = self.stats{b}.R2b_a(a)*100;
+                    fprintf_args(2+b) = self.stats{b}.R2Xb_a(a)*100;
                 end
                 fprintf(all_lines, fprintf_args);
             end

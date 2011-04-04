@@ -9,8 +9,8 @@ function test_plot_class()
     FMC = load('datasets/FMC.mat');
     
     % Initial conditions
-    Z = block(FMC.Z);
-    Z.add_labels(2, FMC.Znames)   % you can always add labels later on 
+    Z = block(FMC.Zop);
+    Z.add_labels(2, FMC.Zop_names)   % you can always add labels later on 
 
     % Final quality attributes (FQAs)
     Y = block(FMC.Y, {'col_labels', FMC.Ynames});   % Add labels when creating the block

@@ -657,9 +657,9 @@ classdef mblvm < handle
                     self.stats{b}.SPE_j = [];
 
                     self.stats{b}.start_SS_col = [];
-                    self.stats{b}.R2k_a = [];  % not cumulative !                    
+                    self.stats{b}.R2Xk_a = [];  % is it cumulative ?
                     self.stats{b}.col_ssq_prior = [];
-                    self.stats{b}.R2b_a = [];
+                    self.stats{b}.R2Xb_a = [];
                     self.stats{b}.SSQ_exp = [];
                     self.stats{b}.VIP_a = [];
                     %self.stats{b}.VIP_f = cell({});
@@ -704,7 +704,7 @@ classdef mblvm < handle
                 
                 % R^2 for every variable in the block, per component (not cumulative)
                 % K(b) x A
-                self.stats{b}.R2k_a = zeroexp([dblock.K, A], self.stats{b}.R2k_a);
+                self.stats{b}.R2Xk_a = zeroexp([dblock.K, A], self.stats{b}.R2Xk_a);
                 
                 % R^2 for every variable in the Y-block, per component (not cumulative)
                 % M x A
@@ -717,7 +717,7 @@ classdef mblvm < handle
                                 
                 % R^2 for the block, per component
                 % 1 x A
-                self.stats{b}.R2b_a = zeroexp([1, A], self.stats{b}.R2b_a);
+                self.stats{b}.R2Xb_a = zeroexp([1, A], self.stats{b}.R2Xb_a);
                 
                 % Sum of squares explained for this component
                 % 1 x A
@@ -2111,7 +2111,7 @@ classdef mblvm < handle
             
             % Single block data sets (PCA and PLS)
             if hP.model.B == 1
-                R2_data = hP.model.stats{1}.R2k_a(:, series.y_num);
+                R2_data = hP.model.stats{1}.R2Xk_a(:, 1:series.y_num);
                 if isa(hP.model.blocks{1}, 'block_batch')
                     batchblock = hP.model.blocks{1};
                 end
@@ -2120,9 +2120,9 @@ classdef mblvm < handle
             
             % Multiblock data sets: we also have superblock VIPs
             if block == 0
-                R2_data = hP.model.super.stats.R2(:, series.y_num);
+                R2_data = hP.model.super.stats.R2(:, 1:series.y_num);
             else
-                R2_data = hP.model.stats{block}.R2k_a(:, series.y_num);
+                R2_data = hP.model.stats{block}.R2Xk_a(:, 1:series.y_num);
                 if isa(hP.model.blocks{block}, 'block_batch')
                     batchblock = hP.model.blocks{block};
                 end
@@ -2141,16 +2141,53 @@ classdef mblvm < handle
                     end
                 end
                 
-                
-                hPlot = bar(ax, R2_data, 'FaceColor', hP.opt.bar.facecolor);
+                if ~isempty(batchblock)
+                    colour_order = {'r', [255, 102, 0]/255, [0.3, 0.8, 0.2], 'k', 'b', 'm'};
+                    R2_data(isnan(R2_data)) = 0.0;
+                    hPlot = zeros(size(R2_data, 2), 1);
+                    for a = 1:size(R2_data, 2)
+                        set(ax, 'Nextplot', 'add')
+                        this_PC = reshape(sum(R2_data(:,1:a),2), batchblock.nTags, batchblock.J)';
+                        colour = colour_order{mod(a,numel(colour_order))+1};
+                        hPlot(a) = plot(this_PC(:), 'Color', colour);
+                    end
+                    tagNames = batchblock.labels{2};
+                    
+                    nSamples = batchblock.J;
+                    x_r = xlim;
+                    y_r = ylim;
+                    xlim([x_r(1,1) nSamples*batchblock.nTags]);
+                    tick = zeros(batchblock.nTags,1);
+                    for k=1:batchblock.nTags
+                        tick(k) = nSamples*k;
+                    end
+                    set(ax, 'LineWidth', 1);
+
+                    for k=1:batchblock.nTags
+                        text(round((k-1)*nSamples+round(nSamples/2)), ...
+                            diff(y_r)*0.9 + y_r(1),strtrim(tagNames(k,:)), ...
+                            'FontWeight','bold','HorizontalAlignment','center');
+                        %text(round((k-1)*nSamples+round(nSamples/2)), ...
+                        %    diff(y_r)*0.05 + y_r(1), sprintf('%.1f',cum_area(k)), ...
+                        %    'FontWeight','bold','HorizontalAlignment','center');
+                    end
+
+                    set(ax,'XTick',tick);
+                    set(ax,'XTickLabel',[]);
+                    set(ax,'Xgrid','On');
+                    xlabel('Batch time repeated for each variable');
+                    title('R2 per variable, per component');
+                else
+                    set(ax, 'YLim', hP.get_good_limits(R2_data, get(ax, 'YLim'), 'zero'))
+                end
                 set(hPlot, 'Tag', 'lvmplot_series');
                 
-                set(ax, 'YLim', hP.get_good_limits(R2_data, get(ax, 'YLim'), 'zero'))
                 
-                % Batch plots are shown differently
-                if ~isempty(batchblock)
-                    hP.annotate_batch_trajectory_plots(ax, hPlot, batchblock)
-                end
+                
+%                 % Batch plots are shown differently
+%                 if ~isempty(batchblock)
+%                     hP.annotate_batch_trajectory_plots(ax, hPlot, batchblock)
+%                 end
             end
         end
         function R2_per_variable_plot_annotate(hP, series)

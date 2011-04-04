@@ -56,7 +56,7 @@ classdef lvmplot < handle
         end
         
         function self = set_defaults(self)
-            self.opt.highlight = [255, 102, 0]/255;  % orangy colour
+            self.opt.highlight = [255, 102, 0]/255;  % orangey colour
             self.opt.font.size = 14;
             self.opt.font.name = 'Arial';
             self.opt.fig.backgd_colour = [1, 1, 1];
@@ -541,14 +541,15 @@ classdef lvmplot < handle
         function label_scatterplot(self, hPlot, labels)
             % Add labels to a scatter plot series, given by ``hPlot`` and
             % labels in cell array ``labels``
-            if ~self.opt.show_labels
+            if ~self.opt.show_labels || isempty(labels)
                 return
             end
             
             %hAx = get(hPlot, 'Parent');
             x_data = get(hPlot, 'XData');
             y_data = get(hPlot, 'YData');
-            if numel(x_data) ~= numel(labels)
+            
+            if  numel(x_data) ~= numel(labels)
                 error('lvmplot:label_scatterplot', 'Incorrect number of labels supplied')
             end
             
