@@ -2142,7 +2142,7 @@ classdef mblvm < handle
                 end
                 
                 if ~isempty(batchblock)
-                    colour_order = {'r', [255, 102, 0]/255, [0.3, 0.8, 0.2], 'k', 'b', 'm'};
+                    colour_order = {'r', [255, 102, 0]/255, [0.2, 0.8, 0.2], 'k', 'b', 'm'};
                     R2_data(isnan(R2_data)) = 0.0;
                     hPlot = zeros(size(R2_data, 2), 1);
                     for a = 1:size(R2_data, 2)
@@ -2164,8 +2164,9 @@ classdef mblvm < handle
                     set(ax, 'LineWidth', 1);
 
                     for k=1:batchblock.nTags
+                        % y was = diff(y_r)*0.9 + y_r(1),
                         text(round((k-1)*nSamples+round(nSamples/2)), ...
-                            diff(y_r)*0.9 + y_r(1),strtrim(tagNames(k,:)), ...
+                            0.97, strtrim(tagNames(k,:)),... 
                             'FontWeight','bold','HorizontalAlignment','center');
                         %text(round((k-1)*nSamples+round(nSamples/2)), ...
                         %    diff(y_r)*0.05 + y_r(1), sprintf('%.1f',cum_area(k)), ...
@@ -2177,6 +2178,7 @@ classdef mblvm < handle
                     set(ax,'Xgrid','On');
                     xlabel('Batch time repeated for each variable');
                     title('R2 per variable, per component');
+                    set(hPlot, 'UserData', 'dont_annotate')
                 else
                     set(ax, 'YLim', hP.get_good_limits(R2_data, get(ax, 'YLim'), 'zero'))
                 end
@@ -2193,6 +2195,9 @@ classdef mblvm < handle
         function R2_per_variable_plot_annotate(hP, series)
             ax = hP.gca();
             hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            if strcmpi(get(hBar, 'UserData'), 'dont_annotate')
+                return
+            end
             
             if series.x_num > 0 && series.y_num > 0                         
                 title(ax, 'R2 plot')

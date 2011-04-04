@@ -56,8 +56,8 @@ Y = Y.exclude(1, missing_chemistry);
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 3 components
-%cqa_pca = lvm({'CQAs', Y}, 2);
-%plot(cqa_pca)
+cqa_pca = lvm({'CQAs', Y}, 2);
+plot(cqa_pca)
 
 % There seem to be 2 clusters in the CQA space.  Let's take a look at
 % contributions between points 
