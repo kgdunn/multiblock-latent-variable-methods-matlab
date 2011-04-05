@@ -453,8 +453,8 @@ classdef mbpls < mblvm
             plt.more_text = ': of component';
             plt.more_type = 'a';
             plt.more_block = '';
-            plt.callback = @self.weight_plot;
-            plt.annotate = @self.weight_plot_annotate;
+            plt.callback = @self.weights_plot;
+            plt.annotate = @self.weights_plot_annotate;
             out = [out; plt];
             
             plt.name = 'R2-Y-variable';
@@ -634,6 +634,7 @@ classdef mbpls < mblvm
         
         function predictions_plot(hP, series)
             ax = hP.gca();
+            hP.hDropdown.setEnabled(false)
             if strcmpi(series.current, 'x')
                 idx = series.x_num;
             elseif strcmpi(series.current, 'y')
@@ -686,9 +687,131 @@ classdef mbpls < mblvm
             end
         end
         
-        function weight_plot(hP, series)
+        function [weights_h, weights_v, batchblock] = get_weights_data(hP, series)
+            % Correctly fetches the loadings data for the current block and dropdowns  \
+            % Ugly hack to get batch blocks shown            
+            block = hP.c_block;
+            batchblock = [];
+            weights_h.data = [];
+            
+            % Single block data sets (PCA and PLS)
+            if hP.model.B == 1
+                if series.x_num > 0
+                    weights_h = hP.model.W{1}(:, series.x_num);
+                    if isa(hP.model.blocks{1}, 'block_batch')
+                        batchblock = hP.model.blocks{1};
+                    end
+                end
+                weights_v = hP.model.W{1}(:, series.y_num);
+                if isa(hP.model.blocks{1}, 'block_batch')
+                    batchblock = hP.model.blocks{1};
+                end
+                return
+            end
+            
+            % Multiblock data sets: we also have superloadings
+            if block == 0
+                weights_v = hP.model.super.W(:, series.y_num);
+            else
+                weights_v = hP.model.W{block}(:, series.y_num);
+                if isa(hP.model.blocks{block}, 'block_batch')
+                    batchblock = hP.model.blocks{block};
+                end
+            end
+                
+            if series.x_num > 0
+                if block == 0
+                    weights_h = hP.model.super.W(:, series.x_num); 
+                else
+                    weights_h = hP.model.W{block}(:, series.x_num);
+                    if isa(hP.model.blocks{block}, 'block_batch')
+                        batchblock = hP.model.blocks{block};
+                    end
+                end
+            end
+        end        
+        function weights_plot(hP, series)            
+            % Loadings plots for overall or per-block
+            ax = hP.gca();
+            [weights_h, weights_v, batchblock] = hP.model.get_weights_data(hP, series);
+            % Batch plots are shown differently
+            % TODO(KGD): figure a better way to deal with batch blocks
+            if ~isempty(batchblock) && not(strcmpi(hP.ptype, 'weights-batch'))
+                hP.model.plot(hP, 'weights-batch')
+                return
+            end
+            if strcmpi(hP.ptype, 'weights-batch')
+                % Find the batchblock, set it to the current block
+                hP.hDropdown.setEnabled(false)
+                for b=1:hP.model.B
+                    if isa(hP.model.blocks{b}, 'block_batch')
+                        bblock = b;
+                        hP.c_block=bblock;
+                        continue
+                    end
+                end
+                [weights_h, weights_v, batchblock] = hP.model.get_weights_data(hP, series);
+            end
+            % Bar plot of the single loading
+            if series.x_num <= 0
+                % We need a bar plot for the loadings
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hPlot
+                    if ishandle(hPlot)
+                        delete(hPlot)
+                    end
+                end
+                hPlot = bar(ax, weights_v, 'FaceColor', hP.opt.bar.facecolor);
+                set(hPlot, 'Tag', 'lvmplot_series');
+                
+                % Batch plots are shown differently
+                % TODO(KGD): figure a better way to deal with batch blocks
+                if ~isempty(batchblock)
+                    hP.annotate_batch_trajectory_plots(ax, hPlot, batchblock)
+                end
+                
+                return
+            end
+            
+            % Scatter plot of the loadings            
+            hPlot = hP.set_data(ax, weights_h, weights_v);            
+            set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0]);
+            set(ax, 'XLim', hP.get_good_limits(weights_h, get(ax, 'YLim'), 'zero'))
+            set(ax, 'YLim', hP.get_good_limits(weights_v, get(ax, 'YLim'), 'zero'))
         end
-        function weight_plot_annotate(hP, series)
+        function weights_plot_annotate(hP, series)
+            ax = hP.gca();
+            hBar = findobj(ax, 'Tag', 'lvmplot_series');
+            if isempty(hBar)
+                return
+            end
+            if series.x_num > 0 && series.y_num > 0                         
+                title(ax, 'Weights plot')
+                grid on
+                xlabel(ax, ['w_', num2str(series.x_num)])
+                ylabel(ax, ['w_', num2str(series.y_num)])
+                hPlot = findobj(ax, 'Tag', 'lvmplot_series');
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
+                else
+                    labels = hP.model.get_labels(hP.dim, 1);
+                end
+                hP.label_scatterplot(hPlot, labels);
+                
+            
+            elseif series.y_num > 0                
+                title(ax, 'Weights bar plot', 'FontSize', 15);
+                grid on
+                ylabel(ax, ['w_', num2str(series.y_num)])
+                
+                hBar = findobj(ax, 'Tag', 'lvmplot_series');
+                if hP.model.B > 1
+                    labels = hP.model.get_labels(hP.dim, hP.c_block);
+                else
+                    labels = hP.model.get_labels(hP.dim, 1);
+                end
+                hP.annotate_barplot(hBar, labels)
+            end
         end
         
         function R2_per_Y_variable_plot(hP, series)

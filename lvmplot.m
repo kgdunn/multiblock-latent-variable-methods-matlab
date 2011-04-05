@@ -222,6 +222,21 @@ classdef lvmplot < handle
             set(hQuick, 'Visible' ,'on')
         end
         
+        function clear_figure(self)
+            N = numel(self.hA);
+            for n = 1:N
+                if ishandle(self.hA(n))
+                    delete(self.hA(n))
+                end
+                if ishandle(self.hS(n))
+                    delete(self.hS(n))
+                end
+                if ishandle(self.hM(n))
+                    delete(self.hM(n))
+                end
+            end
+        end
+        
         function h = new_figure(self, varargin)
             % Syntax: self.new_figure('off')
             % Creates a new figure; set the visibility for it
@@ -558,7 +573,8 @@ classdef lvmplot < handle
             y_data = get(hPlot, 'YData');
             
             if  numel(x_data) ~= numel(labels)
-                error('lvmplot:label_scatterplot', 'Incorrect number of labels supplied')
+                % KGD(HACK): to get batch plots working
+                %error('lvmplot:label_scatterplot', 'Incorrect number of labels supplied')
             end
             
             axis_extent = axis;
@@ -588,16 +604,15 @@ classdef lvmplot < handle
             range = data(end)-data(1);
             actual_range = extent(2) - extent(1);
             if actual_range > 1.4*range
-                delta = 0.08*range;
+                delta = 0.15*range;
                 extent(1) = data(1)-delta;
                 extent(2) = data(end)+delta;
-                if nargin==4
-                    options = varargin{1};
-
-                    switch lower(options)
-                        case 'zero'
-                            extent(1) = min(0.0, extent(1));
-                    end
+            end
+            if nargin==4
+                options = varargin{1};                
+                switch lower(options)
+                    case 'zero'
+                        extent(1) = min(0.0, extent(1));
                 end
             end
             if data(end) > extent(2)

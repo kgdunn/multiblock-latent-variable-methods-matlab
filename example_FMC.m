@@ -79,8 +79,8 @@ plot(pls_mb)
 
 
 % Batch MB PLS model
-batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
-plot(batch_mbpls)
+%batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
+%plot(batch_mbpls)
 
 
 % Create monitoring model

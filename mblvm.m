@@ -871,19 +871,28 @@ classdef mblvm < handle
                     varargout{i} = h;
                 end
                 return
+            elseif nargin==3
+                show_what = varargin{2};
+                h = lvmplot(self, show_what);                
+                h.new_figure();  % Start a new figure window
+                
+                %h = varargin{1};
+                %show_what = varargin{2};
+                %h.clear_figure();
+                %h.ptype = show_what;
             else
                 show_what = varargin{1};
                 h = lvmplot(self, show_what);                
+                h.new_figure();  % Start a new figure window
             end
-            
-            % Start a new figure window
-            h.new_figure();
             
             switch lower(show_what)
                 case 'scores'
                     basic_plot__scores(h);
                 case 'loadings'
                     basic_plot__loadings(h);
+                case 'weights'
+                    basic_plot__weights(h);
                 case 'spe'
                     basic_plot__spe(h);                    
                 case 'predictions'
@@ -898,6 +907,9 @@ classdef mblvm < handle
                     basic_plot_R2_component(h);
                 case 'r2-y-variable'
                     basic_plot_R2_Y_variable(h)
+                case 'weights-batch'
+                    batch_plot__weights(h);
+                    
             end
             h.update_all_plots();
             h.update_annotations();
@@ -2025,6 +2037,14 @@ classdef mblvm < handle
         end
         function coefficient_plot(hP, series)
             ax = hP.gca();
+            % We cannot visualize coefficient from the "Overall block"
+            if hP.hDropdown.getSelectedIndex == 0
+                hP.hDropdown.setSelectedIndex(1)
+                return
+            end
+            
+            
+            
             coeff_data = hP.model.get_coefficient_data(hP, series);
             if isempty(coeff_data)
                 hChild = get(ax, 'Children');
@@ -2407,7 +2427,7 @@ function basic_plot__loadings(hP)
             hP.nCol = 1;
             hP.new_axis([1 2]);
             hP.set_plot(1, {'Order', -1}, {'Loadings', 1});
-            hP.set_plot(1, {'Order', -1}, {'Loadings', 2});
+            hP.set_plot(2, {'Order', -1}, {'Loadings', 2});
         else
             hP.nRow = 1;
             hP.nCol = 1;
@@ -2426,13 +2446,77 @@ function basic_plot__loadings(hP)
             hP.nRow = 2;
             hP.nCol = 2;
             hP.new_axis([1, 2, 3, 4]);
-            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2});  % t1-t2
-            hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2});  % t3-t2
-            hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3});  % t1-t3
-            hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A});  % Hot_T2 using all components
+            hP.set_plot(1, {'Loadings', 1}, {'Loadings', 2});
+            hP.set_plot(2, {'Loadings', 3}, {'Loadings', 2});
+            hP.set_plot(3, {'Loadings', 1}, {'Loadings', 3}); 
+            hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A});  % VIP using all components
         end
     end
 end % ``basic_plot__loadings``
+
+function basic_plot__weights(hP)
+    % Show a basic set of loadings plots.
+
+    % These are variable-based plots
+    hP.dim = 2;
+    
+    if hP.model.A == 1
+        hP.nRow = 1;
+        hP.nCol = 1;
+        hP.new_axis(1);
+        hP.set_plot(1, {'Order', -1}, {'Weights', 1});
+    elseif hP.model.A == 2
+        if hP.model.B == 1 && isa(hP.model.blocks{1}, 'block_batch')
+            hP.nRow = 2;
+            hP.nCol = 1;
+            hP.new_axis([1 2]);
+            hP.set_plot(1, {'Order', -1}, {'Weights', 1});
+            hP.set_plot(2, {'Order', -1}, {'Weights', 2});
+        else
+            hP.nRow = 1;
+            hP.nCol = 1;
+            hP.new_axis(1);
+            hP.set_plot(1, {'Weights', 1}, {'Weights', 2});
+        end
+    elseif hP.model.A >= 3
+        if hP.model.B == 1 && isa(hP.model.blocks{1}, 'block_batch')
+            hP.nRow = 2;
+            hP.nCol = 1;
+            hP.new_axis([1 2]);
+            hP.set_plot(1, {'Order', -1}, {'Weights', 1});
+            hP.set_plot(2, {'Order', -1}, {'Weights', 2});
+        else
+            % Show a t1-t2, a t2-t3, a t1-t3 and a Hotelling's T2 plot
+            hP.nRow = 2;
+            hP.nCol = 2;
+            hP.new_axis([1, 2, 3, 4]);
+            hP.set_plot(1, {'Weights', 1}, {'Weights', 2});
+            hP.set_plot(2, {'Weights', 3}, {'Weights', 2}); 
+            hP.set_plot(3, {'Weights', 1}, {'Weights', 3}); 
+            hP.set_plot(4, {'Order', -1},  {'VIP', hP.model.A});  
+        end
+    end
+end % ``basic_plot__weights``
+
+function batch_plot__weights(hP)
+    % Show weights plots for batch systems
+
+    % These are variable-based plots
+    hP.dim = 2;
+    
+    if hP.model.A == 1
+        hP.nRow = 1;
+        hP.nCol = 1;
+        hP.new_axis(1);
+        hP.set_plot(1, {'Order', -1}, {'Weights', 1});
+    elseif hP.model.A >= 2
+        hP.nRow = 2;
+        hP.nCol = 1;
+        hP.new_axis([1 2]);
+        hP.set_plot(1, {'Order', -1}, {'Weights', 1});
+        hP.set_plot(2, {'Order', -1}, {'Weights', 2});
+    end
+end % ``batch_plot__weights``
 
 function basic_plot__spe(hP)
     % These are observation-based plots
