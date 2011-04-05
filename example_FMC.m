@@ -82,7 +82,7 @@ end
 % Multiblock PLS model: effect of chemistry and operating conditions on the Y's
 % --------------------
 if true
-    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
+    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 2);
     plot(pls_mb)
     plot(Zchem, {'mark', '20'});
 end
@@ -90,7 +90,7 @@ end
 
 % Take a look only at the trajectories
 if true
-    batchPCA = lvm({'Trajectories', X},3);
+    batchPCA = lvm({'Trajectories', X}, 2);
     plot(batchPCA)
     plot(X, {'mark', '20'});
 end

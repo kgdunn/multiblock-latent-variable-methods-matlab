@@ -316,19 +316,18 @@ classdef block_base < handle
             end
             
             for j = 1:numel(names)
-                name_j = strtrim(names(j));
+                name_j = names(j);
                 for k = 1:numel(ax_labels)
                     if strcmp(name_j, strtrim(ax_labels(k)))
                         idx(end+1) = k;
                         idx_names(end+1) = ax_labels(k);
-                    end
-%                     % Deal with strings of numbers
-%                     elseif str2double(ax_labels(k)) == str2double(name_j)
-%                         idx(end+1) = k;
-%                         idx_names(end+1) = ax_labels(k);
-%                     end                        
-                end
-                
+%                    end
+                    % Deal with strings of numbers
+                    elseif str2double(ax_labels(k)) == str2double(name_j)
+                        idx(end+1) = k;
+                        idx_names(end+1) = ax_labels(k);
+                    end                        
+                end                
             end
         end
 
@@ -375,7 +374,7 @@ classdef block_base < handle
             self.add_plot_footers(hFooters, footer_string);
             self.add_plot_window_title(hHeaders, title_str)
             for i=1:nargout
-                varargout{i} = hA;
+                varargout{i} = h;
             end
         end
                
