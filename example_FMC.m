@@ -82,18 +82,40 @@ end
 % Multiblock PLS model: effect of chemistry and operating conditions on the Y's
 % --------------------
 if true
-    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 2);
+    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
     plot(pls_mb)
     plot(Zchem, {'mark', '20'});
+end
+if true    
+    Zcombined = block([FMC.Zchem FMC.Zop]);
+    Zcombined.add_labels(1, FMC.batch_names);
+    Zcombined.add_labels(2, [FMC.Zchem_names; FMC.Zop_names]);
+    missing_chemistry = [12, 13, 14, 15, 28, 29, 30, 31, 32, 33, 34, 35, 53];
+    Zcombined = Zcombined.exclude(1, missing_chemistry);
+    %plot(Zcombined)
+
+    pls_combinedZ = lvm({'Z-combined', Zcombined, 'Y', Y}, 2);
+    plot(pls_combinedZ)
+    plot(pls_combinedZ, {'mark', '20'});    
 end
 
 
 % Take a look only at the trajectories
+% ------------------------------------
 if true
     batchPCA = lvm({'Trajectories', X}, 2);
     plot(batchPCA)
     plot(X, {'mark', '20'});
 end
+
+% And the trajectories vs the Y
+% ------------------------------------
+if true
+    batchPLS = lvm({'Trajectories', X, 'Y', Y}, 2);
+    plot(batchPLS)
+    plot(X, {'mark', '42'});
+end
+
 
 
 % Batch MB PLS model
@@ -103,3 +125,4 @@ if true
                        'Trajectories', X, 'Y', Y}, 2);
     plot(batch_mbpls)
 end
+
