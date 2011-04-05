@@ -291,9 +291,10 @@ classdef lvmplot < handle
  
             % Convert into 3D RGB-space
             cdataRedo = ind2rgb(cdata,map);
-            % Add the icon (and its mirror image = undo) to the latest toolbar
-            hToolbar = findall(self.hF,'tag','FigureToolBar');
-            hSimulate = uipushtool('Parent', hToolbar, 'cdata',cdataRedo, 'tooltip','undo', 'ClickedCallback','uiundo(gcbf,''execUndo'')');
+            % Add the icon to the latest toolbar
+            hToolbar = findall(self.hF, 'tag','FigureToolBar');
+            hSimulate = uipushtool('Parent', hToolbar, 'cdata',cdataRedo, ...
+                'tooltip','Contribution tool', 'ClickedCallback', @(src,event)get_contribution(self.model, self));
             set(hSimulate,'Separator','on');
 
             
@@ -785,13 +786,15 @@ function mouseclick_callback(varargin)
         [value, index] = min(distance); %#ok<ASGLU>
         
         hMarker = getappdata(hP.gca, 'Marker');
-        if isempty(hMarker)
+        if isempty(hMarker) || not(ishandle(hMarker))
             set(hP.gca, 'Nextplot', 'add')
             hMarker = plot(x_data(index), y_data(index), 'rh', ...
-                           'MarkerSize', 15, 'LineWidth', 1.5);
+                           'MarkerSize', 15, 'LineWidth', 1.5, ...
+                            'UserData', index);
             setappdata(hP.gca, 'Marker', hMarker)
         else
-            set(hMarker, 'XData', x_data(index), 'YData', y_data(index))
+            set(hMarker, 'XData', x_data(index), 'YData', y_data(index), ...
+                'UserData', index)
         end
         extent = axis;
         if cPoint(1,1)<extent(1) || cPoint(1,1)>extent(2) || cPoint(1,2)<extent(3) || cPoint(1,2)>extent(4)
@@ -799,7 +802,7 @@ function mouseclick_callback(varargin)
             rmappdata(hP.gca, 'Marker');
         end
     end
-    hP.model.get_contribution(index, getappdata(hP.gca, 'SeriesData'))
+    %hP.model.get_contribution(index, getappdata(hP.gca, 'SeriesData'))
     
 end
 

@@ -819,9 +819,59 @@ classdef mblvm < handle
             self.preprocess_extra();         % method must be subclassed 
         end % ``preprocess_blocks``
                 
-        function out = get_contribution(self, idx, series)
-            disp(idx)
-            disp(series)
+        function get_contribution(self, varargin)
+            hP = varargin{1};
+            series = getappdata(hP.gca, 'SeriesData');
+            hMarker = getappdata(hP.gca, 'Marker');
+            idx = get(hMarker, 'UserData');
+            if hP.c_block == 0
+                return
+            end
+            switch series.y_type{1}
+                case 'SPE'
+                    block_index = self.b_iter(hP.c_block);
+                    spe_contrib = self.data(idx, block_index);
+                    spe_contrib = sign(spe_contrib) .* spe_contrib .^2;
+                    figure('Color', 'white')
+                    hAx = axes;
+                    bar(spe_contrib);
+                    labels= self.blocks{hP.c_block}.labels{2};
+                    if not(isempty(labels))
+                        set(hAx, 'XTickLabel', labels)
+                    end
+                    
+                case 'Scores'                    
+                    pp_data = self.blocks{hP.c_block}.data(idx,:);
+                    contrib = zeros(size(pp_data));
+                    contrib = contrib(:);
+                    if strcmp(self.model_type, 'PCA')
+                        weights = self.P{hP.c_block};
+                    elseif strcmp(self.model_type, 'PLS')
+                        temp_W = self.W{hP.c_block};
+                        temp_P = self.P{hP.c_block};
+                        weights = temp_W*inv(temp_P'*temp_W);  % W-star: is this correct for blocks: non-orthogonal scores?
+                    end
+                    scores = self.T{hP.c_block}(idx, :);
+                    score_variance = std(self.T{hP.c_block});
+                    if series.x_num > 0
+                        contrib = contrib + ...
+                                  abs(scores(series.x_num)./score_variance(series.x_num)) .* ...
+                                  weights(:,series.x_num) .* pp_data(:);
+                    end
+                    if series.y_num > 0
+                        contrib = contrib + ...
+                                  abs(scores(series.y_num)./score_variance(series.y_num)) .* ...
+                                  weights(:,series.y_num) .* pp_data(:);
+                    end
+                    figure('Color', 'white')
+                    hAx = axes;
+                    bar(contrib);
+                    labels= self.blocks{hP.c_block}.labels{2};
+                    if not(isempty(labels))
+                        set(hAx, 'XTickLabel', labels)
+                    end
+                    
+            end
         end
         
         function self = split_result(self, result, rootfield, subfield)
@@ -920,9 +970,9 @@ classdef mblvm < handle
             h.update_annotations();
             
             set(h.hF, 'Visible', 'on')
-            for i=1:nargout
-                varargout{i} = h;
-            end
+%             for i=1:nargout
+%                 varargout{i} = h;
+%             end
 
 %             self.add_plot_footers(hFooters, popt.footer_string);
 %             self.add_plot_window_title(hHeaders, title_str)
@@ -1767,8 +1817,7 @@ classdef mblvm < handle
             hP.label_scatterplot(hPlot, labels);
         end
         
-        function spe_plot(hP, series)
-            ax = hP.gca();
+        function spe_data = get_spe_data(hP, series)
             block = hP.c_block;
             if strcmpi(series.current, 'x')
                 idx = series.x_num;
@@ -1777,15 +1826,18 @@ classdef mblvm < handle
             end       
             
             if block == 0
-                plotdata = hP.model.super.SPE(:, idx);
+                spe_data = hP.model.super.SPE(:, idx);
             else
-                plotdata = hP.model.stats{block}.SPE(:, idx);
+                spe_data = hP.model.stats{block}.SPE(:, idx);
             end
-            
+        end
+        function spe_plot(hP, series)
+            ax = hP.gca();
+            spe_data = hP.model.get_spe_data(hP, series);
             if strcmpi(series.current, 'x')
-                hPlot = hP.set_data(ax, plotdata, []);
+                hPlot = hP.set_data(ax, spe_data, []);
             elseif strcmpi(series.current, 'y')
-                hPlot = hP.set_data(ax, [], plotdata);
+                hPlot = hP.set_data(ax, [], spe_data);
             end
             set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
         end
@@ -2523,7 +2575,7 @@ function basic_plot__spe(hP)
     hP.nRow = 1;
     hP.nCol = 1;
     hP.new_axis(1);
-    hP.set_plot(1, {'Order', -1}, {'SPE', 1});
+    hP.set_plot(1, {'Order', -1}, {'SPE', hP.model.A});
 end % ``basic_plot__spe``
 
 function basic_plot__predictions(hP)
