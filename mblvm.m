@@ -821,24 +821,19 @@ classdef mblvm < handle
                 
         function get_contribution(self, varargin)
             hP = varargin{1};
-            series = getappdata(hP.gca, 'SeriesData');
-            hMarker = getappdata(hP.gca, 'Marker');
-            idx = get(hMarker, 'UserData');
+            series = getappdata(get(hP.hMarker,'Parent'), 'SeriesData');
+            idx = get(hP.hMarker, 'UserData');
             if hP.c_block == 0
-                return
+                error('Cannot calculate contributions for superblock items');
             end
+            contrib = [];
             switch series.y_type{1}
                 case 'SPE'
                     block_index = self.b_iter(hP.c_block);
-                    spe_contrib = self.data(idx, block_index);
-                    spe_contrib = sign(spe_contrib) .* spe_contrib .^2;
-                    figure('Color', 'white')
-                    hAx = axes;
-                    bar(spe_contrib);
+                    contrib = self.data(idx, block_index);
+                    contrib = sign(contrib) .* contrib .^2;
                     labels= self.blocks{hP.c_block}.labels{2};
-                    if not(isempty(labels))
-                        set(hAx, 'XTickLabel', labels)
-                    end
+                    
                     
                 case 'Scores'                    
                     pp_data = self.blocks{hP.c_block}.data(idx,:);
@@ -856,22 +851,32 @@ classdef mblvm < handle
                     if series.x_num > 0
                         contrib = contrib + ...
                                   abs(scores(series.x_num)./score_variance(series.x_num)) .* ...
-                                  weights(:,series.x_num) .* pp_data(:);
+                                  abs(weights(:,series.x_num) .* pp_data(:)) .* sign(pp_data(:));
                     end
                     if series.y_num > 0
                         contrib = contrib + ...
                                   abs(scores(series.y_num)./score_variance(series.y_num)) .* ...
-                                  weights(:,series.y_num) .* pp_data(:);
+                                  abs(weights(:,series.y_num) .* pp_data(:)) .* sign(pp_data(:));
                     end
-                    figure('Color', 'white')
-                    hAx = axes;
-                    bar(contrib);
                     labels= self.blocks{hP.c_block}.labels{2};
-                    if not(isempty(labels))
-                        set(hAx, 'XTickLabel', labels)
-                    end
-                    
             end
+            
+            figure('Color', 'white')
+            hAx = axes;
+            if isempty(contrib)
+                text(0.5, 0.5, 'Contributions not available yet', 'HorizontalAlignment', 'center');
+                set(hAx,'Visible', 'off')
+                return
+            end
+            hBar = bar(contrib);
+            if isa(hP.model.blocks{hP.c_block}, 'block_batch')
+                hP.annotate_batch_trajectory_plots(hAx, hBar, hP.model.blocks{hP.c_block})
+            else
+                if not(isempty(labels))
+                    set(hAx, 'XTickLabel', labels)
+                end
+            end
+                
         end
         
         function self = split_result(self, result, rootfield, subfield)

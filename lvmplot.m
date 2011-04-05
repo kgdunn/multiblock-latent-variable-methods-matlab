@@ -14,6 +14,7 @@ classdef lvmplot < handle
         hS = [];            % Vector of plot handles [nRow x nCol] (in subplot order) for data being shown
         hM = [];            % Vector of axis selector markers
         hDropdown = [];     % Java dropdown
+        hMarker = [];       % Handle to the marker
         nA = NaN;           % Number of axes in plot
         nRow = NaN;         % Number of rows of axes
         nCol = NaN;         % Number of columns of axes
@@ -245,8 +246,9 @@ classdef lvmplot < handle
             self.hF = figure(...
                  'Visible',     'on', ...
                  'DoubleBuffer',  'on', ...  % Allows fast redrawing of images
-                 'BackingStore', 'off', ...  % Faster animation when figures are updated frequently
-                 'WindowButtonDownFcn', @mouseclick_callback);
+                 'BackingStore', 'off');     % Faster animation when figures are updated frequently
+                 %'WindowButtonDownFcn', @mouseclick_callback);
+                 
 
             set(self.hF, 'Color', self.opt.fig.backgd_colour);
             if self.opt.fig.add_menu
@@ -346,6 +348,7 @@ classdef lvmplot < handle
                 set(h, 'Color', self.opt.fig.backgd_colour)
                 set(h, 'FontName', self.opt.font.name)
                 set(h, 'FontSize', self.opt.font.size)
+                set(h, 'ButtonDownFcn', @self.mouseclick_callback);
                 self.hA(i) = h;
                 self.index = i;
 
@@ -389,6 +392,7 @@ classdef lvmplot < handle
                     end
                 end
                 vector = zeros(num, 1) .* NaN;
+                set(h, 'Nextplot', 'add')
                 self.hS(self.index) = plot(h, vector, vector);
                 set(self.hS, 'tag', 'lvmplot_series')
 
@@ -650,11 +654,84 @@ classdef lvmplot < handle
             end            
         end
         
+        function mouseclick_callback(self, varargin)    
+            hAx = varargin{1};
+            cPoint = get(hAx, 'CurrentPoint');
+            hObj = findobj(hAx, 'Tag', 'lvmplot_series');
+            if numel(hObj) == 1 && strcmp(get(hObj,'Type'), 'line')
+                x_data = get(hObj, 'XData');
+                y_data = get(hObj, 'YData');
+                distance = sqrt((x_data-cPoint(1,1)).^2 + (y_data-cPoint(1,2)).^2);
+                [value, idx] = min(distance); %#ok<ASGLU>
+                
+                if isempty(self.hMarker) || not(ishandle(self.hMarker))
+                    set(hAx, 'Nextplot', 'add')
+                    self.hMarker = plot(hAx, x_data(idx), y_data(idx), 'rh', ...
+                        'MarkerSize', 15, 'LineWidth', 1.5, ...
+                        'UserData', idx);
+                    setappdata(hAx, 'Marker', self.hMarker)
+                else
+                    set(self.hMarker, 'XData', x_data(idx), 'YData', y_data(idx), ...
+                        'UserData', idx, 'Parent', hAx)
+                end
+                extent = [get(hAx,'XLim') get(hAx,'YLim')];
+                if cPoint(1,1)<extent(1) || cPoint(1,1)>extent(2) || cPoint(1,2)<extent(3) || cPoint(1,2)>extent(4)
+                    delete(self.hMarker)
+                    rmappdata(hAx, 'Marker');
+                end
+            end
+            
+        end
+        
+        function annotate_batch_trajectory_plots(self, hAx, hBar, batch_block)
+            % Annotates a batch-like trajectory plot in the axis ``hAx``
+            % given the series handle, ``hBar`` and the corresponding batch
+            % block from which it came, ``batch_block`` (used for dimensioning)
+            
+            data = get(hBar, 'YData');
+            set(hAx, 'Xlim', self.get_good_limits(get(hBar, 'XData'), get(hAx, 'XLim')))
+            set(hAx, 'Ylim', self.get_good_limits(data, get(hAx, 'YLim'), 'zero'))
+            nSamples = batch_block.J;     % Number of samples per tag
+            nTags = batch_block.nTags;    % Number of tags in the batch data
+            
+            % Reshape the data in the bar plot to variable based order
+            data = reshape(data, nTags, nSamples)';
+            data(isnan(data)) = 0.0;
+            cum_area = sum(abs(data));
+            set(hBar, 'YData', data(:), 'FaceColor', self.opt.bar.facecolor, ...
+                                        'EdgeColor', self.opt.bar.facecolor);
+                                    
+            tagNames = batch_block.labels{2};
+            
+            x_r = xlim;
+            y_r = ylim;
+            xlim([x_r(1,1) nSamples*nTags]);
+            tick = zeros(nTags,1);
+            for k=1:nTags
+                tick(k) = nSamples*k;
+            end
+            set(hAx, 'LineWidth', 1);
+
+            for k=1:nTags
+                text(round((k-1)*nSamples+round(nSamples/2)), ...
+                    diff(y_r)*0.9 + y_r(1),strtrim(tagNames(k,:)), ...
+                    'FontWeight','bold','HorizontalAlignment','center');
+                text(round((k-1)*nSamples+round(nSamples/2)), ...
+                    diff(y_r)*0.05 + y_r(1), sprintf('%.1f',cum_area(k)), ...
+                    'FontWeight','bold','HorizontalAlignment','center');
+            end
+
+            set(hAx,'XTick',tick);
+            set(hAx,'XTickLabel',[]);
+            set(hAx,'Xgrid','On');
+            xlabel('Batch time repeated for each variable');            
+            
+        end % ``annotate_batch_trajectory_plots``
+        
     end % end: methods (ordinary)
     
     methods (Static=true)
-        
-        
+                
         function [nrow, ncol] = subplot_layout(nplots) 
             % Determines the best layout for ``nplots``.  
             % TODO(KGD): give the figure handle so that it can take a minimum
@@ -724,87 +801,9 @@ classdef lvmplot < handle
                 end
             end            
         end %``annotate_barplot``
-        
-        function annotate_batch_trajectory_plots(hAx, hBar, batch_block)
-            % Annotates a batch-like trajectory plot in the axis ``hAx``
-            % given the series handle, ``hBar`` and the corresponding batch
-            % block from which it came, ``batch_block`` (used for dimensioning)
-            hP = get(get(hAx, 'Parent'), 'UserData');
-            self = hP;
-            data = get(hBar, 'YData');
-            set(hAx, 'Xlim', self.get_good_limits(get(hBar, 'XData'), get(hAx, 'XLim')))
-            set(hAx, 'Ylim', self.get_good_limits(data, get(hAx, 'YLim'), 'zero'))
-            nSamples = batch_block.J;     % Number of samples per tag
-            nTags = batch_block.nTags;    % Number of tags in the batch data
-            
-            % Reshape the data in the bar plot to variable based order
-            data = reshape(data, nTags, nSamples)';
-            data(isnan(data)) = 0.0;
-            cum_area = sum(abs(data));
-            set(hBar, 'YData', data(:), 'FaceColor', hP.opt.bar.facecolor, ...
-                                        'EdgeColor', hP.opt.bar.facecolor);
-                                    
-            tagNames = batch_block.labels{2};
-            
-            x_r = xlim;
-            y_r = ylim;
-            xlim([x_r(1,1) nSamples*nTags]);
-            tick = zeros(nTags,1);
-            for k=1:nTags
-                tick(k) = nSamples*k;
-            end
-            set(hAx, 'LineWidth', 1);
-
-            for k=1:nTags
-                text(round((k-1)*nSamples+round(nSamples/2)), ...
-                    diff(y_r)*0.9 + y_r(1),strtrim(tagNames(k,:)), ...
-                    'FontWeight','bold','HorizontalAlignment','center');
-                text(round((k-1)*nSamples+round(nSamples/2)), ...
-                    diff(y_r)*0.05 + y_r(1), sprintf('%.1f',cum_area(k)), ...
-                    'FontWeight','bold','HorizontalAlignment','center');
-            end
-
-            set(hAx,'XTick',tick);
-            set(hAx,'XTickLabel',[]);
-            set(hAx,'Xgrid','On');
-            xlabel('Batch time repeated for each variable');            
-            
-        end % ``annotate_batch_trajectory_plots``
-        
-        
+      
     end % end: methods (static)
 end % end: ``classdef``
-      
-function mouseclick_callback(varargin)
-    hP = get(varargin{1}, 'UserData');
-    cPoint = get(hP.gca, 'CurrentPoint');
-    hObj = findobj(hP.gca, 'Tag', 'lvmplot_series');
-    if numel(hObj) == 1 && strcmp(get(hObj,'Type'), 'line')
-        x_data = get(hObj, 'XData');
-        y_data = get(hObj, 'YData');
-        distance = sqrt((x_data-cPoint(1,1)).^2 + (y_data-cPoint(1,2)).^2);
-        [value, index] = min(distance); %#ok<ASGLU>
-        
-        hMarker = getappdata(hP.gca, 'Marker');
-        if isempty(hMarker) || not(ishandle(hMarker))
-            set(hP.gca, 'Nextplot', 'add')
-            hMarker = plot(x_data(index), y_data(index), 'rh', ...
-                           'MarkerSize', 15, 'LineWidth', 1.5, ...
-                            'UserData', index);
-            setappdata(hP.gca, 'Marker', hMarker)
-        else
-            set(hMarker, 'XData', x_data(index), 'YData', y_data(index), ...
-                'UserData', index)
-        end
-        extent = axis;
-        if cPoint(1,1)<extent(1) || cPoint(1,1)>extent(2) || cPoint(1,2)<extent(3) || cPoint(1,2)>extent(4)
-            delete(hMarker)
-            rmappdata(hP.gca, 'Marker');
-        end
-    end
-    %hP.model.get_contribution(index, getappdata(hP.gca, 'SeriesData'))
-    
-end
 
 function dropdown_block_selector(hCombo, varargin)
     idx = get(hCombo,'SelectedIndex');  % 0=topmost item

@@ -321,12 +321,12 @@ classdef block_base < handle
                     if strcmp(name_j, ax_labels(k))
                         idx(end+1) = k;
                         idx_names(end+1) = ax_labels(k);
-                        
-                    % Deal with strings of numbers
-                    elseif str2double(ax_labels(k)) == name_j
-                        idx(end+1) = k;
-                        idx_names(end+1) = ax_labels(k);
                     end
+%                     % Deal with strings of numbers
+%                     elseif str2double(ax_labels(k)) == str2double(name_j)
+%                         idx(end+1) = k;
+%                         idx_names(end+1) = ax_labels(k);
+%                     end
                         
                 end
                 
@@ -618,12 +618,21 @@ classdef block_base < handle
             set(hF, 'units', 'Pixels');
              
             screen = get(0,'ScreenSize');   
+%             fPos = get(hF, 'position');
+%             fPos(1) = round(0.10*screen(3));
+%             fPos(2) = round(0); %.10*screen(4));
+%             fPos(3) = screen(3)-2*screen(1);
+%             fPos(4) = screen(4)-2*screen(2);
+%             set(hF, 'Position', fPos);
+%             
             fPos = get(hF, 'position');
-            fPos(1) = round(0.10*screen(3));
-            fPos(2) = round(0); %.10*screen(4));
-            fPos(3) = screen(3)-2*screen(1);
-            fPos(4) = screen(4)-2*screen(2);
+            fPos(1) = round(0.05*screen(3));
+            fPos(2) = round(0.1*screen(4));
+            fPos(3) = 0.90*screen(3);
+            fPos(4) = 0.80*screen(4);
             set(hF, 'Position', fPos);
+            
+            
   
             Txt.Interruptible = 'off';  % Text fields different to default values
             Txt.BusyAction    = 'queue';
