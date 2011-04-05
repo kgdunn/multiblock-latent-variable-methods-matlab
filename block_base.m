@@ -699,6 +699,9 @@ function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_siz
         title(hA(k), char(tagnames{k}), 'FontSize',14)
         set(hA(k), 'FontSize',14)
         axis(hA(k), 'tight')
+        extent = get(hA(k), 'YLim');
+        delta = diff(extent(1:2))*0.05;
+        set(hA(k), 'YLim', [extent(1)-delta extent(2)+delta])
         grid(hA(k),'on')
         if not(isnan(mark))
             set(hA(k),'Nextplot', 'add')

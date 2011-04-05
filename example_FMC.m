@@ -13,10 +13,8 @@
 % [3] http://digitalcommons.mcmaster.ca/opendissertations/1596/
 %      "Batch Process Improvement Using Latent Variable Methods"
 
-show_plots = false;
-special_plots = false;
-fontsize =14;
-
+clear all
+close all
 FMC = load('datasets/FMC.mat');
 
 % Initial conditions block: chemistry
@@ -36,8 +34,6 @@ Zop.add_labels(2, FMC.Zop_names)   % you can always add labels later on
 Zop = Zop.exclude(1, missing_chemistry);
 %plot(Zop) 
 
-
-
 % Batch data block (pre-aligned)
 % ------------------------------
 X = block(FMC.X, 'X: batch data',...                     % name of the block
@@ -51,107 +47,59 @@ X = X.exclude(1, missing_chemistry);
 % Add labels when creating the block
 Y = block(FMC.Y, {'col_labels', FMC.Ynames}, {'row_labels', FMC.batch_names}); 
 Y = Y.exclude(1, missing_chemistry);
-%plot(Y, {'layout', [2, 6]})
+%plot(Y, {'layout', [2, 4]})
 
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
-% We will use 3 components
-%cqa_pca = lvm({'CQAs', Y}, 2);
-%plot(cqa_pca)
+% We will use 2 components
+% ----------------------------------
+if false    
+    cqa_pca = lvm({'CQAs', Y}, 2);
+    plot(cqa_pca)
 
-% There seem to be 2 clusters in the CQA space.  Let's take a look at
-% contributions between points 
-
-%batchPCA = lvm({'Trajectories', X},3);
-%plot(batchPCA)
-%plot(X, {'mark', '20'});
-
-% Understand the effect of chemistry on the Y's
-%pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
-%plot(pls_chemistry)
-
-% Understand the effect of operating conditions on the Y's
-%pls_operating = lvm({'Z-timing', Zop, 'Y', Y}, 2);
-%plot(pls_operating)
-
-% Multiblock PLS model
-pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
-plot(pls_mb)
-plot(Zchem, {'mark', '20'});
-
-% Batch MB PLS model
-%batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);
-%plot(batch_mbpls)
-
-
-% Create monitoring model
-% bad_batch = [3, 5, 6, 7, 34:71];
-% 
-% Z.exclude(1, bad_batch);
-% Z.exclude(2, [1:8]);
-% Zcopy.exclude(2, [1:8]);
-% Y.exclude(1, bad_batch);
-% X.data(bad_batch, :) = [];
-% X.batch_raw(bad_batch, :) = [];
-% 
-% A_mon = 3;
-% mon = lvm({'Z', Z, 'X', X, 'y', Y}, A_mon);
-
-% SPEs are in disagreement: too high
-% Scores for existing batches are offset slightly, or a lot in some cases
-
-
-
-%N = mon.N;
-if special_plots
-    % Score plot
-    hF = figure('Color', [1, 1, 1]);
-    hT = axes;
-    plot(mon.super.T(:,1), mon.super.T(:,2),'.')
-    hold on
-    %S = std(mon.super.T);
-    s_i = 1./sqrt(mon.super.S(1,1));
-    s_j = 1./sqrt(mon.super.S(2,2));
-    plot_ellipse(s_i, s_j, mon.super.lim.T2(A_mon))
-    grid()
-    xlabel('t_1', 'FontSize', fontsize, 'Fontweight', 'bold')
-    ylabel('t_2', 'FontSize', fontsize, 'Fontweight', 'bold')
-    
-    % SPE plot
-    hF = figure('Color', [1, 1, 1]);
-    hS = axes;
-    plot(mon.super.SPE(:,A_mon), '.-')
-    hold on
-    hS_lim = plot([0 N], [mon.super.lim.SPE(A_mon) mon.super.lim.SPE(A_mon)], 'r-', 'linewidth', 2)
-    grid()
-    xlabel('Batches', 'FontSize', fontsize, 'Fontweight', 'bold')
-    ylabel('SPE', 'FontSize', fontsize, 'Fontweight', 'bold')
-    
-    
-    % Where does batch 3 lie?
-    which = 3;
-    new = cell(1, 2);
-    new{1} = Zcopy.data(which,:);
-    new{2} = Xcopy.data(which,:);
-    out = mon.apply(new);
-
-    
-    for n = 1:shape(Zcopy, 1)
-        which = n;
-        new = cell(1, 2);
-        new{1} = Zcopy.data(which,:);
-        new{2} = Xcopy.data(which,:);
-        out = mon.apply(new);
-        
-        axes(hT)
-        plot(hT, out.T_super(1), out.T_super(2), 'k.')
-        text(hT, out.T_super(1)+0.1, out.T_super(2)+.1, num2str(n))
-        
-        plot(hS, n +N,  out.stats.SPE{A_mon}, 'k.')
-        text(hS, n+N,   out.stats.SPE{A_mon}+0.1, num2str(n))
-        set(hS_lim, 'XData', [0 N+n])
-    end
+    % There seem to be 2 clusters in the CQA space.  Take a look at contributions.
+    % To confirm contributions in the raw data:
+    plot(Y, {'mark', '61'})
+    plot(Y, {'mark', '14'})
 end
 
 
+% Understand the effect of chemistry on the Y's (PLS)
+% -----------------------------------
+if true
+    pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
+    plot(pls_chemistry)
+end
 
+% Understand the effect of operating conditions on the Y's  (PLS)
+% -----------------------------------
+if true
+    pls_operating = lvm({'Z-timing', Zop, 'Y', Y}, 2);
+    plot(pls_operating)
+end
+
+
+% Multiblock PLS model: effect of chemistry and operating conditions on the Y's
+% --------------------
+if true
+    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
+    plot(pls_mb)
+    plot(Zchem, {'mark', '20'});
+end
+
+
+% Take a look only at the trajectories
+if true
+    batchPCA = lvm({'Trajectories', X},3);
+    plot(batchPCA)
+    plot(X, {'mark', '20'});
+end
+
+
+% Batch MB PLS model
+% -------------------
+if true
+    batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, ...
+                       'Trajectories', X, 'Y', Y}, 2);
+    plot(batch_mbpls)
+end

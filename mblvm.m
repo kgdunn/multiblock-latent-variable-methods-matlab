@@ -300,7 +300,8 @@ classdef mblvm < handle
         
         function limit_calculations(self)
             % Calculates the monitoring limits for a batch blocks in the model
-            
+            % Avoid this step for now
+            return;
             batch_blocks = false(1, self.B);
             for b = 1:self.B
                 if any(ismember(properties(self.blocks{b}), 'batch_raw'))
