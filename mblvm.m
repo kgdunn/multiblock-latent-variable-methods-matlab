@@ -839,9 +839,11 @@ classdef mblvm < handle
                     pp_data = self.blocks{hP.c_block}.data(idx,:);
                     contrib = zeros(size(pp_data));
                     contrib = contrib(:);
-                    if strcmp(self.model_type, 'PCA')
+                    
+                    % This shouldn't branch like this: put this in each class
+                    if strcmp(self.model_type, 'PCA') || strcmp(self.model_type, 'MB-PCA')
                         weights = self.P{hP.c_block};
-                    elseif strcmp(self.model_type, 'PLS')
+                    elseif strcmp(self.model_type, 'PLS') || strcmp(self.model_type, 'MB-PLS')
                         temp_W = self.W{hP.c_block};
                         temp_P = self.P{hP.c_block};
                         weights = temp_W*inv(temp_P'*temp_W);  % W-star: is this correct for blocks: non-orthogonal scores?
@@ -864,7 +866,8 @@ classdef mblvm < handle
             figure('Color', 'white')
             hAx = axes;
             if isempty(contrib)
-                text(0.5, 0.5, 'Contributions not available yet', 'HorizontalAlignment', 'center');
+                text(0.5, 0.5, 'Contributions not available for this plot type ... yet', ...
+                    'HorizontalAlignment', 'center', 'FontSize', 12);
                 set(hAx,'Visible', 'off')
                 return
             end
@@ -2102,6 +2105,7 @@ classdef mblvm < handle
             % We cannot visualize coefficient from the "Overall block"
             if hP.hDropdown.getSelectedIndex == 0
                 hP.hDropdown.setSelectedIndex(1)
+                pause(1);
                 return
             end
             

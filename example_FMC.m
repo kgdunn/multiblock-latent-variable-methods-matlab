@@ -62,9 +62,9 @@ Y = Y.exclude(1, missing_chemistry);
 % There seem to be 2 clusters in the CQA space.  Let's take a look at
 % contributions between points 
 
-batchPCA = lvm({'Trajectories', X},3);
-plot(batchPCA)
-plot(X, {'mark', '20'});
+%batchPCA = lvm({'Trajectories', X},3);
+%plot(batchPCA)
+%plot(X, {'mark', '20'});
 
 % Understand the effect of chemistry on the Y's
 %pls_chemistry = lvm({'Z-chemistry', Zchem, 'Y', Y}, 2);
@@ -75,9 +75,9 @@ plot(X, {'mark', '20'});
 %plot(pls_operating)
 
 % Multiblock PLS model
-%pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
-%plot(pls_mb)
-
+pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
+plot(pls_mb)
+plot(Zchem, {'mark', '20'});
 
 % Batch MB PLS model
 %batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Trajectories', X, 'Y', Y}, 2);

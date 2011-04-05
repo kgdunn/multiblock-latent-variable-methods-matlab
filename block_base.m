@@ -316,9 +316,9 @@ classdef block_base < handle
             end
             
             for j = 1:numel(names)
-                name_j = names(j);
+                name_j = strtrim(names(j));
                 for k = 1:numel(ax_labels)
-                    if strcmp(name_j, ax_labels(k))
+                    if strcmp(name_j, strtrim(ax_labels(k)))
                         idx(end+1) = k;
                         idx_names(end+1) = ax_labels(k);
                     end
@@ -326,14 +326,10 @@ classdef block_base < handle
 %                     elseif str2double(ax_labels(k)) == str2double(name_j)
 %                         idx(end+1) = k;
 %                         idx_names(end+1) = ax_labels(k);
-%                     end
-                        
+%                     end                        
                 end
                 
             end
-            
-            
-            
         end
 
         function out = isempty(self)
@@ -369,9 +365,9 @@ classdef block_base < handle
                     subplot_size = value;
                 elseif strcmpi(key, 'one')
                     subplot_size = [1, 1];
-                    tags = self.get_vector(2, value);
+                    tags = self.index_by_name(2, value);
                 elseif strcmpi(key, 'mark')
-                    mark = self.get_vector(1, value);
+                    mark = self.index_by_name(1, value);
                 end 
             end
             
@@ -697,13 +693,20 @@ function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_siz
             tagnames{k} = ['Tag ', num2str(k)];
         end
     end
-            
+    highlight_colour = [255, 102, 0]/255;
     for k = 1:K
-        plot(hA(k), self.data(:,tags(k)), 'k')
+        hPlot = plot(hA(k), self.data(:,tags(k)), 'k');
         title(hA(k), char(tagnames{k}), 'FontSize',14)
         set(hA(k), 'FontSize',14)
         axis(hA(k), 'tight')
         grid(hA(k),'on')
+        if not(isnan(mark))
+            set(hA(k),'Nextplot', 'add')
+            x_data = get(hPlot, 'XData');
+            y_data = get(hPlot, 'YData');
+            plot(hA(k), x_data(mark), y_data(mark), 's', 'Color', highlight_colour, ...
+                'MarkerSize', 5, 'Linewidth', 2)
+        end        
     end
     title_str = 'Plots of raw data';
 end
