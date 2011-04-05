@@ -297,7 +297,6 @@ classdef mbpca < mblvm
 
         end
        
-        
         % Superclass abstract method implementation
         function out = register_plots_post(self)
             out = [];

@@ -775,7 +775,32 @@ classdef lvmplot < handle
 end % end: ``classdef``
       
 function mouseclick_callback(varargin)
-    %disp(get(varargin{1}, 'UserData'))
+    hP = get(varargin{1}, 'UserData');
+    cPoint = get(hP.gca, 'CurrentPoint');
+    hObj = findobj(hP.gca, 'Tag', 'lvmplot_series');
+    if numel(hObj) == 1 && strcmp(get(hObj,'Type'), 'line')
+        x_data = get(hObj, 'XData');
+        y_data = get(hObj, 'YData');
+        distance = sqrt((x_data-cPoint(1,1)).^2 + (y_data-cPoint(1,2)).^2);
+        [value, index] = min(distance); %#ok<ASGLU>
+        
+        hMarker = getappdata(hP.gca, 'Marker');
+        if isempty(hMarker)
+            set(hP.gca, 'Nextplot', 'add')
+            hMarker = plot(x_data(index), y_data(index), 'rh', ...
+                           'MarkerSize', 15, 'LineWidth', 1.5);
+            setappdata(hP.gca, 'Marker', hMarker)
+        else
+            set(hMarker, 'XData', x_data(index), 'YData', y_data(index))
+        end
+        extent = axis;
+        if cPoint(1,1)<extent(1) || cPoint(1,1)>extent(2) || cPoint(1,2)<extent(3) || cPoint(1,2)>extent(4)
+            delete(hMarker)
+            rmappdata(hP.gca, 'Marker');
+        end
+    end
+    hP.model.get_contribution(index, getappdata(hP.gca, 'SeriesData'))
+    
 end
 
 function dropdown_block_selector(hCombo, varargin)

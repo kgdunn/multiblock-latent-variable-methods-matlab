@@ -819,6 +819,11 @@ classdef mblvm < handle
             self.preprocess_extra();         % method must be subclassed 
         end % ``preprocess_blocks``
                 
+        function out = get_contribution(self, idx, series)
+            disp(idx)
+            disp(series)
+        end
+        
         function self = split_result(self, result, rootfield, subfield)
             % Splits the result from a merged calculation (over all blocks)
             % into the storage elements for each block.  It uses block size,
@@ -2254,16 +2259,6 @@ classdef mblvm < handle
                 end
             end
         end
-%         function add_plot_footers(hFooters, footer_string)
-%             % Convert the cell string to a long char string
-%             foot = footer_string{1};
-%             for j = 2:numel(footer_string)
-%                 foot = [foot, footer_string{j}]; %#ok<AGROW>
-%             end
-%             for k = 1:numel(hFooters)
-%                 set(hFooters(k), 'String', footer_string)
-%             end
-%         end
 
     end % end methods (static)
     
