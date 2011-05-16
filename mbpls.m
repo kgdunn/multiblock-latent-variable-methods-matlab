@@ -36,8 +36,7 @@ classdef mbpls < mblvm
             self.Y_hat.data = self.Y_hat.data .* 0;
             self.M = shape(self.Y, 2);
             self.has_missing = self.has_missing | self.Y.has_missing;
-            
-            
+                         
         end % ``mbpls``        
         
         % Another painful example of MATLAB's poor OOP. Cannot redefine a 
@@ -70,7 +69,7 @@ classdef mbpls < mblvm
             end
             
         end
-        
+
         % Superclass abstract method implementation
         function self = calc_model(self, A)
             % Fits a PLS latent variable model.

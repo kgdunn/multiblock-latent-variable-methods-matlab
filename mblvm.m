@@ -41,6 +41,41 @@ classdef mblvm < handle
         error_j = [];% Instantaneous errors
     end 
     
+    events
+        
+        % Model building events
+        % ---------------------
+        build_launch
+        
+        build_initializestorage_launch
+        build_initializestorage_action
+        build_initializestorage_finish
+
+        build_preprocess_launch
+        build_preprocess_core
+        build_preprocess_action
+        build_preprocess_finish
+        
+        build_merge_launch
+        build_merge_action
+        build_merge_finish
+        
+        build_calculate_launch
+        
+        build_calculate_loop_launch
+        build_calculate_loop_addcomponent_action
+        build_calculate_loop_deflate_action
+        build_calculate_loop_calcstats_action
+        build_calculate_loop_calclimits_action
+        build_calculate_loop_finish
+        
+        build_calculate_finish
+                
+        build_finish
+    end
+        
+        
+    
     % Only set by this class and subclasses
     properties (SetAccess = protected)
         data = [];
@@ -290,12 +325,13 @@ classdef mblvm < handle
             % TODO: handle the case where the model is shrunk or grown to 
             %       a different A value.
             % Resize the storage for ``A`` components
-            self.initialize_storage(requested_A);
-                
-            preprocess_blocks(self);        % superclass method            
-            merge_blocks(self);             % method may be subclassed 
-            calc_model(self, requested_A);  % method must be subclassed
+            self.initialize_storage(requested_A); 
+            preprocess_blocks(self);        % superclass method           
+            merge_blocks(self);             % method may be subclassed         
+            calc_model(self, requested_A);  % method must be subclassed        
             limit_calculations(self);       % method must be subclassed
+            
+            
         end % ``build``
         
         function limit_calculations(self)

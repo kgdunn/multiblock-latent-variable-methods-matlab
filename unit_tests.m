@@ -28,7 +28,7 @@ function unit_tests(varargin)
     MBPLS_tests();
     PLS_batch_data();
     
-    %PLS_randomization_tests()
+    PLS_randomization_tests()
     
     % Basic plots
     test_plots()
