@@ -260,7 +260,7 @@ classdef lvmplot < handle
             fPos = get(self.hF, 'position');
             fPos(1) = round(0.05*self.screen(3));
             fPos(2) = round(0.1*self.screen(4));
-            fPos(3) = 0.90*self.screen(3);
+            fPos(3) = 0.70*self.screen(3);
             fPos(4) = 0.80*self.screen(4);
             set(self.hF, 'Position', fPos);
   

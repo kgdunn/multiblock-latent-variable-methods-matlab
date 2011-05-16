@@ -204,7 +204,8 @@ classdef mbpca < mblvm
                     state.T_sb(:,b,a) = state.T{b}(:,a);
                 end
                 
-                % Calculate the superscore, T_super
+                % Calculate the superscore, T_super. Verify that self.super.P
+                % is always of unit length.
                 state.T_super(:,a) = state.T_sb(:,:,a) * self.super.P(:,a);
                 
                 % Deflate each block: using the SUPERSCORE and the block loading

@@ -1143,15 +1143,21 @@ classdef mblvm < handle
             if dim == 1 && req_block == 0 
             % search through all blocks to find these labels
                 for b = 1:self.B
-                    if ~isempty(self.blocks{b}.labels{dim})
-                        out = self.blocks{b}.labels{dim};
-                        return
+                    if ~isempty(self.blocks{b}.labels)
+                        if ~isempty(self.blocks{b}.labels{dim})
+                            out = self.blocks{b}.labels{dim};
+                            return
+                        end
                     end
                 end
             else
-                if req_block ~= 0
-                    
-                    out = self.blocks{req_block}.labels{dim};
+                if req_block ~= 0  
+                    if ~isempty(self.blocks{req_block}.labels)
+                        if ~isempty(self.blocks{req_block}.labels{dim})
+                            out = self.blocks{req_block}.labels{dim};
+                            return
+                        end
+                    end
                 else
                     block_names = cell(self.B, 1);            
                     for b = 1:self.B
@@ -1184,7 +1190,10 @@ classdef mblvm < handle
             % large matrices
             n = size(T, 1);
             if nargin == 2
-                T2 = diag(T * varargin{1} * T');
+                T2 = zeros(n,1);
+                for idx = 1:n
+                    T2(idx) = T(idx,:) * varargin{1} * T(idx,:)';
+                end
             else
                 estimated_S = inv((T'*T)/(n));
                 T2 = diag(T * estimated_S * T'); %#ok<MINV>
@@ -2184,11 +2193,13 @@ classdef mblvm < handle
                 
                 top = 0.95*extent(4);
                 set(ax, 'XTickLabel', {})
-                for n = 1:numel(breaks)
-                     text(breaks(n), top, strtrim(labels{n}), 'Rotation', 0,...
-                         'FontSize', 10, 'HorizontalAlignment', 'center');
+                if not(isempty(labels))
+                    for n = 1:numel(breaks)
+                         text(breaks(n), top, strtrim(labels{n}), 'Rotation', 0,...
+                             'FontSize', 10, 'HorizontalAlignment', 'center');
+                    end
                 end
-                set(ax, 'TickLength', [0 0], 'XLim', [breaks(1)-0.5 breaks(end)+0.5])
+                %set(ax, 'TickLength', [0 0], 'XLim', [breaks(1)-0.5 breaks(end)+0.5])
 
 
             end

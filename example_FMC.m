@@ -53,7 +53,7 @@ Y = Y.exclude(1, missing_chemistry);
 % Let's start with a PCA on the Y-block, to understand the quality variables
 % We will use 2 components
 % ----------------------------------
-if false    
+if true    
     cqa_pca = lvm({'CQAs', Y}, 2);
     plot(cqa_pca)
 
@@ -76,13 +76,14 @@ end
 if true
     pls_operating = lvm({'Z-timing', Zop, 'Y', Y}, 2);
     plot(pls_operating)
+    plot(Zop, {'mark', '20'})
 end
 
 
 % Multiblock PLS model: effect of chemistry and operating conditions on the Y's
 % --------------------
 if true
-    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 3);
+    pls_mb = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, 'Y', Y}, 2);
     plot(pls_mb)
     plot(Zchem, {'mark', '20'});
 end
@@ -113,9 +114,10 @@ end
 if true
     batchPLS = lvm({'Trajectories', X, 'Y', Y}, 2);
     plot(batchPLS)
-    plot(X, {'mark', '42'});
+    plot(X, {'mark', '13'});
+    plot(X, {'mark', '5'});
+    plot(X, {'mark', '7'});
 end
-
 
 
 % Batch MB PLS model
@@ -125,4 +127,3 @@ if true
                        'Trajectories', X, 'Y', Y}, 2);
     plot(batch_mbpls)
 end
-

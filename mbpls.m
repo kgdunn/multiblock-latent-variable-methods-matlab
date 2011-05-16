@@ -278,7 +278,7 @@ classdef mbpls < mblvm
         
         % Superclass abstract method implementation
         function state = apply_model(self, new, state, varargin) 
-            % Applies a PCA model to the given ``block`` of (new) data.
+            % Applies a PLS model to the given ``block`` of (new) data.
             % 
             % TODO(KGD): allow user to specify ``A``
             
@@ -488,7 +488,7 @@ classdef mbpls < mblvm
     % These methods don't require a class instance
     methods(Static=true)
         function [t_a, p_a, c_a, u_a, w_a, itern] = single_block_PLS(X, Y, self, a, has_missing)
-            % Extracts a PCA component on a single block of data, ``data``.
+            % Extracts a PLS component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
             % The ``a`` entry is merely used to show which component is being
             % extracted in the progress bar.
@@ -612,7 +612,7 @@ classdef mbpls < mblvm
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
             end   
-            labels = hP.model.Y.labels{2};            
+            labels = hP.model.Y.labels{2};
             label_str = ['Observed: ', labels{idx}];
             if strcmpi(series.current, 'x')
                 xlabel(ax, label_str)
@@ -640,8 +640,13 @@ classdef mbpls < mblvm
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
             end   
-            labels = hP.model.Y.labels{2};            
-            label_str = ['Predicted: ', labels{idx}];                
+            % Get the column labels for the Y-block
+            label_str = [];
+            labels = hP.model.Y.labels;
+            if not(isempty(labels))
+                label_str = ['Predicted: ', labels{idx}];
+            end
+            
             if strcmpi(series.current, 'x')
                 xlabel(ax, label_str)
             elseif strcmpi(series.current, 'y')
@@ -657,9 +662,9 @@ classdef mbpls < mblvm
                 hPlot = hP.set_data(ax, [], plotdata);
             end
             if strcmpi(series.x_type{1}, 'Order')
-                set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0])
+                set(hPlot, 'LineStyle', '-', 'Marker', '.', 'Color', [0, 0, 0], 'MarkerSize', 15)
             else
-                set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0])
+                set(hPlot, 'LineStyle', 'none', 'Marker', '.', 'Color', [0, 0, 0], 'MarkerSize', 15)
             end
         end
         function predictions_annotate(hP, series)
