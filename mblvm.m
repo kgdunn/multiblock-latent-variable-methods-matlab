@@ -449,7 +449,9 @@ classdef mblvm < handle
             self.opt.randomize_test.test_statistic(current_A) = ...
                                       self.randomization_objective(current_A);
  
-            Y_original = self.Y.data;
+            self.randomization_test_launch();
+            
+            
             capture_more_permutations = true;
             rounds = 0;
             stats = struct; %#ok<*PROP>
@@ -470,19 +472,19 @@ classdef mblvm < handle
                 
                 % Use the ``fit_PLS`` function internally, with a special flag to
                 % return early
-                previous_max_iter = self.opt.max_iter;
                 previous_tolerance = self.opt.tolerance;
-                randomize_max_iter = 200;
-                self.opt.max_iter = randomize_max_iter;
                 self.opt.tolerance = 1e-2;
                 itern = zeros(nperm,1);
                 
                 for g = 1:nperm
                     perc = floor(g/nperm*100);
-                    num_G = stats.num_G_exceeded + sum(permuted_stats > self.opt.randomize_test.test_statistic(current_A));
+                    num_G = stats.num_G_exceeded + sum(permuted_stats > ...
+                           self.opt.randomize_test.test_statistic(current_A));
                     den_G = stats.nperm + g;
                     if show_progress
-                        stats.stop_early = awaitbar(perc/100,h,sprintf('Risk of component %d. Risk so far=%d out of %d models. [%d%%]',current_A, num_G, den_G, perc));
+                        stats.stop_early = awaitbar(perc/100,h, ...
+                              sprintf('Risk of component %d. Risk so far=%d out of %d models. [%d%%]', ...
+                                              current_A, num_G, den_G, perc));
                         if stats.stop_early
                             nperm = g-1;
                             permuted_stats = permuted_stats(1:g-1);
@@ -490,25 +492,16 @@ classdef mblvm < handle
                             break;
                         end
                     end
+                    
                     % Set the random seed: to ensure we can reproduce calculations.
-                    % Shuffle the rows in Y randomly.
                     rand('twister', g+rounds*nperm); %#ok<RAND>
-                    self.Y.data = self.Y.data(randperm(self.N), :);
+                    out = self.randomization_permute_and_build();
                     
-                    % Calculate the "a"th component using this permuted Y-matrix, but
-                    % the unpermuted X-matrix.
-                    out = mbpls.single_block_PLS(self.data, self.Y.data, self, current_A, self.has_missing); 
+                    % Next, calculate the statistic under test and store it
+                    permuted_stats(g) = self.randomization_objective(current_A, out);
+                    itern(g) = out.itern;
                     
-                    
-                    %[t_a, p_a, c_a, u_a, w_a, itern]
-                    
-                    if out.itern < randomize_max_iter
-                        % Next, calculate the statistic under test and store it
-                        permuted_stats(g) = self.randomization_objective(current_A, out);
-                        itern(g) = out.itern;
-                    end
                 end
-                self.opt.max_iter = previous_max_iter;
                 self.opt.tolerance = previous_tolerance;
                 
                 num_G = sum(permuted_stats > self.opt.randomize_test.test_statistic(current_A));
@@ -523,8 +516,7 @@ classdef mblvm < handle
                 stats.std_G = sqrt(((prev_ssq + curr_ssq) - (stats.nperm+nperm)*stats.mean_G^2)/(stats.nperm+nperm-1));
                 stats.num_G_exceeded = stats.num_G_exceeded + num_G;
                 stats.nperm = stats.nperm + nperm;
-                rounds = rounds + 1;
-                
+                rounds = rounds + 1;                
                 
                 % Assume we've got enough randomized values to make an accurate risk
                 % assessment.
@@ -544,11 +536,7 @@ classdef mblvm < handle
             self.opt.randomize_test.risk_statistics{current_A} = stats;
             
             % Set the Y-block back to its usual order
-            self.Y.data= Y_original;
-                  
-
- 
-            
+            self.randomization_test_finish();
             
         end % ``randomization_test``
         
@@ -1442,6 +1430,9 @@ classdef mblvm < handle
         summary(self)            % show a text-based summary of ``self``
         register_plots_post(self)% register which variables are plottable      
         randomization_objective(self) % the randomization test's objective function
+        randomization_test_launch(self) % Setup required before randomization
+        randomization_test_finish(self) % Cleanup required after randomization
+        randomization_permute_and_build(self) % Permutes data and build model
     end % end: methods (abstract)
     
     % Subclasses may not redefine these methods

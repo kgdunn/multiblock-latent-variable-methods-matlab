@@ -29,6 +29,7 @@ opt.randomize_test.test_statistic = [];
 opt.randomize_test.risk_statistics = cell(1,1);
 opt.randomize_test.last_worthwhile_A = 0;        % The last worthwhile component added to the model
 opt.randomize_test.show_progress = true;
+opt.randomize_test.temp_data = {};               % Temporary data during the randomization routine
 
 
 % Cross-validation is not working as intended.

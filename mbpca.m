@@ -307,9 +307,46 @@ classdef mbpca < mblvm
         % Superclass abstract method implementation
         function stat = randomization_objective(self)
             score_vector = self.super.T(:, self.A);
-            stat = sqrt(self.robust_scale(score_vector));             
-
+            stat = sqrt(self.robust_scale(score_vector));
         end % ``randomization_objective``
+        
+        % Superclass abstract method implementation
+        function randomization_test_launch(self)
+            % Setup required before running the randomization permutations
+            
+            % Store the original Y. We will restore it afterwards
+            %self.opt.randomize_test.temp_data = self.Y.data;
+            
+        end % ``randomization_test_launch``
+        
+        % Superclass abstract method implementation
+        function randomization_test_finish(self)
+            % Clean up after running the randomization permutations
+            
+            % Store the original Y. We will restore it afterwards
+            %self.Y.data = self.opt.randomize_test.temp_data;            
+        end % ``randomization_test_finish``
+    
+        % Superclass abstract method implementation
+        function output = randomization_permute_and_build(self)
+            % Function to permute the data and  build the model without error 
+            % checks and delays
+            %
+            % NOTE: this function must not reset the random number generator.
+            %       That will already be set ahead of time in the calling
+            %       function.
+            % 
+            % Must return a structure, ``output`` that will be sent to 
+            % ``self.randomization_objective(...)`` in ``varargin``.
+            % So store in ``output`` all the entries required to evaluate
+            % the randomization objective function.
+            
+                    
+            % Calculate the "a"th component using this permuted Y-matrix, but
+            % the unpermuted X-matrix.
+            
+            
+        end % ``randomization_test_finish``
         
     end % end methods (ordinary)
     

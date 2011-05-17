@@ -126,9 +126,13 @@ classdef mbpls < mblvm
                 end 
 
                 % Converge onto a single component
-                %[t_a, p_a, c_a, u_a, w_a, itern] 
-                out = mbpls.single_block_PLS(self.data, self.Y.data, ...
-                                                   self, a, self.has_missing); 
+                if self.opt.show_progress
+                    h = awaitbar(0, sprintf('Calculating component %d', a));
+                    out = self.single_block_PLS(self.data, self.Y.data, h); 
+                    close(h);
+                else
+                    out = self.single_block_PLS(self.data, self.Y.data);
+                end
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
@@ -314,7 +318,8 @@ classdef mbpls < mblvm
         % Superclass abstract method implementation
         function stat = randomization_objective(self, current_A, varargin)
              % 12 May 2011: Use Matthews correlation coefficient for categorical,
-             % single Y-variables
+             % single Y-variables.
+             %
              % * http://en.wikipedia.org/wiki/Matthews_correlation_coefficient
              % * http://en.wikipedia.org/wiki/Receiver_operating_characteristic
              
@@ -333,6 +338,44 @@ classdef mbpls < mblvm
             end
             
         end % ``randomization_objective``
+        
+        % Superclass abstract method implementation
+        function randomization_test_launch(self)
+            % Setup required before running the randomization permutations
+            
+            % Store the original Y. We will restore it afterwards
+            self.opt.randomize_test.temp_data = self.Y.data;
+            
+        end % ``randomization_test_launch``
+        
+        % Superclass abstract method implementation
+        function randomization_test_finish(self)
+            % Clean up after running the randomization permutations
+            
+            % Store the original Y. We will restore it afterwards
+            self.Y.data = self.opt.randomize_test.temp_data;            
+        end % ``randomization_test_finish``
+        
+        % Superclass abstract method implementation
+        function output = randomization_permute_and_build(self)
+            % Function to permute the data and  build the model without error 
+            % checks and delays
+            %
+            % NOTE: this function must not reset the random number generator.
+            %       That will already be set ahead of time in the calling
+            %       function.
+            % 
+            % Must return a structure, ``output`` that will be sent to 
+            % ``self.randomization_objective(...)`` in ``varargin``.
+            % So store in ``output`` all the entries required to evaluate
+            % the randomization objective function.
+            self.Y.data = self.Y.data(randperm(self.N), :);
+                    
+            % Calculate the "a"th component using this permuted Y-matrix, but
+            % the unpermuted X-matrix.
+            output = self.single_block_PLS(self.data, self.Y.data);
+            
+        end % ``randomization_test_finish``
     
         % Superclass abstract method implementation
         function limits_subclass(self)
@@ -473,7 +516,7 @@ classdef mbpls < mblvm
             end
             fprintf(']\n');
             
-        end
+        end % ``summary``
         
         % Superclass abstract method implementation
         function out = register_plots_post(self)
@@ -533,7 +576,7 @@ classdef mbpls < mblvm
             plt.annotate = @self.R2_per_Y_variable_plot_annotate;
             out = [out; plt];
             
-        end
+        end % ``register_plots_post``
         
         function out = get_predictions(self, varargin)
             % Gets the prediction matrix of the data in the model building
@@ -548,19 +591,14 @@ classdef mbpls < mblvm
                 out = self.Y_hat.un_preprocess([], self.YPP);
             end
             
-        end
-    end % end methods (ordinary)
-    
-    % These methods don't require a class instance
-    methods(Static=true)
-        function out = single_block_PLS(X, Y, self, a, has_missing)
-            % Extracts a PLS component on a single block of data, ``data``.
-            % The model object, ``self``, should also be provided, for options.
-            % The ``a`` entry is merely used to show which component is being
-            % extracted in the progress bar.
-            % The ``has_missing`` flag is used to indicate if any entries in 
-            % ``dblock`` are missing.
+        end % ``get_predictions``
+        
+        function out = single_block_PLS(self, X, Y, varargin)
+            % Extracts a PLS component on a single block of data, ``X`` and
+            % ``Y``.
             %
+            %  The ``varargin`` input can optionally provide a handle to the
+            % progress bar.
             %
             % [1] Höskuldsson, PLS regression methods, Journal of Chemometrics,
             %     2(3), 211-228, 1998, http://dx.doi.org/10.1002/cem.1180020306
@@ -571,10 +609,7 @@ classdef mbpls < mblvm
             % be used to extract the relevant results.
             
             out = struct;
-            N = size(X, 1);
-            if self.opt.show_progress
-                h = awaitbar(0, sprintf('Calculating component %d', a));
-            end
+            N = size(X, 1);            
             rand('state', 0) %#ok<RAND>
             u_a_guess = rand(N,1)*2-1;
             out.u_a = u_a_guess + 1.0;
@@ -593,9 +628,9 @@ classdef mbpls < mblvm
                     progress_intercept = 0 - start_perc*progress_slope;
                 end
                 
-                if self.opt.show_progress && out.itern > 2
+                if nargin > 3 && self.opt.show_progress && out.itern > 2 
                     perc = log(norm(u_a_guess - out.u_a))*progress_slope + progress_intercept;
-                    stop_early = awaitbar(perc, h);
+                    stop_early = awaitbar(perc, varargin{1});
                     if stop_early
                         break;
                     end
@@ -607,7 +642,7 @@ classdef mbpls < mblvm
                 % 1: Regress the score, u_a, onto every column in X, compute the
                 %    regression coefficient and store in w_a
                 % w_a = X.T * u_a / (u_a.T * u_a)
-                out.w_a = regress_func(X, out.u_a, has_missing);
+                out.w_a = regress_func(X, out.u_a, self.has_missing);
                 
                 % 2: Normalize w_a to unit length
                 out.w_a = out.w_a / norm(out.w_a);
@@ -617,19 +652,19 @@ classdef mbpls < mblvm
                 % 3: Now regress each row in X on the w_a vector, and store the
                 %    regression coefficient in t_a
                 % t_a = X * w_a / (w_a.T * w_a)
-                out.t_a = regress_func(X, out.w_a, has_missing);
+                out.t_a = regress_func(X, out.w_a, self.has_missing);
 
                 % 4: Now regress score, t_a, onto every column in Y, compute the
                 %    regression coefficient and store in c_a
                 % c_a = Y.T * t_a / (t_a.T * t_a)
-                out.c_a = regress_func(Y, out.t_a, has_missing);
+                out.c_a = regress_func(Y, out.t_a, self.has_missing);
                 
                 % 5: Now regress each row in Y on the c_a vector, and store the
                 %    regression coefficient in u_a
                 % u_a = Y * c_a / (c_a.T * c_a)
                 %
                 % TODO(KGD):  % Still handle case when entire row in Y is missing
-                out.u_a = regress_func(Y, out.c_a, has_missing);
+                out.u_a = regress_func(Y, out.c_a, self.has_missing);
                 
                 out.itern = out.itern + 1;
             end
@@ -640,15 +675,15 @@ classdef mbpls < mblvm
             % deflate afterwards.
             % Note the similarity with step 4! and that similarity helps
             % understand the deflation process.
-            out.p_a = regress_func(X, out.t_a, has_missing); 
-
-            if self.opt.show_progress
-                if ishghandle(h)
-                    close(h);
-                end
-            end
+            out.p_a = regress_func(X, out.t_a, self.has_missing); 
             
-        end
+        end % ``single_block_PLS``
+        
+    end % end methods (ordinary)
+    
+    % These methods don't require a class instance
+    methods(Static=true)
+        
         
         function observed_plot(hP, series)
             % Score plots for overall or block scores
