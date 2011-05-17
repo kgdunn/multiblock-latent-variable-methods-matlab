@@ -51,6 +51,10 @@ classdef mbpca < mblvm
                 % magnitude element is positive.
                 % (Wold, Esbensen, Geladi, PCA, CILS, 1987, p 42
                 %  http://dx.doi.org/10.1016/0169-7439(87)80084-9)
+                % 
+                % Also see: http://www.models.life.ku.dk/signflipsvd
+                % See 10.1.1.120.8476.pdf in the readings directory
+                
                 [max_el, max_el_idx] = max(abs(p_a)); %#ok<ASGLU>
                 if sign(p_a(max_el_idx)) < 1
                     p_a = -1.0 * p_a;
