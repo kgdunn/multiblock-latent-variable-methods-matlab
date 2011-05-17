@@ -2,6 +2,8 @@ function unit_tests(varargin)
     close all;
     
     test_significant_figures()
+        
+    %PCA_randomization_tests()
     
     % PCA tests
     test_syntax()
@@ -10,7 +12,6 @@ function unit_tests(varargin)
     PCA_with_missing_data()
     PCA_batch_data()
     
-    PCA_cross_validation_no_missing()
     MBPCA_tests()
     
     % Missing data tests
@@ -137,7 +138,6 @@ function test_syntax()
     PCA_model = lvm({'Y', Y}, 2);
     assertTrue(strcmp(PCA_model.blocks{1}.name, 'Y'))
     
-
 function Wold_article_PCA_test()
 %   Tests from the PCA paper by Wold, Esbensen and Geladi, 1987
 %   Principal Component Analysis, Chemometrics and Intelligent Laboratory
@@ -498,10 +498,18 @@ function PLS_batch_data()
     % tags, 100 time steps). As on page 45, 46, 47, 48 (table)
 return
 
-function PCA_cross_validation_no_missing()
-    % Generates several cases of loadings matrices and scores matrices and
-    % verifies whether the cross-validation algorithm can calculate the
-    % number of components accurately.
+function PCA_randomization_tests()
+
+    datasets = struct;
+    a_dataset = struct;
+    a_dataset.name = 'Test name';
+    a_dataset.filename = 'tests/';
+    a_dataset.expected_A = 0;
+    
+    datasets.randn1 = a_dataset;
+    datasets.randn1.name = 'Randomized matrix 1';
+    datasets.randn1.filename = '';
+    datasets.randn1.expected_A = 5;
     N = 100;
     K = 10;
     A = 5;
@@ -521,13 +529,31 @@ function PCA_cross_validation_no_missing()
     
     %T = create_centered_decreasing_spread_orthogonal(N, A, 5, 
     X = T*P';
-    X = X ./ repmat(std(X),N,1);
+    datasets.randn1.X = X ./ repmat(std(X),N,1);
     % ??? R2 == [2, 1.8, 1.5, 1.2, 1].^2 ./ sum([2, 1.8, 1.5, 1.2, 1].^2)
-    options = lvm_opt(); 
-    options.cross_val.use = true;
     
-    % This model causes the chi2inv code to crash: "degrees of freedom < 2"
-    %PCA_model = lvm({'X', X}, A);
+    
+    names = fieldnames(datasets);   
+    n_tests = numel(names);
+    for k = 1:n_tests        
+        test = datasets.(names{k});
+        fprintf(['Testing randomization: ', test.name])
+        try
+            data = load(test.filename);
+            X = data.Xcal;
+        catch ME
+            X = test.X;
+        end
+        options = lvm_opt(); 
+        options.randomize_test.use = true;
+        options.show_progress = false;     
+        options.randomize_test.show_progress = false;
+        options.randomize_test.permutations = 100;
+        PCA_model = lvm({'X', X}, options);
+        assertTrue(PCA_model.A == test.expected_A)
+        fprintf(': OK\n');
+    end
+    
 return
 
 function PLS_randomization_tests()

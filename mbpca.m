@@ -21,15 +21,23 @@ classdef mbpca < mblvm
         end
         
         % Superclass abstract method implementation
-        function self = calc_model(self, A)
+        function self = calc_model(self, requested_A)
             % Fits a multiblock PCA model on the data, extracting A components
             % We assume the data are merged and preprocessed already.
             % 
             % Must also calculate all summary statistics for each block.
             
             % Perform ordinary missing data PCA on the merged block of data
-            which_components = max(self.A+1, 1) : A;            
-            for a = which_components
+            
+            a = max(self.A+1,1);
+            base_condition = a <= requested_A;
+            
+            randomize_keep_adding = false;
+            %if self.opt.randomize_test.use
+            %    randomize_keep_adding = not(self.randomization_should_terminate());
+            %end                
+            
+            while base_condition || randomize_keep_adding
                 
                 start_time = cputime;
                 % Baseline for all R2 calculations and variance check
@@ -60,9 +68,10 @@ classdef mbpca < mblvm
                     p_a = -1.0 * p_a;
                     t_a = -1.0 * t_a;
                 end    
-                
-                self.model.stats.timing(a) = cputime - start_time;
-                self.model.stats.itern(a) = itern;
+                % Randomization testing for this component
+                if self.opt.randomize_test.use
+                    self.randomization_test(a);
+                end
                 
                 % Recover block information and store that.
                 t_superblock = zeros(self.N, self.B);
@@ -165,8 +174,28 @@ classdef mbpca < mblvm
                 % Calculate the limits                
                 self.calc_statistics_and_limits(a);
                 
+                self.model.stats.timing(a) = cputime - start_time;
+                self.model.stats.itern(a) = itern;
                 self.A = a;
                 
+                
+                % Termination condition: fixed request for a certain number of components.
+                if self.A < requested_A
+                    base_condition = true;                    
+                else
+                    base_condition = false;
+                end
+                
+                % Termination condition: randomization test
+                if self.opt.randomize_test.use
+                    %randomize_keep_adding = not(self.randomization_should_terminate());
+                    %stats = self.opt.randomize_test.risk_statistics{a};
+                    %self.model.stats.risk.stats{a} = stats;
+                    %self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
+                    %self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
+                end                
+                
+                a = a + 1;                
             end % looping on ``a`` latent variables
         end % ``calc_model``
         
@@ -319,7 +348,14 @@ classdef mbpca < mblvm
             % Setup required before running the randomization permutations
             
             % Store the original Y. We will restore it afterwards
-            %self.opt.randomize_test.temp_data = self.Y.data;
+            self.opt.randomize_test.temp_data = self.data;
+            
+            % Randomly permute all columns the first time:
+            for k = 1:self.K
+                rand('twister', k);
+                self.data(:,k) = self.data(randperm(N),k);
+            end
+
             
         end % ``randomization_test_launch``
         
@@ -327,8 +363,8 @@ classdef mbpca < mblvm
         function randomization_test_finish(self)
             % Clean up after running the randomization permutations
             
-            % Store the original Y. We will restore it afterwards
-            %self.Y.data = self.opt.randomize_test.temp_data;            
+            % Store the original data. We will restore it afterwards
+            self.data = self.opt.randomize_test.temp_data;
         end % ``randomization_test_finish``
     
         % Superclass abstract method implementation
@@ -348,6 +384,7 @@ classdef mbpca < mblvm
                     
             % Calculate the "a"th component using this permuted Y-matrix, but
             % the unpermuted X-matrix.
+            a=2;
             
             
         end % ``randomization_test_finish``

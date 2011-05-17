@@ -507,13 +507,16 @@ classdef mblvm < handle
                 num_G = sum(permuted_stats > self.opt.randomize_test.test_statistic(current_A));
                 
                 % TODO(KGD): put this into the above function
-                prev_ssq = stats.std_G^2 * (stats.nperm-1) + stats.nperm*stats.mean_G^2;
+                prev_ssq = stats.std_G^2 * (stats.nperm-1) + ...
+                                                   stats.nperm*stats.mean_G^2;
                 curr_ssq = ssq(permuted_stats);
-                stats.mean_G = (stats.mean_G*stats.nperm + block_base.nanmean(permuted_stats)*nperm)/(stats.nperm+nperm);
+                stats.mean_G = (stats.mean_G*stats.nperm + ...
+                 block_base.nanmean(permuted_stats)*nperm)/(stats.nperm+nperm);
                 
                 % Guard against getting a negative under the square root
                 % This approach quickly becomes inaccurate when using many rounds.
-                stats.std_G = sqrt(((prev_ssq + curr_ssq) - (stats.nperm+nperm)*stats.mean_G^2)/(stats.nperm+nperm-1));
+                stats.std_G = sqrt(((prev_ssq + curr_ssq) - ...
+                    (stats.nperm+nperm)*stats.mean_G^2)/(stats.nperm+nperm-1));
                 stats.num_G_exceeded = stats.num_G_exceeded + num_G;
                 stats.nperm = stats.nperm + nperm;
                 rounds = rounds + 1;                
