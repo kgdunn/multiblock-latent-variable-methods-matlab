@@ -1457,379 +1457,179 @@ classdef mblvm < handle
                 end
             end
         end
-        
-        function x = finv(p,v1,v2)
-            %FINV   Inverse of the F cumulative distribution function.
-            %   X=FINV(P,V1,V2) returns the inverse of the F distribution 
-            %   function with V1 and V2 degrees of freedom, at the values in P.
-            %   Copyright 1993-2004 The MathWorks, Inc.
-            %   $Revision: 2.12.2.5 $  $Date: 2004/12/06 16:37:23 $
-
-            % NOTE: This function is a pure copy and paste of the relevant parts of the Matlab statistical toolbox function "finv.m"
-            % Please use the Statistical Toolbox function, if you have the toolbox
-
-            % Guarantees:  0 < p < 1    :    The original stats toolbox function handles the case of p=0 and p=1
-            %              v1 > 0
-            %              v2 > 0
-            z = mblvm.betainv(1 - p,v2/2,v1/2);
-            x = (v2 ./ z - v2) ./ v1;
-        end
-
-        function x = betainv(p,a,b)
-            %BETAINV Inverse of the beta cumulative distribution function (cdf).
-            %   X = BETAINV(P,A,B) returns the inverse of the beta cdf with 
-            %   parameters A and B at the values in P.
-            %   Copyright 1993-2004 The MathWorks, Inc. 
-            %   $Revision: 2.11.2.5 $  $Date: 2004/12/06 16:37:01 $
-
-            %x = zeros(size(p));
-            seps = sqrt(eps);
-
-            % Newton's Method: permit no more than count_limit interations.
-            count_limit = 100;
-            count = 0;
-
-            %   Use the mean as a starting guess. 
-            xk = a ./ (a + b);
-
-            % Move starting values away from the boundaries.
-            xk(xk==0) = seps;
-            xk(xk==1) = 1 - seps;
-            h = ones(size(p));
-            crit = seps;
-
-            % Break out of the iteration loop for the following:
-            %  1) The last update is very small (compared to x).
-            %  2) The last update is very small (compared to 100*eps).
-            %  3) There are more than 100 iterations. This should NEVER happen. 
-            while(any(abs(h) > crit * abs(xk)) && max(abs(h)) > crit && count < count_limit), 
-                count = count+1;    
-                h = (mblvm.betacdf(xk,a,b) - p) ./ mblvm.betapdf(xk,a,b);
-                xnew = xk - h;
-
-            % Make sure that the values stay inside the bounds.
-            % Initially, Newton's Method may take big steps.
-                ksmall = find(xnew <= 0);
-                klarge = find(xnew >= 1);
-                if any(ksmall) || any(klarge)
-                    xnew(ksmall) = xk(ksmall) /10;
-                    xnew(klarge) = 1 - (1 - xk(klarge))/10;
-                end
-                xk = xnew;  
-            end
-
-            % Return the converged value(s).
-            x = xk;
-
-            if count==count_limit, 
-                fprintf('\nWarning: BETAINV did not converge.\n');
-                str = 'The last step was:  ';
-                outstr = sprintf([str,'%13.8f\n'],max(h(:)));
-                fprintf(outstr);
-            end
-        end
-
-        function p = betacdf(x,a,b)
-            %BETACDF Beta cumulative distribution function.
-            %   P = BETACDF(X,A,B) returns the beta cumulative distribution
-            %   function with parameters A and B at the values in X.
-            %   Copyright 1993-2004 The MathWorks, Inc. 
-            %   $Revision: 2.9.2.6 $  $Date: 2004/12/24 20:46:45 $
-
-            % Initialize P to 0.
-            p = zeros(size(x));
-            p(a<=0 | b<=0) = NaN;
-
-            % If is X >= 1 the cdf of X is 1. 
-            p(x >= 1) = 1;
-
-            k = find(x > 0 & x < 1 & a > 0 & b > 0);
-            if any(k)
-               p(k) = betainc(x(k),a(k),b(k));
-            end
-            % Make sure that round-off errors never make P greater than 1.
-            p(p > 1) = 1;
-        end
-
-        function y = betapdf(x,a,b)
-            %BETAPDF Beta probability density function.
-            %   Y = BETAPDF(X,A,B) returns the beta probability density
-            %   function with parameters A and B at the values in X.
-            %   Copyright 1993-2004 The MathWorks, Inc.
-            %   $Revision: 2.11.2.7 $  $Date: 2004/12/24 20:46:46 $
-
-            % Return NaN for out of range parameters.
-            a(a<=0) = NaN;
-            b(b<=0) = NaN;
-
-            % Out of range x could create a spurious NaN*i part to y, prevent that.
-            % These entries will get set to zero later.
-            xOutOfRange = (x<0) | (x>1);
-            x(xOutOfRange) = .5;
-
-            try
-                % When a==1, the density has a limit of beta(a,b) at x==0, and
-                % similarly when b==1 at x==1.  Force that, instead of 0*log(0) = NaN.
-                warn = warning('off','MATLAB:log:logOfZero');
-                logkerna = (a-1).*log(x);   logkerna(a==1 & x==0) = 0;
-                logkernb = (b-1).*log(1-x); logkernb(b==1 & x==1) = 0;
-                warning(warn);
-                y = exp(logkerna+logkernb - betaln(a,b));
-            catch %#ok<CTCH>
-                warning(warn);
-                error('stats:betapdf:InputSizeMismatch',...
-                      'Non-scalar arguments must match in size.');
-            end
-            % Fill in for the out of range x values, but don't overwrite NaNs from nonpositive params.
-            y(xOutOfRange & ~isnan(a) & ~isnan(b)) = 0;
-        end
             
-        function x = chi2inv(p, v)
-            %CHI2INV Inverse of the chi-square cumulative distribution function (cdf).
-            %   X = CHI2INV(P,V)  returns the inverse of the chi-square cdf with V  
-            %   degrees of freedom at the values in P. The chi-square cdf with V 
-            %   degrees of freedom, is the gamma cdf with parameters V/2 and 2.   
-
-            % NOTE: This function is a pure copy and paste of the relevant parts of the Matlab statistical toolbox function "chi2inv.m"
-            % Please use the Statistical Toolbox function, if you have the toolbox
-
-            % Call the gamma inverse function. 
-
-            % Guaratentees: % 0<p<1
-            a = v/2;        % a>0
-            b = 2;          % b>0
-            %x = gaminv(p,v/2,2);
-
-            % ==== Newton's Method to find a root of GAMCDF(X,A,B) = P ====
-            maxiter = 500;
-            iter = 0;
-
-            % Choose a starting guess for q.  Use quantiles from a lognormal
-            % distribution with the same mean (==a) and variance (==a) as G(a,1).
-            loga = log(a);
-            sigsq = log(1+a) - loga;
-            mu = loga - 0.5 .* sigsq;
-            q = exp(mu - sqrt(2.*sigsq).*erfcinv(2*p));
-            h = ones(size(p));
-
-            % Break out of the iteration loop when the relative size of the last step
-            % is small for all elements of q.
-            myeps = eps(class(p+a+b));
-            reltol = myeps.^(3/4);
-            dF = zeros(size(p));
-            while any(abs(h(:)) > reltol*q(:))
-                iter = iter + 1;
-                if iter > maxiter
-                    % Too many iterations.  This should not happen.
-                    break
-                end
-
-                F = mblvm.gamcdf(q,a,1);
-                f = max(mblvm.gampdf(q,a,1), realmin(class(p)));
-                dF = F-p;
-                h = dF ./ f;
-                qnew = q - h;
-                % Make sure that the current iterates stay positive.  When Newton's
-                % Method suggests steps that lead to negative values, take a step
-                % 9/10ths of the way to zero instead.
-                ksmall = find(qnew <= 0);
-                if ~isempty(ksmall)
-                    qnew(ksmall) = q(ksmall) / 10;
-                    h = q - qnew;
-                end
-                q = qnew;
-            end
-
-            badcdf = (isfinite(a) & abs(dF)>sqrt(myeps));
-            if iter>maxiter || any(badcdf(:))   % too many iterations or cdf is too far off
-                didnt = find(abs(h)>reltol*q | badcdf);
-                didnt = didnt(1);
-                if numel(a) == 1, abad = a; else abad = a(didnt); end
-                if numel(b) == 1, bbad = b; else bbad = b(didnt); end
-                if numel(p) == 1, pbad = p; else pbad = p(didnt); end
-                warning('chi2inv:NoConvergence','Did not converge for a = %g, b = %g, p = %g.',abad,bbad,pbad);
-            end
-            x = q .* b;
-
+        function q = chi2inv(p, v)
+             %CHISQQ	Quantiles of the chi-square distribution.
+            %	Q = CHISQQ(P,V) satisfies P(X < Q) = P, where X follows a
+            %	chi-squared distribution on V degrees of freedom.
+            %	V must be a scalar.
+            %
+            %	See also CHISQP.
+            %
+            %	Gordon K Smyth, University of Queensland, gks@maths.uq.edu.au
+            %	27 July 1999
+            %
+            %	Reference:  Johnson and Kotz (1970). Continuous Univariate
+            %	Distributions, Volume I. Wiley, New York.
+            %
+            %   From: http://www.statsci.org/matlab/contents.html
+            q = 2*mblvm.gammaq(p,v/2);
         end
         
-        function y = gampdf(x,a,b)
-            %GAMPDF Gamma probability density function.
-            %   Y = GAMPDF(X,A,B) returns the gamma probability density function with
-            %   shape and scale parameters A and B, respectively, at the values in X.
-            %   Copyright 1993-2004 The MathWorks, Inc.
-            %   $Revision: 2.10.2.6 $  $Date: 2004/12/24 20:46:51 $
+        function p = gammap(q,a)
+            %GAMMAP Gamma distribution function.
+            %	GAMMAP(Q,A) is Pr(X < Q) where X is a Gamma random variable with
+            %	shape parameter A.  A must be scalar.
+            %
+            %	See also GAMMAQ, GAMMAR.
+            %
+            %   GKS  2 August 1998.
+            %
+            %   From: http://www.statsci.org/matlab/contents.html
 
-            % Return NaN for out of range parameters.
-            a(a <= 0) = NaN;
-            b(b <= 0) = NaN;
-
-            z = x ./ b;
-            % Negative data would create complex values, potentially creating
-            % spurious NaNi's in other elements of y.  Map them to the far right
-            % tail, which will be forced to zero.
-            z(z < 0) = Inf;
-            % Prevent LogOfZero warnings.
-            warn = warning('off','MATLAB:log:logOfZero');
-            u = (a - 1) .* log(z) - z - gammaln(a);
-            warning(warn);
-
-            % Get the correct limit for z == 0.
-            u(z == 0 & a == 1) = 0;
-            % These two cases work automatically
-            %  u(z == 0 & a < 1) = Inf;
-            %  u(z == 0 & a > 1) = -Inf;
-
-            % Force a 0 for extreme right tail, instead of getting exp(Inf-Inf)==NaN
-            u(z == Inf & isfinite(a)) = -Inf;
-            % Force a 0 when a is infinite, instead of getting exp(Inf-Inf)==NaN
-            u(z < Inf & a == Inf) = -Inf;
-            y = exp(u) ./ b;
-
+            if a < 0, error('Gamma parameter A must be positive'); end
+            p = gammainc(q,a);
+            k = find(q < 0);
+            if any(k), p(k) = zeros(size(k)); end
         end
         
-        function p = gamcdf(x,a,b)
-            %GAMCDF Gamma cumulative distribution function.
-            %   P = GAMCDF(X,A,B) returns the gamma cumulative distribution function
-            %   with shape and scale parameters A and B, respectively, at the values in X.
-            %   Copyright 1993-2004 The MathWorks, Inc. 
-            %   $Revision: 2.12.2.4 $  $Date: 2004/12/24 20:46:50 $
-            
-            x(x < 0) = 0;
-            z = x ./ b;
-            p = gammainc(z, a);
-            p(z == Inf) = 1;
-            
+        function q = gammaq(p,a)
+            %GAMMAQ	Gamma distribution quantiles.
+            %	Q = GAMMAQ(P,A) satisfies Pr(X < Q) = P where X follows a
+            %	Gamma distribution with shape parameter A > 0.
+            %	A must be scalar.
+            %
+            %	See also GAMMAP, GAMMAR
+
+            %	Gordon Smyth, gks@maths.uq.edu.au, University of Queensland
+            %	2 August 1998
+
+            %	Method:  Newton iteration on the scale of log(X), starting
+            %	from point of inflexion of cdf.  Monotonic convergence is
+            %	guaranteed.
+
+            if any(p < 0 | p > 1), error('P must be between 0 and 1'); end
+
+            if a == 0.5, q = 0.5*normq((1-p)/2).^2; return; end
+            if a == 1, q = -log(1-p); return; end
+
+            G = gammaln(a);
+            x = log(a);
+            q = a;
+            for i=1:10,
+                x = x - (mblvm.gammap(q,a) - p) ./ exp(a*x - q - G);
+                q = exp(x);
+            end
+
+            k = find((p>0 & p<1.5e-4) | (p>0.99999 & p<1));
+            if any(k),
+               X = x(k);
+               Q = q(k);
+               P = p(k);
+               for i=1:10,
+                  X = X - (mblvm.gammap(Q,a) - P) ./ exp(a*X - Q - G);
+                  Q = exp(X);
+               end;
+               q(k) = Q;
+            end
+
+            k = find(p == 0);
+            if any(k), q(k) = zeros(size(k)); end
+
+            k = find(p == Inf);
+            if any(k), q(k) = ones(size(k)); end
         end
         
-        function x = tinv(p,v)
-            %TINV   Inverse of Student's T cumulative distribution function (cdf).
-            %   X=TINV(P,V) returns the inverse of Student's T cdf with V degrees 
-            %   of freedom, at the values in P.
+        function q = finv(p,v1,v2)
+            %FQ	F distribution quantiles.
+            %	Q = FQ(P,V1,V2) satisfies Pr(X < Q) = P, where X follows
+            %	and F distribution on V1 and V2 degrees of freedom.
+            %	V1 and V2 must be scalars.
             %
-            %   The size of X is the common size of P and V. A scalar input   
-            %   functions as a constant matrix of the same size as the other input.    
+            %	See also FP
+            %
+            %	Gordon Smyth, gks@maths.uq.edu.au, University of Queensland
+            %
+            %   From: http://www.statsci.org/matlab/contents.html
 
-            % NOTE: This function is a pure copy and paste of the relevant parts of the Matlab statistical toolbox function "finv.m"
-            % Please use the Statistical Toolbox function, if you have the toolbox
-
-            %   References:
-            %      [1]  M. Abramowitz and I. A. Stegun, "Handbook of Mathematical
-            %      Functions", Government Printing Office, 1964, 26.6.2
-
-            % Initialize Y to zero, or NaN for invalid d.f.
-            if isa(p,'single') || isa(v,'single')
-                x = NaN(size(p),'single');
-            else
-                x = NaN(size(p));
-            end
-
-            % The inverse cdf of 0 is -Inf, and the inverse cdf of 1 is Inf.
-            x(p==0 & v > 0) = -Inf;
-            x(p==1 & v > 0) = Inf;
-
-            k0 = (0<p & p<1) & (v > 0);
-
-            % Invert the Cauchy distribution explicitly
-            k = find(k0 & (v == 1));
-            if any(k)
-              x(k) = tan(pi * (p(k) - 0.5));
-            end
-
-            % For small d.f., call betainv which uses Newton's method
-            k = find(k0 & (v < 1000));
-            if any(k)
-                q = p(k) - .5;
-                df = v(k);
-                t = (abs(q) < .25);
-                z = zeros(size(q),class(x));
-                oneminusz = zeros(size(q),class(x));
-                if any(t)
-                    % for z close to 1, compute 1-z directly to avoid roundoff
-                    oneminusz(t) = betainv(2.*abs(q(t)),0.5,df(t)/2);
-                    z(t) = 1 - oneminusz(t);
-                end
-                if any(~t)
-                    z(~t) = mblvm.betainv(1-2.*abs(q(~t)),df(~t)/2,0.5);
-                    oneminusz(~t) = 1 - z(~t);
-                end
-                x(k) = sign(q) .* sqrt(df .* (oneminusz./z));
-            end
-
-            % For large d.f., use Abramowitz & Stegun formula 26.7.5
-            % k = find(p>0 & p<1 & ~isnan(x) & v >= 1000);
-            k = find(k0 & (v >= 1000));
-            if any(k)
-               xn = mblvm.norminv(p(k));
-               df = v(k);
-               x(k) = xn + (xn.^3+xn)./(4*df) + ...
-                       (5*xn.^5+16.*xn.^3+3*xn)./(96*df.^2) + ...
-                       (3*xn.^7+19*xn.^5+17*xn.^3-15*xn)./(384*df.^3) +...
-                       (79*xn.^9+776*xn.^7+1482*xn.^5-1920*xn.^3-945*xn)./(92160*df.^4);
-            end
+            q = mblvm.betainv(p,v1/2,v2/2);
+            q = v2/v1 * q./(1-q);
         end
         
-        function [x,xlo,xup] = norminv(p,mu,sigma,pcov,alpha)
-            %NORMINV Inverse of the normal cumulative distribution function (cdf).
-            %   X = NORMINV(P,MU,SIGMA) returns the inverse cdf for the normal
-            %   distribution with mean MU and standard deviation SIGMA, evaluated at
-            %   the values in P.  The size of X is the common size of the input
-            %   arguments.  A scalar input functions as a constant matrix of the same
-            %   size as the other inputs.
+        function q = betainv(p,a,b)
+            %BETAQ	Beta distribution quantiles.
+            %	Q = BETAQ(P,A,B) satisfies Pr(X < Q) = P where X follows a
+            %	BETA distribution with parameters A > 0 and B > 0.
+            %	A and B must be scalars.
             %
-            %   Default values for MU and SIGMA are 0 and 1, respectively.
+            %	See also BETAP
+
+            %	Gordon Smyth, smyth@wehi.edu.au,
+            %	Walter and Eliza Hall Institute of Medical Research
+            %	1 August 1998
+
+            %	Method:  Work with the distribution function of log(X/(1-X)).
+            %	The cdf of this distribution has one point of inflexion at the
+            %	the mode of the distribution at log(A/B).  Newton's method
+            %	converges monotonically from this starting value.
             %
-            %   [X,XLO,XUP] = NORMINV(P,MU,SIGMA,PCOV,ALPHA) produces confidence bounds
-            %   for X when the input parameters MU and SIGMA are estimates.  PCOV is a
-            %   2-by-2 matrix containing the covariance matrix of the estimated parameters.
-            %   ALPHA has a default value of 0.05, and specifies 100*(1-ALPHA)% confidence
-            %   bounds.  XLO and XUP are arrays of the same size as X containing the lower
-            %   and upper confidence bounds.
-            %
-            %   See also ERFINV, ERFCINV, NORMCDF, NORMFIT, NORMLIKE, NORMPDF,
-            %            NORMRND, NORMSTAT.
+            %   From: http://www.statsci.org/matlab/contents.html
 
-            %   References:
-            %      [1] Abramowitz, M. and Stegun, I.A. (1964) Handbook of Mathematical
-            %          Functions, Dover, New York, 1046pp., sections 7.1, 26.2.
-            %      [2] Evans, M., Hastings, N., and Peacock, B. (1993) Statistical
-            %          Distributions, 2nd ed., Wiley, 170pp.
+            q = zeros(size(p));
 
-            %   Copyright 1993-2004 The MathWorks, Inc. 
-            %   $Revision: 2.16.4.2 $  $Date: 2004/08/20 20:06:03 $
+            k = find(p >= 1);
+            if any(k), q(k) = ones(size(k)); end
 
-            if nargin < 2
-                mu = 0;
-            end
-            if nargin < 3
-                sigma = 1;
-            end
-
-            % More checking if we need to compute confidence bounds.
-            if nargout>2
-               if nargin<5
-                  alpha = 0.05;
+            k = find(p > 0 & p < 1);
+            if any(k),
+               P = p(k);
+               B = betaln(a,b);
+               r = a/(a+b);
+               x = log(a/b);
+               ex = a/b;
+               for i=1:6,
+                  x = x - (mblvm.betap(r,a,b) - P) ./ exp(a*x - (a+b)*log(1+ex) - B);
+                  ex = exp(x);
+                  r = ex./(1+ex);
                end
+               q(k) = r;
             end
+        end
+        
+        function p = betap(x,a,b)
+            %BETAP	Beta cumulative distribution function.
+            %	BETAP(X,A,B) gives P(X < x) where X follows a BETA distribution
+            %	with parameters A > 0 and B > 0.  A and B must be scalars.
+            %
+            %	See also BETAQ, BETAR
 
-            % Return NaN for out of range parameters or probabilities.
-            sigma(sigma <= 0) = NaN;
-            p(p < 0 | 1 < p) = NaN;
+            %	Gordon Smyth, gks@maths.uq.edu.au, University of Queensland
+            %	31 July 1998
+            %
+            %   From: http://www.statsci.org/matlab/contents.html
 
-            x0 = -sqrt(2).*erfcinv(2*p);
-            try %#ok<TRYNC>
-                x = sigma.*x0 + mu;
-            end
+            p = zeros(size(x));
 
-            % Compute confidence bounds if requested.
-            if nargout>=2
-               xvar = pcov(1,1) + 2*pcov(1,2)*x0 + pcov(2,2)*x0.^2;
-               normz = -norminv(alpha/2);
-               halfwidth = normz * sqrt(xvar);
-               xlo = x - halfwidth;
-               xup = x + halfwidth;
-            end
+            k = find(x >= 1);
+            if any(k), p(k) = ones(size(k)); end
 
+            k = find(x > 0 & x < 1);
+            if any(k), p(k) = betainc(x(k),a,b); end
+        end
+        
+        function q = tinv(p,v)
+            %TQ	t distribution quantiles.
+            %	Q = TQ(P,V) satisfies Pr(T < Q) = P where T follows a
+            %	t-distribution on V degrees of freedom.
+            %	V must be a scalar.
+            %
+            %	Gordon Smyth, University of Queensland, gks@maths.uq.edu.au
+            %	2 August 1998
+            % 
+            %   From: http://www.statsci.org/matlab/contents.html
+            if v <= 0, error('Degrees of freedom must be positive.'); end;
+
+            q = sign(p-0.5).*sqrt( mblvm.finv(2.*abs(p-0.5),1,v) );
         end
         
         function limits = spe_limits(values, levels)
