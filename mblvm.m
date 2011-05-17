@@ -1473,6 +1473,9 @@ classdef mblvm < handle
             %	Distributions, Volume I. Wiley, New York.
             %
             %   From: http://www.statsci.org/matlab/contents.html
+            %
+            % Another alternative might be: 
+            % http://www.spatial-econometrics.com/
             q = 2*mblvm.gammaq(p,v/2);
         end
         
