@@ -73,10 +73,6 @@ classdef mbpca < mblvm
                 if sign(out.p_a(max_el_idx)) < 1
                     out.p_a = -1.0 * out.p_a;
                     out.t_a = -1.0 * out.t_a;
-                end    
-                % Randomization testing for this component
-                if self.opt.randomize_test.use
-                    self.randomization_test(a);
                 end
                 
                 % Recover block information and store that.
@@ -124,6 +120,11 @@ classdef mbpca < mblvm
                 self.super.T_summary(:,:,a) = t_superblock;
                 self.super.T(:,a) = out.t_a;
                 self.super.P(:,a) = p_super;
+                
+                % Randomization testing for this component
+                if self.opt.randomize_test.use
+                    self.randomization_test(a);
+                end
                 
                 % Now deflate the data matrix using the superscore
                 self.data = self.data - out.t_a * out.p_a';
@@ -342,9 +343,17 @@ classdef mbpca < mblvm
         end % ``register_plots_post``
         
         % Superclass abstract method implementation
-        function stat = randomization_objective(self)
-            score_vector = self.super.T(:, self.A);
-            stat = sqrt(self.robust_scale(score_vector));
+        function stat = randomization_objective(self, current_A, varargin)
+            if nargin == 2
+                overall_T = self.super.T(:,current_A);
+            else
+                overall_T = varargin{1}.t_a;
+            end
+            
+            stat = sqrt(self.robust_scale(overall_T));
+            if isnan(stat)
+                stat = 0.0;
+            end            
         end % ``randomization_objective``
         
         % Superclass abstract method implementation
@@ -357,8 +366,11 @@ classdef mbpca < mblvm
             % Randomly permute all columns the first time:
             for k = 1:self.K
                 rand('twister', k);
-                self.data(:,k) = self.data(randperm(N),k);
+                self.data(:,k) = self.data(randperm(self.N),k);
             end
+            
+            % Track which column was permuted last
+            self.opt.randomize_test.current_column = self.K;
 
             
         end % ``randomization_test_launch``
@@ -385,11 +397,18 @@ classdef mbpca < mblvm
             % So store in ``output`` all the entries required to evaluate
             % the randomization objective function.
             
-                    
+            k = self.opt.randomize_test.current_column;
+            self.data(:, k) = self.data(randperm(self.N), k);
+            k = k +1;
+            if k > self.K
+                k = 1;
+            end
+            self.opt.randomize_test.current_column = k;
+                                
             % Calculate the "a"th component using this permuted Y-matrix, but
             % the unpermuted X-matrix.
-            a=2;
-            
+            output = self.single_block_PCA(self.data);
+                        
             
         end % ``randomization_test_finish``
         

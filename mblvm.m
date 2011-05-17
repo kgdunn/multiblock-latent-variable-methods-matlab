@@ -511,7 +511,7 @@ classdef mblvm < handle
                                                    stats.nperm*stats.mean_G^2;
                 curr_ssq = ssq(permuted_stats);
                 stats.mean_G = (stats.mean_G*stats.nperm + ...
-                 block_base.nanmean(permuted_stats)*nperm)/(stats.nperm+nperm);
+                   block_base.nanmean(permuted_stats)*nperm)/(stats.nperm+nperm);
                 
                 % Guard against getting a negative under the square root
                 % This approach quickly becomes inaccurate when using many rounds.

@@ -3,7 +3,7 @@ function unit_tests(varargin)
     
     test_significant_figures()
         
-    %PCA_randomization_tests()
+    PCA_randomization_tests()
     
     % PCA tests
     test_syntax()
