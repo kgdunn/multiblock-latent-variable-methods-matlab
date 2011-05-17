@@ -18,7 +18,7 @@ classdef mbpca < mblvm
         
         % Superclass abstract method implementation
         function self = preprocess_extra(self)
-        end
+        end % ``preprocess_extra``
         
         % Superclass abstract method implementation
         function self = calc_model(self, requested_A)
@@ -33,9 +33,9 @@ classdef mbpca < mblvm
             base_condition = a <= requested_A;
             
             randomize_keep_adding = false;
-            %if self.opt.randomize_test.use
-            %    randomize_keep_adding = not(self.randomization_should_terminate());
-            %end                
+            if self.opt.randomize_test.use
+                randomize_keep_adding = not(self.randomization_should_terminate());
+            end                
             
             while base_condition || randomize_keep_adding
                 
@@ -53,7 +53,13 @@ classdef mbpca < mblvm
                 end
                 
                 % Converge onto a single component
-                [t_a, p_a, itern] = mbpca.single_block_PCA(self.data, self, a, self.has_missing);                
+                if self.opt.show_progress
+                    h = awaitbar(0, sprintf('Calculating component %d', a));
+                    out = self.single_block_PCA(self.data, h); 
+                    close(h);
+                else
+                    out = self.single_block_PCA(self.data);
+                end                
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
@@ -63,10 +69,10 @@ classdef mbpca < mblvm
                 % Also see: http://www.models.life.ku.dk/signflipsvd
                 % See 10.1.1.120.8476.pdf in the readings directory
                 
-                [max_el, max_el_idx] = max(abs(p_a)); %#ok<ASGLU>
-                if sign(p_a(max_el_idx)) < 1
-                    p_a = -1.0 * p_a;
-                    t_a = -1.0 * t_a;
+                [max_el, max_el_idx] = max(abs(out.p_a)); %#ok<ASGLU>
+                if sign(out.p_a(max_el_idx)) < 1
+                    out.p_a = -1.0 * out.p_a;
+                    out.t_a = -1.0 * out.t_a;
                 end    
                 % Randomization testing for this component
                 if self.opt.randomize_test.use
@@ -81,7 +87,7 @@ classdef mbpca < mblvm
                     
                     % Regress sub-columns of self.data onto the superscore
                     % to get the block loadings.
-                    p_b = regress_func(X_portion, t_a, self.has_missing);
+                    p_b = regress_func(X_portion, out.t_a, self.has_missing);
                     
                     p_b = p_b / norm(p_b);
                     
@@ -95,7 +101,7 @@ classdef mbpca < mblvm
                     self.P{b}(:,a) = p_b;
                    
                     % Store the SS prior to deflation 
-                    X_portion_hat = t_a * p_b';
+                    X_portion_hat = out.t_a * p_b';
                     self.stats{b}.col_ssq_prior(:, a) = ssq(X_portion_hat,1);
                     
                     % VIP calculations
@@ -113,14 +119,14 @@ classdef mbpca < mblvm
                     [self.stats{b}.T2(:,a), S] = self.mahalanobis_distance(self.T{b}(:,1:a));
                     self.stats{b}.S = S;
                 end
-                p_super = regress_func(t_superblock, t_a, false);
+                p_super = regress_func(t_superblock, out.t_a, false);
                      
                 self.super.T_summary(:,:,a) = t_superblock;
-                self.super.T(:,a) = t_a;
+                self.super.T(:,a) = out.t_a;
                 self.super.P(:,a) = p_super;
                 
                 % Now deflate the data matrix using the superscore
-                self.data = self.data - t_a * p_a';
+                self.data = self.data - out.t_a * out.p_a';
                 ssq_cumul = 0;
                 ssq_before = 0;
                 for b = 1:self.B
@@ -175,7 +181,7 @@ classdef mbpca < mblvm
                 self.calc_statistics_and_limits(a);
                 
                 self.model.stats.timing(a) = cputime - start_time;
-                self.model.stats.itern(a) = itern;
+                self.model.stats.itern(a) = out.itern;
                 self.A = a;
                 
                 
@@ -188,11 +194,11 @@ classdef mbpca < mblvm
                 
                 % Termination condition: randomization test
                 if self.opt.randomize_test.use
-                    %randomize_keep_adding = not(self.randomization_should_terminate());
-                    %stats = self.opt.randomize_test.risk_statistics{a};
-                    %self.model.stats.risk.stats{a} = stats;
-                    %self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
-                    %self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
+                    randomize_keep_adding = not(self.randomization_should_terminate());
+                    stats = self.opt.randomize_test.risk_statistics{a};
+                    self.model.stats.risk.stats{a} = stats;
+                    self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
+                    self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
                 end                
                 
                 a = a + 1;                
@@ -328,14 +334,12 @@ classdef mbpca < mblvm
                 end
             end
             fprintf(']\n');
-
-        end
+        end % ``summary``
        
         % Superclass abstract method implementation
         function out = register_plots_post(self)
-            out = [];
-            
-        end
+            out = [];            
+        end % ``register_plots_post``
         
         % Superclass abstract method implementation
         function stat = randomization_objective(self)
@@ -389,17 +393,11 @@ classdef mbpca < mblvm
             
         end % ``randomization_test_finish``
         
-    end % end methods (ordinary)
-    
-    % These methods don't require a class instance
-    methods(Static)
-        function [t_a, p_a, itern] = single_block_PCA(dblock, self, a, has_missing)
+        function out = single_block_PCA(self, X, varargin)
             % Extracts a PCA component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
             % The ``a`` entry is merely used to show which component is being
             % extracted in the progress bar.
-            % The ``has_missing`` flag is used to indicate if any entries in 
-            % ``dblock`` are missing.
             %
             %
             % 1.   Wold, Esbensen and Geladi, 1987, Principal Component Analysis,
@@ -407,67 +405,62 @@ classdef mbpca < mblvm
             %      http://dx.doi.org/10.1016/0169-7439(87)80084-9
             % 2.   Missing data: http://dx.doi.org/10.1016/B978-044452701-1.00125-3
             
-            tolerance = self.opt.tolerance;
-            N = size(dblock, 1);
-            if self.opt.show_progress
-                h = awaitbar(0, sprintf('Calculating component %d', a));
-            end
+            N = size(X, 1);
             rand('state', 0) %#ok<RAND>
             t_a_guess = rand(N,1)*2-1;
-            t_a = t_a_guess + 1.0;
-            itern = 0;
-            while not(self.iter_terminate(t_a_guess, t_a, itern, tolerance))
+            out.t_a = t_a_guess + 1.0;
+            out.itern = 0;
+            while not(self.iter_terminate(t_a_guess, out.t_a, out.itern, self.opt.tolerance))
                 % 0: Richardson's acceleration, or any numerical acceleration
                 %    method for PCA where there is slow convergence?
                 
                 % Progress for PCA converges logarithmically from whatever
                 % starting tolerance to the final tolerance.  Use a linear
                 % mapping between 0 and 1, where 1 is mapped to log(tol).
-                if itern == 3
-                    start_perc = log(norm(t_a_guess - t_a));
-                    final_perc = log(tolerance);
+                if out.itern == 3
+                    start_perc = log(norm(t_a_guess - out.t_a));
+                    final_perc = log(self.opt.tolerance);
                     progress_slope = (1-0)/(final_perc-start_perc);
                     progress_intercept = 0 - start_perc*progress_slope;
                 end
                 
-                if self.opt.show_progress && itern > 2
-                    perc = log(norm(t_a_guess - t_a))*progress_slope + progress_intercept;
-                    stop_early = awaitbar(perc, h);
+                if nargin > 3 && self.opt.show_progress && out.itern > 2
+                    perc = log(norm(t_a_guess - out.t_a))*progress_slope + progress_intercept;
+                    stop_early = awaitbar(perc, varargin{1});
                     if stop_early
                         break;
                     end
                 end
                 
                 % 0: starting point for convergence checking on next loop
-                t_a_guess = t_a;
+                t_a_guess = out.t_a;
                 
                 % 1: Regress the score, t_a, onto every column in X, compute the
                 %    regression coefficient and store in p_a
                 %p_a = X.T * t_a / (t_a.T * t_a)
                 %p_a = (X.T)(t_a) / ((t_a.T)(t_a))
                 %p_a = dot(X.T, t_a) / ssq(t_a)
-                p_a = regress_func(dblock, t_a, has_missing);
+                out.p_a = regress_func(X, out.t_a, self.has_missing);
                 
                 % 2: Normalize p_a to unit length
-                p_a = p_a / sqrt(ssq(p_a));
+                out.p_a = out.p_a / sqrt(out.p_a' * out.p_a);
                 
                 % 3: Now regress each row in X on the p_a vector, and store the
                 %    regression coefficient in t_a
                 %t_a = X * p_a / (p_a.T * p_a)
                 %t_a = (X)(p_a) / ((p_a.T)(p_a))
                 %t_a = dot(X, p_a) / ssq(p_a)
-                t_a = regress_func(dblock, p_a, has_missing);
+                out.t_a = regress_func(X, out.p_a, self.has_missing);
                 
-                itern = itern + 1;
+                out.itern = out.itern + 1;
             end
-            
-            if self.opt.show_progress
-                if ishghandle(h)
-                    close(h);
-                end
-            end
-            
-        end
+        end % ``single_block_PCA``
+        
+    end % end methods (ordinary)
+    
+    % These methods don't require a class instance
+    methods(Static)
+        
     end % end methods (static)
     
 end % end classdef
