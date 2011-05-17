@@ -19,12 +19,11 @@ opt.batch.monitoring_limits_show_progress = true;
 
 opt.randomize_test = struct;
 opt.randomize_test.use = false;
-opt.randomize_test.use_internal = false;         % does the randomization internal to the LV calculations
-opt.randomize_test.quick_return = false;         % Early return from the PLS algorithm
+opt.randomize_test.points = 0;                    % Start with zero points
 opt.randomize_test.risk_uncertainty = [0.5 10.0]; % Between these levels the percentage risk is considered uncertain, and could be due 
                                                  % to the  randomization values.  So will do more permutationsm, to a maximum of 3 
                                                  % times the default amount, to more clearly define the risk level.
-opt.randomize_test.permutations = 50;            % Default number of permutations.
+opt.randomize_test.permutations = 500;           % Default number of permutations.
 opt.randomize_test.max_rounds = 20;              % We will do at most 1000 permutations to assess risk
 opt.randomize_test.test_statistic = [];
 opt.randomize_test.risk_statistics = cell(1,1);

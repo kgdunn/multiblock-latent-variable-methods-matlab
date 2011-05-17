@@ -304,6 +304,13 @@ classdef mbpca < mblvm
             
         end
         
+        % Superclass abstract method implementation
+        function stat = randomization_objective(self)
+            score_vector = self.super.T(:, self.A);
+            stat = sqrt(self.robust_scale(score_vector));             
+
+        end % ``randomization_objective``
+        
     end % end methods (ordinary)
     
     % These methods don't require a class instance

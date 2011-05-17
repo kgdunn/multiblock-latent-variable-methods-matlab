@@ -627,6 +627,7 @@ function PLS_randomization_tests()
         options.randomize_test.use = true;
         options.show_progress = false;     
         options.randomize_test.show_progress = false;
+        options.randomize_test.permutations = 100;
         if strcmp(test.pretreatment, 'MCUV')
             PLS_model = lvm({'X', X, 'Y', Y}, options);
         end

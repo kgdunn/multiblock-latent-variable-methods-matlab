@@ -145,18 +145,17 @@ classdef block_batch < block_base
             % ``other`` will retain all properties originally in ``self``.
             %
             % Example: [batch_X, test_X] = batch_X.exclude(1, 41); % removes batch 41
-            %
-            % NOTE: at this time, you cannot exclude a variable from a batch
-            % block.  To do that, exclude the variable in the raw data, before
-            % creating the block.
 
-
-            exc_s = struct; 
+            if not(isnumeric(which))
+                error('block_batch:exclude', 'Exclude based on numeric indices only, not based on row or column labels.')
+            end
+            
+            exc_s = struct;
             exc_s.type = '()';
 
             rem_s = struct; 
             rem_s.type = '()';
-
+            
             if dim == 1 
                 if any(which>self.N)
                     error('block:exclude', 'Entries to exclude exceed the size (row size) of the block.')

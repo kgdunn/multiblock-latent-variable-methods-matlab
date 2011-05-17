@@ -71,29 +71,40 @@ function test_exclude()
 
     % Array blocks
     FMC = load('datasets/FMC.mat');
-    Z = block(FMC.Z);
-    Z.add_labels(2, FMC.Znames)
+    Zchem = block(FMC.Zchem);
+    Zchem.add_labels(2, FMC.Zchem_names)
     
-    [Z, other] = Z.exclude(1, 12:15);
-    assertTrue(all(shape(Z) == [55, 20]))
-    assertTrue(all(shape(other) == [4, 20]))
+    % Exclude some rows
+    [Zchem, other] = Zchem.exclude(1, 19:22);
+    assertTrue(all(shape(Zchem) == [55, 11]))
+    assertTrue(all(shape(other) == [4, 11]))
     
-    [Z, other] = Z.exclude(2, [9:14 16]);
-    assertTrue(all(shape(Z) == [55, 13]))
-    assertTrue(all(shape(other) == [55, 7]))
+    % Exclude some columns
+    [Zchem, other] = Zchem.exclude(2, 7:10);
+    assertTrue(all(shape(Zchem) == [55, 7]))
+    assertTrue(all(shape(other) == [55, 4]))
 
-    % Batch blocks
-    
-    
+    % Exclude from batch blocks    
     tag_names = {'CTankLvl','DiffPres','DryPress','Power','Torque','Agitator','J-Temp-SP','J-Temp','D-Temp-SP','D-Temp','ClockTime'};
-    b = block(FMC.batchSPCData, 'X block', {'batch_names', FMC.Xnames}, ...
-                                 {'batch_tag_names', tag_names});
+    
+    assertExceptionThrown('block_batch:inconsistent_data_specification', ...
+                          @block, FMC.X, 'X block', ...
+                          {'batch_names', FMC.Xnames}, ...
+                          {'batch_tag_names', tag_names});
+    
+    b = block(FMC.X, 'X block', {'batch_names', FMC.batch_names}, ...
+                                {'batch_tag_names', tag_names});
+                            
+    assertTrue(all(shape(b) == [59, 11, 325]))
                         
-    b.exclude(1, 4);
-%     b.exclude(1, 'A');
-%     
-%     b.exclude(1, {'A'});
-%     b.exclude(1, {'A', 'H'});
+    [bnew, other] = b.exclude(1, 4);
+    assertTrue(all(shape(bnew) == [58, 11, 325]))
+    assertTrue(all(shape(other) == [1, 11, 325]))
+    assertTrue(FMC.batch_names(4) == str2double(other.labels{1}));
+    
+    
+    assertExceptionThrown('block_batch:exclude', @b.exclude, 1, '52');
+
 end
 
 function test_batch_blocks()

@@ -71,7 +71,7 @@ classdef mbpls < mblvm
         end
 
         % Superclass abstract method implementation
-        function self = calc_model(self, A)
+        function self = calc_model(self, requested_A)
             % Fits a PLS latent variable model.
             %  
             % We assume the data are merged and preprocessed already.
@@ -89,48 +89,59 @@ classdef mbpls < mblvm
                         ['Cannot handle the case yet where the entire '...
                          'observation in Y-matrix is missing.  Please '...
                          'remove those rows and refit model.'])
-            end
+            end            
+                       
+            %which_components = max(self.A+1, 1) : requested_A;
+            a = max(self.A+1,1);
+            base_condition = a <= requested_A;
             
-            which_components = max(self.A+1, 1) : A;            
-            for a = which_components
+            randomize_keep_adding = false;
+            if self.opt.randomize_test.use
+                randomize_keep_adding = not(self.randomization_should_terminate());
+            end                
+            
+            while base_condition || randomize_keep_adding
                 
                 start_time = cputime;
+
                 % Baseline for all R2 calculations and variance check
                 if a == 1             
                     ssq_before = ssq(self.data, 1);
                     self.split_result(ssq_before, 'stats', 'start_SS_col');
-                    
+
                     ssq_Y_before = ssq(self.Y.data, 1);
                     self.super.stats.ssq_Y_before = ssq_Y_before;
                 else
                     ssq_before = ssq(self.data, 1);
                     ssq_Y_before = ssq(self.Y.data, 1);
                 end
-                
+
                 if all(ssq_before < self.opt.tolerance)
-                    warning('mbpls:calc_model', 'There is no variance left in the X-data')
+                    warning('mbpls:calc_model', ...
+                            'There is no variance left in the X-data')
                 end
                 if all(ssq_Y_before < self.opt.tolerance)
-                    warning('mbpls:calc_model', 'There is no variance left in the Y-data')
+                    warning('mbpls:calc_model', ...
+                            'There is no variance left in the Y-data')
                 end 
-                         
+
                 % Converge onto a single component
-                [t_a, p_a, c_a, u_a, w_a, itern] = mbpls.single_block_PLS(self.data, self.Y.data, self, a, self.has_missing); 
+                %[t_a, p_a, c_a, u_a, w_a, itern] 
+                out = mbpls.single_block_PLS(self.data, self.Y.data, ...
+                                                   self, a, self.has_missing); 
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
                 % (Wold, Esbensen, Geladi, PCA, CILS, 1987, p 42
                 %  http://dx.doi.org/10.1016/0169-7439(87)80084-9)
-                [max_el, max_el_idx] = max(abs(w_a)); %#ok<ASGLU>
-                if sign(w_a(max_el_idx)) < 1
-                    p_a = -1.0 * p_a;
-                    t_a = -1.0 * t_a;
-                    c_a = -1.0 * c_a;
-                    u_a = -1.0 * u_a;
-                end                    
-                
-                self.model.stats.timing(a) = cputime - start_time;
-                self.model.stats.itern(a) = itern;
+                [max_el, max_el_idx] = max(abs(out.w_a)); %#ok<ASGLU>
+                if sign(out.w_a(max_el_idx)) < 1
+                    out.p_a = -1.0 * out.p_a;
+                    out.t_a = -1.0 * out.t_a;
+                    out.c_a = -1.0 * out.c_a;
+                    out.u_a = -1.0 * out.u_a;
+                    out.w_a = -1.0 * out.w_a;
+                end  
                 
                 % Recover block information and store that.
                 t_superblock = zeros(self.N, self.B);
@@ -140,7 +151,7 @@ classdef mbpls < mblvm
                     
                     % Regress sub-columns of self.data onto the superscore
                     % to get the block weights.
-                    w_b = regress_func(X_portion, u_a, self.has_missing);
+                    w_b = regress_func(X_portion, out.u_a, self.has_missing);
                     
                     w_b = w_b / norm(w_b);
                     
@@ -152,7 +163,7 @@ classdef mbpls < mblvm
                     
                     % Block loadings: that would have been used to deflate the
                     % X-blocks
-                    p_b = regress_func(X_portion, t_a, self.has_missing);
+                    p_b = regress_func(X_portion, out.t_a, self.has_missing);
                     
                     % Store the block scores, weights and loadings
                     self.T{b}(:,a) = t_b;
@@ -160,7 +171,7 @@ classdef mbpls < mblvm
                     self.P{b}(:,a) = p_b;
                    
                     % Store the SS prior to deflation 
-                    X_portion_hat = t_a * p_b';
+                    X_portion_hat = out.t_a * p_b';
                     self.stats{b}.col_ssq_prior(:, a) = ssq(X_portion_hat,1);
                     
                     % VIP calculations
@@ -180,21 +191,28 @@ classdef mbpls < mblvm
                     self.stats{b}.S = S;
                     
                 end
-                w_super = regress_func(t_superblock, u_a, false);
+                w_super = regress_func(t_superblock, out.u_a, false);
                 w_super = w_super / norm(w_super);
                 
                 % Store the super-level results
                 self.super.T_summary(:,:,a) = t_superblock;
-                self.super.T(:,a) = t_a;
+                self.super.T(:,a) = out.t_a;
                 self.super.W(:,a) = w_super;
-                self.super.C(:,a) = c_a;
-                self.super.U(:,a) = u_a;
+                self.super.C(:,a) = out.c_a;
+                self.super.U(:,a) = out.u_a;
+                
+                
+                % Randomization testing for this component
+                if self.opt.randomize_test.use
+                    self.randomization_test(a);
+                end
+                
                                 
                 % Now deflate the data matrix using the superscore
-                self.data = self.data - t_a * p_a';
+                self.data = self.data - out.t_a * out.p_a';
                 
                 % Make current predictions of Y using all available PCs
-                Y_hat_update = t_a * c_a';
+                Y_hat_update = out.t_a * out.c_a';
                 self.Y_hat.data = self.Y_hat.data + Y_hat_update;
                 self.Y.data = self.Y.data - Y_hat_update;
                 ssq_Y_after = ssq(self.Y.data, 1)';
@@ -261,11 +279,60 @@ classdef mbpls < mblvm
                 % Calculate the limits                
                 self.calc_statistics_and_limits(a);
                 
-                self.A = a;
+                
+                self.model.stats.timing(a) = cputime - start_time;
+                self.model.stats.itern(a) = out.itern;
+                
+                self.A = a;                
+                
+                % Termination condition: fixed request for a certain number of components.
+                if self.A < requested_A
+                    base_condition = true;                    
+                else
+                    base_condition = false;
+                end
+                
+                % Termination condition: randomization test
+                if self.opt.randomize_test.use
+                    randomize_keep_adding = not(self.randomization_should_terminate());
+                    stats = self.opt.randomize_test.risk_statistics{a};
+                    self.model.stats.risk.stats{a} = stats;
+                    self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
+                    self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
+                end
+                
+                a = a + 1;
+                
             end % looping on ``a`` latent variables
-          
-            
+
+            if self.opt.randomize_test.use                
+                self.A = self.opt.randomize_test.last_worthwhile_A;
+            end
+                      
         end % ``calc_model``
+        
+        % Superclass abstract method implementation
+        function stat = randomization_objective(self, current_A, varargin)
+             % 12 May 2011: Use Matthews correlation coefficient for categorical,
+             % single Y-variables
+             % * http://en.wikipedia.org/wiki/Matthews_correlation_coefficient
+             % * http://en.wikipedia.org/wiki/Receiver_operating_characteristic
+             
+             if nargin == 2
+                overall_T = self.super.T(:,current_A);
+                overall_U = self.super.U(:,current_A);
+             else
+                 overall_T = varargin{1}.t_a;
+                 overall_U = varargin{1}.u_a;
+             end
+                
+             stat = (overall_U' * overall_T) ./ ...
+                 (sqrt(overall_T'*overall_T) .* sqrt(overall_U' * overall_U));
+            if isnan(stat)
+                stat = 0.0;
+            end
+            
+        end % ``randomization_objective``
     
         % Superclass abstract method implementation
         function limits_subclass(self)
@@ -486,7 +553,7 @@ classdef mbpls < mblvm
     
     % These methods don't require a class instance
     methods(Static=true)
-        function [t_a, p_a, c_a, u_a, w_a, itern] = single_block_PLS(X, Y, self, a, has_missing)
+        function out = single_block_PLS(X, Y, self, a, has_missing)
             % Extracts a PLS component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
             % The ``a`` entry is merely used to show which component is being
@@ -499,31 +566,35 @@ classdef mbpls < mblvm
             %     2(3), 211-228, 1998, http://dx.doi.org/10.1002/cem.1180020306
             %
             % [2] Missing data: http://dx.doi.org/10.1016/B978-044452701-1.00125-3
+            %
+            % Returns a ``trans`` (transient) data structure that is meant to
+            % be used to extract the relevant results.
             
+            out = struct;
             N = size(X, 1);
             if self.opt.show_progress
                 h = awaitbar(0, sprintf('Calculating component %d', a));
             end
             rand('state', 0) %#ok<RAND>
             u_a_guess = rand(N,1)*2-1;
-            u_a = u_a_guess + 1.0;
-            itern = 0;
-            while not(self.iter_terminate(u_a_guess, u_a, itern, self.opt.tolerance))
+            out.u_a = u_a_guess + 1.0;
+            out.itern = 0;
+            while not(self.iter_terminate(u_a_guess, out.u_a, out.itern, self.opt.tolerance))
                 % 0: Richardson's acceleration, or any numerical acceleration
                 %    method for PLS where there is slow convergence?
                 
                 % Progress for PLS converges logarithmically from whatever
                 % starting tolerance to the final tolerance.  Use a linear
                 % mapping between 0 and 1, where 1 is mapped to log(tol).
-                if itern == 3
-                    start_perc = log(norm(u_a_guess - u_a));
+                if out.itern == 3
+                    start_perc = log(norm(u_a_guess - out.u_a));
                     final_perc = log(self.opt.tolerance);
                     progress_slope = (1-0)/(final_perc-start_perc);
                     progress_intercept = 0 - start_perc*progress_slope;
                 end
                 
-                if self.opt.show_progress && itern > 2
-                    perc = log(norm(u_a_guess - u_a))*progress_slope + progress_intercept;
+                if self.opt.show_progress && out.itern > 2
+                    perc = log(norm(u_a_guess - out.u_a))*progress_slope + progress_intercept;
                     stop_early = awaitbar(perc, h);
                     if stop_early
                         break;
@@ -531,36 +602,36 @@ classdef mbpls < mblvm
                 end
                 
                 % 0: starting point for convergence checking on next loop
-                u_a_guess = u_a;
+                u_a_guess = out.u_a;
                 
                 % 1: Regress the score, u_a, onto every column in X, compute the
                 %    regression coefficient and store in w_a
                 % w_a = X.T * u_a / (u_a.T * u_a)
-                w_a = regress_func(X, u_a, has_missing);
+                out.w_a = regress_func(X, out.u_a, has_missing);
                 
                 % 2: Normalize w_a to unit length
-                w_a = w_a / norm(w_a);
+                out.w_a = out.w_a / norm(out.w_a);
                 
                 % TODO(KGD): later on: investage NOT deflating X
                 
                 % 3: Now regress each row in X on the w_a vector, and store the
                 %    regression coefficient in t_a
                 % t_a = X * w_a / (w_a.T * w_a)
-                t_a = regress_func(X, w_a, has_missing);
+                out.t_a = regress_func(X, out.w_a, has_missing);
 
                 % 4: Now regress score, t_a, onto every column in Y, compute the
                 %    regression coefficient and store in c_a
                 % c_a = Y.T * t_a / (t_a.T * t_a)
-                c_a = regress_func(Y, t_a, has_missing);
+                out.c_a = regress_func(Y, out.t_a, has_missing);
                 
                 % 5: Now regress each row in Y on the c_a vector, and store the
                 %    regression coefficient in u_a
                 % u_a = Y * c_a / (c_a.T * c_a)
                 %
                 % TODO(KGD):  % Still handle case when entire row in Y is missing
-                u_a = regress_func(Y, c_a, has_missing);
+                out.u_a = regress_func(Y, out.c_a, has_missing);
                 
-                itern = itern + 1;
+                out.itern = out.itern + 1;
             end
             
             % 6: To deflate the X-matrix we need to calculate the
@@ -569,7 +640,7 @@ classdef mbpls < mblvm
             % deflate afterwards.
             % Note the similarity with step 4! and that similarity helps
             % understand the deflation process.
-            p_a = regress_func(X, t_a, has_missing); 
+            out.p_a = regress_func(X, out.t_a, has_missing); 
 
             if self.opt.show_progress
                 if ishghandle(h)

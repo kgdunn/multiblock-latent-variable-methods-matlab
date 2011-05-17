@@ -129,7 +129,7 @@ classdef block_base < handle
         end
         
         function y = mean(self, varargin)
-            y = nanmean(self.data, varargin{:});
+            y = block_base.nanmean(self.data, varargin{:});
         end
         
         function y = std(self, dim, flag)
@@ -178,7 +178,7 @@ classdef block_base < handle
             end
 
             if nargin < 2
-                dim = min(find(size(x)~=1));
+                dim = find(size(x)~=1, 1);
                 if isempty(dim)
                     dim = 1; 
                 end	  
@@ -186,7 +186,7 @@ classdef block_base < handle
 
             % Find NaNs in x and nanmean(x)
             nans = isnan(x);
-            avg = nanmean(x,dim);
+            avg = block_base.nanmean(x,dim);
 
             % create array indicating number of element 
             % of x in dimension DIM (needed for subtraction of mean)
@@ -336,9 +336,14 @@ classdef block_base < handle
             out = isempty(self.data);
         end
         
-        function disp_header(self)
+        function disp(self)
             % Displays a text summary of the block
             fprintf('%s: %d observations and %d variables\n', self.name, self.N, self.K)
+            if self.has_missing
+                fprintf('* Has missing data\n')
+            else
+                fprintf('* Has _no_ missing data\n')
+            end
             
         end
         
@@ -500,6 +505,10 @@ classdef block_base < handle
             % block.  To do that, exclude the variable in the raw data, before
             % creating the block.
 
+            
+            if not(isnumeric(which))
+                error('block_batch:exclude', 'Exclude based on numeric indices only, not based on row or column labels.')
+            end
 
             exc_s = struct; 
             exc_s.type = '()';
@@ -555,17 +564,6 @@ classdef block_base < handle
     
     % Subclasses may not redefine these methods
     methods (Sealed=true)
-        function disp(self)
-            
-            disp_header(self)
-            
-            if self.has_missing
-                fprintf('* Has missing data\n')
-            else
-                fprintf('* Has _no_ missing data\n')
-            end
-        end
-        
     end % end methods (sealed)
     
     % These methods don't invoke ``self``
@@ -659,6 +657,57 @@ classdef block_base < handle
             end
         end
         
+        function y = nanmean(x, dim)
+            % FORMAT: Y = NANMEAN(X,DIM)
+            % 
+            %    Average or mean value ignoring NaNs
+            %
+            %    This function enhances the functionality of NANMEAN as distributed in
+            %    the MATLAB Statistics Toolbox and is meant as a replacement (hence the
+            %    identical name).  
+            %
+            %    NANMEAN(X,DIM) calculates the mean along any dimension of the N-D
+            %    array X ignoring NaNs.  If DIM is omitted NANMEAN averages along the
+            %    first non-singleton dimension of X.
+            %
+            %    Similar replacements exist for NANSTD, NANMEDIAN, NANMIN, NANMAX, and
+            %    NANSUM which are all part of the NaN-suite.
+            %
+            %    See also MEAN
+
+            % -------------------------------------------------------------------------
+            %    author:      Jan Gläscher
+            %    affiliation: Neuroimage Nord, University of Hamburg, Germany
+            %    email:       glaescher@uke.uni-hamburg.de
+            %    
+            %    $Revision: 1.1 $ $Date: 2004/07/15 22:42:13 $
+            if isempty(x)
+                y = NaN;
+                return
+            end
+
+            if nargin < 2
+                dim = find(size(x)~=1, 1 );
+                if isempty(dim)
+                    dim = 1;
+                end
+            end
+
+            % Replace NaNs with zeros.
+            nans = isnan(x);
+            x(isnan(x)) = 0; 
+
+            % denominator
+            count = size(x,dim) - sum(nans,dim);
+
+            % Protect against a  all NaNs in one dimension
+            i = find(count==0);
+            count(i) = ones(size(i));
+
+            y = sum(x,dim)./count;
+            y(i) = i + NaN;
+            % $Id: nanmean.m,v 1.1 2004/07/15 22:42:13 glaescher Exp glaescher $
+        end
     end % end methods (static)
 
 %     % Subclass must redefine these methods
@@ -713,57 +762,7 @@ function [hA, hHeaders, hFooters, title_str] = plot_tags(self, tags, subplot_siz
     title_str = 'Plots of raw data';
 end
 
-function y = nanmean(x, dim)
-    % FORMAT: Y = NANMEAN(X,DIM)
-    % 
-    %    Average or mean value ignoring NaNs
-    %
-    %    This function enhances the functionality of NANMEAN as distributed in
-    %    the MATLAB Statistics Toolbox and is meant as a replacement (hence the
-    %    identical name).  
-    %
-    %    NANMEAN(X,DIM) calculates the mean along any dimension of the N-D
-    %    array X ignoring NaNs.  If DIM is omitted NANMEAN averages along the
-    %    first non-singleton dimension of X.
-    %
-    %    Similar replacements exist for NANSTD, NANMEDIAN, NANMIN, NANMAX, and
-    %    NANSUM which are all part of the NaN-suite.
-    %
-    %    See also MEAN
 
-    % -------------------------------------------------------------------------
-    %    author:      Jan Gläscher
-    %    affiliation: Neuroimage Nord, University of Hamburg, Germany
-    %    email:       glaescher@uke.uni-hamburg.de
-    %    
-    %    $Revision: 1.1 $ $Date: 2004/07/15 22:42:13 $
-    if isempty(x)
-        y = NaN;
-        return
-    end
-
-    if nargin < 2
-        dim = min(find(size(x)~=1));
-        if isempty(dim)
-            dim = 1;
-        end
-    end
-
-    % Replace NaNs with zeros.
-    nans = isnan(x);
-    x(isnan(x)) = 0; 
-
-    % denominator
-    count = size(x,dim) - sum(nans,dim);
-
-    % Protect against a  all NaNs in one dimension
-    i = find(count==0);
-    count(i) = ones(size(i));
-
-    y = sum(x,dim)./count;
-    y(i) = i + NaN;
-    % $Id: nanmean.m,v 1.1 2004/07/15 22:42:13 glaescher Exp glaescher $
-end
 
 % function plot_loadings(self, which_loadings)  
 %         

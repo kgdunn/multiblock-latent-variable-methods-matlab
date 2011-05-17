@@ -42,7 +42,6 @@ classdef mblvm < handle
     end 
     
     events
-        
         % Model building events
         % ---------------------
         build_launch
@@ -62,19 +61,25 @@ classdef mblvm < handle
         
         build_calculate_launch
         
-        build_calculate_loop_launch
+        % Collect all criteria to decide if loop to add next component should
+        % be run. All criteria must be true if the next component is to be
+        % added
+        build_calculate_ifaddnext__loop_entry_condition
+        
         build_calculate_loop_addcomponent_action
         build_calculate_loop_deflate_action
         build_calculate_loop_calcstats_action
         build_calculate_loop_calclimits_action
-        build_calculate_loop_finish
+        
+        % Sometimes we can only decide on a component after it is calculated.
+        % This 
+        
+        build_calculate_ifaddnext__loop_exit_condition
         
         build_calculate_finish
                 
         build_finish
     end
-        
-        
     
     % Only set by this class and subclasses
     properties (SetAccess = protected)
@@ -309,8 +314,7 @@ classdef mblvm < handle
     end % end: methods (ordinary)
     
     % Subclasses may not redefine these methods
-    methods (Sealed=true)
-                
+    methods (Sealed=true)                
         function self = build(self, varargin)
             % Build the multiblock latent variable model.
             % * preprocess the data if it has not been already
@@ -328,11 +332,225 @@ classdef mblvm < handle
             self.initialize_storage(requested_A); 
             preprocess_blocks(self);        % superclass method           
             merge_blocks(self);             % method may be subclassed         
-            calc_model(self, requested_A);  % method must be subclassed        
+            calc_model(self, requested_A);  % method must be subclassed
             limit_calculations(self);       % method must be subclassed
             
             
         end % ``build``
+        
+        function terminate_adding = randomization_should_terminate(self)
+            % Determines whether a new component should be added using a
+            % randomization test.
+            %
+            % Wiklund, et al., J Chemometrics, 21, p427-439, 2007, "A randomization
+            % test for PLS component selection". http://dx.doi.org/10.1002/cem.1086
+            %
+            % Also see: http://www.springerlink.com/content/u2u43772t603k7w7/
+            %
+            % Based on results in that paper we will keep fitting components until
+            % the deemed risk is too high.  The risk is quantified by a the number of
+            % risk points.  After 2 points we stop adding components and revert to the
+            % component where we had 1.0 points, or fewer.
+            %
+            % Points are cumulative. If we have 1.0 points, and we add a new
+            % component, then the points from previous components are still retained.
+
+            max_A = min(self.N, self.K);
+            
+            if self.A == 0
+                % This is the very first iteration (no components fitted yet)
+                % so we should try fitting a single component.
+                terminate_adding = false;
+                return
+            end
+
+            % Return if we've reached the maximum number of components supported by
+            % this model.
+            % Return if the user has clicked the "Stop adding" button during
+            % randomization risk assessment.
+            if self.A >= max_A || self.opt.randomize_test.risk_statistics{self.A}.stop_early
+                self.opt.randomize_test.last_worthwhile_A = self.A;
+                terminate_adding = true;
+                return
+            end
+
+            % We've already evaluated the risk-free cases, now let's evaulate the risky ones.
+            %
+            % 1.	Let risk = \frac{\text{number of}\,\,S_g\,\,\text{values exceeding}\,\,S_0}{G}
+            %
+            %     *	If risk :math:`\geq 0.08`, then ``points = points + 2``, as there is a high risk, one in 12 chance, we are accepting a component that should not be accepted.
+            %
+            %     *	or, if :math:`0.03 < \text{risk} < 0.08` then ``points = points + 1``  (moderately risky to accept this component)
+            %
+            %     *	finally, if :math:`risk \leq 0.03` then we accept the component without accumulating any points, however, we might still add some points if the correlation, :math:`S_0` is small (see next step).
+            %
+            % 2.	Note that :math:`S_0` represents the correlation between :math:`t_a` and the :math:`u_a`, which is nothing more than a scaled version of the objective function of the PLS model, which each component is trying to maximize, subject to certain constraints.  We accumulate risk based on the strength of this correlation as follows:
+            %
+            %     *	If :math:`S_0 \geq 0.50`, then we do not augment our risk, as this is a strong correlation
+            %
+            %     *	Or, if :math:`0.35 < S_0 < 0.50`, then ``points = points + 0.5`` (weak correlation between :math:`t_a` and :math:`u_a`)
+            %
+            %     *	Or, if :math:`S_0 \leq 0.35` then ``points = points + 1.0`` (very weak correlation between :math:`t_a` and :math:`u_a`)
+            %
+            % We stop adding components when the total risk points *accumulated on the current and all previous components* equals or exceeds 2.0.  We revert to the component where we had a risk points of 1.0 or less and stop adding components.
+
+            randstats = self.opt.randomize_test.risk_statistics{self.A};
+            current_risk = randstats.num_G_exceeded  / randstats.nperm;
+            correlation = self.opt.randomize_test.test_statistic(self.A);
+            current_points = self.opt.randomize_test.points;
+            % Assess risk based on the number of violations in randomization
+            if current_risk >= 0.10
+                self.opt.randomize_test.points = self.opt.randomize_test.points + 2;
+            elseif current_risk >= 0.05
+                self.opt.randomize_test.points = self.opt.randomize_test.points + 1;
+            elseif current_risk >= 0.01
+                self.opt.randomize_test.points = self.opt.randomize_test.points + 0;
+            elseif current_risk < 0.01
+                self.opt.randomize_test.last_worthwhile_A = self.A;
+                %self.opt.randomize_test.points = max(0, self.opt.randomize_test.points - 1.0);
+                self.opt.randomize_test.risk_statistics{self.A}.points = self.opt.randomize_test.points - current_points;
+                terminate_adding = false;
+                return
+            end
+
+            % Assess risk also based on the strength of the t_a vs u_a correlation
+            if correlation >= 0.5
+                self.opt.randomize_test.points = self.opt.randomize_test.points + 0;
+            elseif correlation >= 0.35
+                self.opt.randomize_test.points = self.opt.randomize_test.points + 0.5;
+            else
+                self.opt.randomize_test.points = self.opt.randomize_test.points + 1.0;
+            end
+
+            self.opt.randomize_test.risk_statistics{self.A}.points = self.opt.randomize_test.points - current_points;
+
+            if self.opt.randomize_test.points >= 2.0
+                terminate_adding = true;
+            else
+                terminate_adding = false;
+                if self.opt.randomize_test.points <= 1.0
+                    self.opt.randomize_test.last_worthwhile_A = self.A;
+                end
+            end           
+            
+        end % ``randomization_add_next``
+        
+        function self = randomization_test(self, current_A) 
+       
+            nperm = self.opt.randomize_test.permutations;
+            self.opt.randomize_test.test_statistic = zeroexp([1, current_A], ...
+                                     self.opt.randomize_test.test_statistic);
+            
+            
+            % TODO(KGD): ensure there is variation left in the X and Y blocks
+            % to support extracting components.  Right now that error check is 
+            % left out of the loop - for speed. 
+ 
+            self.opt.randomize_test.test_statistic(current_A) = ...
+                                      self.randomization_objective(current_A);
+ 
+            Y_original = self.Y.data;
+            capture_more_permutations = true;
+            rounds = 0;
+            stats = struct; %#ok<*PROP>
+            stats.mean_G = 0;
+            stats.std_G = 0;
+            stats.num_G_exceeded = 0;
+            stats.nperm = 0;
+            stats.stop_early = false;
+            show_progress = self.opt.randomize_test.show_progress;
+            if show_progress
+                h = awaitbar(0, sprintf('Risk of component %d', current_A));
+            end
+            while capture_more_permutations && ...
+                                 (rounds < self.opt.randomize_test.max_rounds)
+                % Run the purmutation tests at least once, in a group of G,
+                % but maybe more, especially when the risk is borderline:                
+                permuted_stats = zeros(nperm, 1);
+                
+                % Use the ``fit_PLS`` function internally, with a special flag to
+                % return early
+                previous_max_iter = self.opt.max_iter;
+                previous_tolerance = self.opt.tolerance;
+                randomize_max_iter = 200;
+                self.opt.max_iter = randomize_max_iter;
+                self.opt.tolerance = 1e-2;
+                itern = zeros(nperm,1);
+                
+                for g = 1:nperm
+                    perc = floor(g/nperm*100);
+                    num_G = stats.num_G_exceeded + sum(permuted_stats > self.opt.randomize_test.test_statistic(current_A));
+                    den_G = stats.nperm + g;
+                    if show_progress
+                        stats.stop_early = awaitbar(perc/100,h,sprintf('Risk of component %d. Risk so far=%d out of %d models. [%d%%]',current_A, num_G, den_G, perc));
+                        if stats.stop_early
+                            nperm = g-1;
+                            permuted_stats = permuted_stats(1:g-1);
+                            rounds = Inf;  % forces it to exit
+                            break;
+                        end
+                    end
+                    % Set the random seed: to ensure we can reproduce calculations.
+                    % Shuffle the rows in Y randomly.
+                    rand('twister', g+rounds*nperm); %#ok<RAND>
+                    self.Y.data = self.Y.data(randperm(self.N), :);
+                    
+                    % Calculate the "a"th component using this permuted Y-matrix, but
+                    % the unpermuted X-matrix.
+                    out = mbpls.single_block_PLS(self.data, self.Y.data, self, current_A, self.has_missing); 
+                    
+                    
+                    %[t_a, p_a, c_a, u_a, w_a, itern]
+                    
+                    if out.itern < randomize_max_iter
+                        % Next, calculate the statistic under test and store it
+                        permuted_stats(g) = self.randomization_objective(current_A, out);
+                        itern(g) = out.itern;
+                    end
+                end
+                self.opt.max_iter = previous_max_iter;
+                self.opt.tolerance = previous_tolerance;
+                
+                num_G = sum(permuted_stats > self.opt.randomize_test.test_statistic(current_A));
+                
+                % TODO(KGD): put this into the above function
+                prev_ssq = stats.std_G^2 * (stats.nperm-1) + stats.nperm*stats.mean_G^2;
+                curr_ssq = ssq(permuted_stats);
+                stats.mean_G = (stats.mean_G*stats.nperm + block_base.nanmean(permuted_stats)*nperm)/(stats.nperm+nperm);
+                
+                % Guard against getting a negative under the square root
+                % This approach quickly becomes inaccurate when using many rounds.
+                stats.std_G = sqrt(((prev_ssq + curr_ssq) - (stats.nperm+nperm)*stats.mean_G^2)/(stats.nperm+nperm-1));
+                stats.num_G_exceeded = stats.num_G_exceeded + num_G;
+                stats.nperm = stats.nperm + nperm;
+                rounds = rounds + 1;
+                
+                
+                % Assume we've got enough randomized values to make an accurate risk
+                % assessment.
+                capture_more_permutations = false;
+                risk = stats.num_G_exceeded / stats.nperm * 100;
+                bounds = self.opt.randomize_test.risk_uncertainty;
+                if any( (risk > bounds(1)) && risk < bounds(2) )
+                    % Do another round of permutations to clarify risk level.
+                    capture_more_permutations = true;
+                end
+            end
+            if show_progress
+                if ishghandle(h)
+                    close(h);
+                end
+            end
+            self.opt.randomize_test.risk_statistics{current_A} = stats;
+            
+            % Set the Y-block back to its usual order
+            self.Y.data= Y_original;
+                  
+
+ 
+            
+            
+        end % ``randomization_test``
         
         function limit_calculations(self)
             % Calculates the monitoring limits for a batch blocks in the model
@@ -590,7 +808,13 @@ classdef mblvm < handle
             self.model.stats.timing = [];
             
             % Iterations per component
-            self.model.stats.itern = [];             
+            self.model.stats.itern = [];
+            
+            % Randomization-based risk calculation
+            self.model.stats.risk = struct;
+            self.model.stats.risk.rate = [];
+            self.model.stats.risk.objective = [];
+            self.model.stats.risk.stats = {};
             
             nb = self.B; 
             
@@ -670,7 +894,10 @@ classdef mblvm < handle
             end
             
             self.model.stats.timing = zeroexp([A, 1], self.model.stats.timing);
-            self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);            
+            self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);
+            self.model.stats.risk.rate = zeroexp([A, 1], self.model.stats.risk.rate);
+            self.model.stats.risk.objective = zeroexp([A, 1], self.model.stats.risk.objective);
+            
             
             % Storage for each block
             for b = 1:self.B
@@ -1214,6 +1441,7 @@ classdef mblvm < handle
         expand_storage(self, A)  % expands the storage to accomodate ``A`` components
         summary(self)            % show a text-based summary of ``self``
         register_plots_post(self)% register which variables are plottable      
+        randomization_objective(self) % the randomization test's objective function
     end % end: methods (abstract)
     
     % Subclasses may not redefine these methods
@@ -1671,6 +1899,19 @@ classdef mblvm < handle
             limits = n_ppf .* std(score_column, 0, 1);
         end
 
+        function  v = robust_scale(a)
+        % Using the formula from Mosteller and Tukey, Data Analysis and Regression,
+        % p 207-208, 1977.
+            n = numel(a);
+            location = median(a);
+            spread_MAD = median(abs(a-location));
+            ui = (a - location)/(6*spread_MAD);    
+            % Valid u_i values used in the summation:
+            vu = ui.^2 <= 1;
+            num = (a(vu)-location).^2 .* (1-ui(vu).^2).^4;
+            den = (1-ui(vu).^2) .* (1-5*ui(vu).^2);
+            v = n * sum(num) / (sum(den))^2;
+        end    
     end % end: methods (sealed and static)
     
     methods (Static=true)
