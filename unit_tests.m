@@ -387,9 +387,13 @@ function PLS_no_missing_data()
     Y = lowarp.Y;
     options = lvm_opt(); 
     options.randomize_test.use = true;
+    lastwarn('')
+    warning('off', 'mbpls:calc_model:no_X_variance')
     PLS_model = lvm({'X', X, 'Y', Y}, 5);
-    assertTrue(PLS_model.A == 3);
-    [msg, msg_id] = lastwarn;
+    assertTrue(PLS_model.A == 3);    
+    [~, msg_id] = lastwarn;
+    assertTrue(strcmp('mbpls:calc_model:no_X_variance', msg_id))
+    warning('on', 'mbpls:calc_model:no_X_variance')
 return
 
 function PCA_with_missing_data()
@@ -549,7 +553,9 @@ function PCA_randomization_tests()
         options.show_progress = false;     
         options.randomize_test.show_progress = false;
         options.randomize_test.permutations = 100;
+        warning('off', 'mbpca:calc_model:no_X_variance')
         PCA_model = lvm({'X', X}, options);
+        warning('on', 'mbpca:calc_model:no_X_variance')
         assertTrue(PCA_model.A == test.expected_A)
         fprintf(': OK\n');
     end

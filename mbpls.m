@@ -96,16 +96,21 @@ classdef mbpls < mblvm
             % Combine all conditions that *should* be met
             add_next_component = request || randomize_keep_adding;
             
+            % We already know the result. Return early.
+            if not(add_next_component)
+                return
+            end
+            
             % These next conditions can veto the addition of another component            
             variance_left = true;
             if all(ssq_X < self.opt.tolerance)
                 variance_left = false;
-                warning('mbpls:calc_model', ['There is no variance left ', ...
+                warning('mbpls:calc_model:no_X_variance', ['There is no variance left ', ...
                         'in the X-data. A new component will not be added.'])
             end
             if all(ssq_Y < self.opt.tolerance)
                 variance_left = false;
-                warning('mbpls:calc_model', ['There is no variance left ', ...
+                warning('mbpls:calc_model:no_Y_variance', ['There is no variance left ', ...
                         'in the Y-data. A new component will not be added.'])
             end            
             veto = self.opt.stop_now || not(variance_left);            
