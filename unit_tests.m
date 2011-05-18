@@ -388,7 +388,8 @@ function PLS_no_missing_data()
     options = lvm_opt(); 
     options.randomize_test.use = true;
     PLS_model = lvm({'X', X, 'Y', Y}, 5);
-
+    assertTrue(PLS_model.A == 3);
+    [msg, msg_id] = lastwarn;
 return
 
 function PCA_with_missing_data()
