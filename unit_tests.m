@@ -52,17 +52,7 @@ function unit_tests(varargin)
     %     PCA_model = lvm({'X', X}, options);
     %   a)options.build_now = false; <-- used for cross-validation internally
     %   b)options.build_now = true;
-    
-    % Add test on this PLS model:
-    % since it has 4 X-space variables, but there is no variance left in the
-    % 4th PC to support another component (DOE on recipe data)
-    %     lowarp = xlsread('tests/lowarp-data.xls');
-    %     X = lowarp(:,1:4);
-    %     Y = lowarp(:,5:end);
-    %     options = lvm_opt(); 
-    %     options.randomize_test.use = true;
-    %     PLS_model = lvm({'X', X, 'Y', Y}, options);
-    
+      
     % Tests based on data in http://dx.doi.org/10.1002/cem.1248
     
     % TODO: tests based on values in http://dx.doi.org/10.1002/aic.690400509
@@ -389,6 +379,15 @@ function PLS_no_missing_data()
     assertEAE(sum(PLS.super.stats.R2Yk_a, 2), R2kY_cum, 4); 
     
     % TODO(KGD): Coefficients
+    
+    % This PLS model: has 4 X-space variables, but there is no variance left
+    % in the 4th PC to support another component (DOE on recipe data)
+    lowarp = load('tests/lowarp.mat');
+    X = lowarp.recipe;
+    Y = lowarp.Y;
+    options = lvm_opt(); 
+    options.randomize_test.use = true;
+    PLS_model = lvm({'X', X, 'Y', Y}, 5);
 
 return
 

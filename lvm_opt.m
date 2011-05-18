@@ -8,6 +8,7 @@ opt.min_lv = -1;
 opt.max_lv = inf;
 opt.build_now = true;
 opt.tolerance = sqrt(eps);
+opt.stop_now = false;             % Periodically checked; used to stop any loops
 
 opt.mbpls.block_scale_X = true;                  % The various X-blocks should be block scaled
 opt.mbpls.deflate_X = true;                      % No need to deflate the X-blocks, but, we must account for it in the PLS model

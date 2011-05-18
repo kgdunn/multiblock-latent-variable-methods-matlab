@@ -1448,19 +1448,23 @@ classdef mblvm < handle
             % large matrices
             n = size(T, 1);
             if nargin == 2
-                T2 = zeros(n,1);
-                for idx = 1:n
-                    T2(idx) = T(idx,:) * varargin{1} * T(idx,:)';
-                end
+                estimated_S = varargin{1};
             else
-                estimated_S = inv((T'*T)/(n));
-                T2 = diag(T * estimated_S * T'); %#ok<MINV>
-                if nargout > 1
-                    varargout{1} = estimated_S;
-                end
+                covariance = (T'*T)/n;
+                estimated_S = inv(covariance);
             end
-        end
             
+            % Equivalent of T2 = diag(T * estimated_S * T'); but more 
+            % memory efficient
+            T2 = zeros(n,1);            
+            for idx = 1:n
+                T2(idx) = T(idx,:) * estimated_S * T(idx,:)';
+            end
+            if nargout > 1
+                varargout{1} = estimated_S;
+            end            
+        end
+        
         function q = chi2inv(p, v)
              %CHISQQ	Quantiles of the chi-square distribution.
             %	Q = CHISQQ(P,V) satisfies P(X < Q) = P, where X follows a
@@ -1476,6 +1480,7 @@ classdef mblvm < handle
             %	Distributions, Volume I. Wiley, New York.
             %
             %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
             %
             % Another alternative might be: 
             % http://www.spatial-econometrics.com/
@@ -1492,6 +1497,7 @@ classdef mblvm < handle
             %   GKS  2 August 1998.
             %
             %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
 
             if a < 0, error('Gamma parameter A must be positive'); end
             p = gammainc(q,a);
@@ -1513,6 +1519,9 @@ classdef mblvm < handle
             %	Method:  Newton iteration on the scale of log(X), starting
             %	from point of inflexion of cdf.  Monotonic convergence is
             %	guaranteed.
+            %
+            %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
 
             if any(p < 0 | p > 1), error('P must be between 0 and 1'); end
 
@@ -1557,6 +1566,7 @@ classdef mblvm < handle
             %	Gordon Smyth, gks@maths.uq.edu.au, University of Queensland
             %
             %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
 
             q = mblvm.betainv(p,v1/2,v2/2);
             q = v2/v1 * q./(1-q);
@@ -1580,6 +1590,7 @@ classdef mblvm < handle
             %	converges monotonically from this starting value.
             %
             %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
 
             q = zeros(size(p));
 
@@ -1613,6 +1624,7 @@ classdef mblvm < handle
             %	31 July 1998
             %
             %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
 
             p = zeros(size(x));
 
@@ -1633,6 +1645,8 @@ classdef mblvm < handle
             %	2 August 1998
             % 
             %   From: http://www.statsci.org/matlab/contents.html
+            %   Permission was granted to use code; see email on 17 May 2011.
+            
             if v <= 0, error('Degrees of freedom must be positive.'); end;
 
             q = sign(p-0.5).*sqrt( mblvm.finv(2.*abs(p-0.5),1,v) );

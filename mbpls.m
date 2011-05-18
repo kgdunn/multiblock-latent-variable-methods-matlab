@@ -70,6 +70,49 @@ classdef mbpls < mblvm
             
         end
 
+        function add_next_component = add_next_component(self, requested_A, a, ssq_X, ssq_Y)
+            % Certain conditions should be met, while other conditions must be
+            % met in order to add the next component.            
+            
+            % These conditions *should* be met in order to add the next 
+            % component:
+
+            % Termination condition: fixed request for a certain number 
+            % of components.
+            request = a < requested_A;            
+           
+            % Termination condition: randomization test
+            randomize_keep_adding = false;
+            if self.opt.randomize_test.use
+                randomize_keep_adding = not(self.randomization_should_terminate());
+                if a ~= 0 && not(isempty(self.opt.randomize_test.risk_statistics{a}))
+                    stats = self.opt.randomize_test.risk_statistics{a};
+                    self.model.stats.risk.stats{a} = stats;
+                    self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
+                    self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
+                end
+            end
+            
+            % Combine all conditions that *should* be met
+            add_next_component = request || randomize_keep_adding;
+            
+            % These next conditions can veto the addition of another component            
+            variance_left = true;
+            if all(ssq_X < self.opt.tolerance)
+                variance_left = false;
+                warning('mbpls:calc_model', ['There is no variance left ', ...
+                        'in the X-data. A new component will not be added.'])
+            end
+            if all(ssq_Y < self.opt.tolerance)
+                variance_left = false;
+                warning('mbpls:calc_model', ['There is no variance left ', ...
+                        'in the Y-data. A new component will not be added.'])
+            end            
+            veto = self.opt.stop_now || not(variance_left);            
+            
+            add_next_component = add_next_component && not(veto);
+        end % ``add_next_component``
+        
         % Superclass abstract method implementation
         function self = calc_model(self, requested_A)
             % Fits a PLS latent variable model.
@@ -91,39 +134,23 @@ classdef mbpls < mblvm
                          'remove those rows and refit model.'])
             end            
                        
-            %which_components = max(self.A+1, 1) : requested_A;
             a = max(self.A+1,1);
-            base_condition = a <= requested_A;
+                    
             
-            randomize_keep_adding = false;
-            if self.opt.randomize_test.use
-                randomize_keep_adding = not(self.randomization_should_terminate());
-            end                
+            % Baseline for all R2 calculations and variance check
+            ssq_X_before = ssq(self.data, 1);
+            ssq_Y_before = ssq(self.Y.data, 1);
+            if a == 1                
+                self.split_result(ssq_X_before, 'stats', 'start_SS_col');
+                self.super.stats.ssq_Y_before = ssq_Y_before;
+            end
             
-            while base_condition || randomize_keep_adding
+            add_next_component = self.add_next_component(requested_A, a-1, ...
+                                ssq_X_before, ssq_Y_before);
+            
+            while add_next_component
                 
                 start_time = cputime;
-
-                % Baseline for all R2 calculations and variance check
-                if a == 1             
-                    ssq_before = ssq(self.data, 1);
-                    self.split_result(ssq_before, 'stats', 'start_SS_col');
-
-                    ssq_Y_before = ssq(self.Y.data, 1);
-                    self.super.stats.ssq_Y_before = ssq_Y_before;
-                else
-                    ssq_before = ssq(self.data, 1);
-                    ssq_Y_before = ssq(self.Y.data, 1);
-                end
-
-                if all(ssq_before < self.opt.tolerance)
-                    warning('mbpls:calc_model', ...
-                            'There is no variance left in the X-data')
-                end
-                if all(ssq_Y_before < self.opt.tolerance)
-                    warning('mbpls:calc_model', ...
-                            'There is no variance left in the Y-data')
-                end 
 
                 % Converge onto a single component
                 if self.opt.show_progress
@@ -209,8 +236,7 @@ classdef mbpls < mblvm
                 % Randomization testing for this component
                 if self.opt.randomize_test.use
                     self.randomization_test(a);
-                end
-                
+                end                
                                 
                 % Now deflate the data matrix using the superscore
                 self.data = self.data - out.t_a * out.p_a';
@@ -228,7 +254,7 @@ classdef mbpls < mblvm
                 end
                 
                 ssq_cumul = 0;
-                ssq_before = 0;
+                ssq_X_before = 0;
                 for b = 1:self.B
                     idx = self.b_iter(b);
                     
@@ -241,7 +267,7 @@ classdef mbpls < mblvm
                     % Calculate R2 per variable
                     col_ssq_remain = ssq(X_portion, 1)';
                     ssq_cumul = ssq_cumul + sum(col_ssq_remain);
-                    ssq_before = ssq_before + sum(self.stats{b}.start_SS_col);
+                    ssq_X_before = ssq_X_before + sum(self.stats{b}.start_SS_col);
                     
                     self.stats{b}.R2Xk_a(:,a) = 1 - col_ssq_remain ./ self.stats{b}.start_SS_col';
                     self.stats{b}.R2Xb_a(1,a) = 1 - sum(col_ssq_remain) / sum(self.stats{b}.start_SS_col);
@@ -250,13 +276,10 @@ classdef mbpls < mblvm
                         self.stats{b}.R2Xk_a(:,a) = self.stats{b}.R2Xk_a(:,a) - sum(self.stats{b}.R2Xk_a(:,1:a-1), 2);
                         self.stats{b}.R2Xb_a(1,a) = self.stats{b}.R2Xb_a(1,a) - sum(self.stats{b}.R2Xb_a(1,1:a-1), 2);
                     end
-                     
-                    
-                end
-                
+                end                
                 
                 % Cumulative R2 value for the whole component
-                self.super.stats.R2X(a) = 1 - ssq_cumul/ssq_before;
+                self.super.stats.R2X(a) = 1 - ssq_cumul/ssq_X_before;
                 if a>1
                     self.super.stats.R2X(a) = self.super.stats.R2X(a) - sum(self.super.stats.R2X(1:a-1), 2);
                 end
@@ -287,25 +310,13 @@ classdef mbpls < mblvm
                 self.model.stats.timing(a) = cputime - start_time;
                 self.model.stats.itern(a) = out.itern;
                 
-                self.A = a;                
+                self.A = a;  
                 
-                % Termination condition: fixed request for a certain number of components.
-                if self.A < requested_A
-                    base_condition = true;                    
-                else
-                    base_condition = false;
-                end
-                
-                % Termination condition: randomization test
-                if self.opt.randomize_test.use
-                    randomize_keep_adding = not(self.randomization_should_terminate());
-                    stats = self.opt.randomize_test.risk_statistics{a};
-                    self.model.stats.risk.stats{a} = stats;
-                    self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
-                    self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
-                end
+                % Do we add another component?
+                add_next_component = self.add_next_component(requested_A, a, col_ssq_remain, ssq_Y_after);
                 
                 a = a + 1;
+                
                 
             end % looping on ``a`` latent variables
 

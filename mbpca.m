@@ -20,6 +20,44 @@ classdef mbpca < mblvm
         function self = preprocess_extra(self)
         end % ``preprocess_extra``
         
+        function add_next_component = add_next_component(self, requested_A, a, ssq_X)
+            % Certain conditions should be met, while other conditions must be
+            % met in order to add the next component.            
+            
+            % These conditions *should* be met in order to add the next 
+            % component:
+
+            % Termination condition: fixed request for a certain number 
+            % of components.
+            request = a < requested_A;            
+           
+            % Termination condition: randomization test
+            randomize_keep_adding = false;
+            if self.opt.randomize_test.use
+                randomize_keep_adding = not(self.randomization_should_terminate());
+                if a~=0 && not(isempty(self.opt.randomize_test.risk_statistics{a}))
+                    stats = self.opt.randomize_test.risk_statistics{a};
+                    self.model.stats.risk.stats{a} = stats;
+                    self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
+                    self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
+                end
+            end
+            
+            % Combine all conditions that *should* be met
+            add_next_component = request || randomize_keep_adding;
+            
+            % These next conditions can veto the addition of another component            
+            variance_left = true;
+            if all(ssq_X < self.opt.tolerance)
+                variance_left = false;
+                warning('mbpca:calc_model', ['There is no variance left ', ...
+                        'in the X-data. A new component will not be added.'])
+            end                    
+            veto = self.opt.stop_now || not(variance_left);            
+            
+            add_next_component = add_next_component && not(veto);
+        end % ``add_next_component``
+        
         % Superclass abstract method implementation
         function self = calc_model(self, requested_A)
             % Fits a multiblock PCA model on the data, extracting A components
@@ -30,28 +68,19 @@ classdef mbpca < mblvm
             % Perform ordinary missing data PCA on the merged block of data
             
             a = max(self.A+1,1);
-            base_condition = a <= requested_A;
+             
+            % Baseline for all R2 calculations and variance check
+            ssq_before = ssq(self.data, 1);
+            if a == 1                
+                self.split_result(ssq_before, 'stats', 'start_SS_col');                    
+            end
+
+            add_next_component = self.add_next_component(requested_A, a-1, ssq_before);
             
-            randomize_keep_adding = false;
-            if self.opt.randomize_test.use
-                randomize_keep_adding = not(self.randomization_should_terminate());
-            end                
-            
-            while base_condition || randomize_keep_adding
+            while add_next_component
                 
                 start_time = cputime;
-                % Baseline for all R2 calculations and variance check
-                if a == 1             
-                    ssq_before = ssq(self.data, 1);
-                    self.split_result(ssq_before, 'stats', 'start_SS_col');                    
-                else
-                    ssq_before = ssq(self.data, 1);
-                end
-                
-                if all(ssq_before < self.opt.tolerance)
-                    warning('mbpca:calc_model', 'There is no variance left in the data')
-                end
-                
+                                
                 % Converge onto a single component
                 if self.opt.show_progress
                     h = awaitbar(0, sprintf('Calculating component %d', a));
@@ -185,23 +214,7 @@ classdef mbpca < mblvm
                 self.model.stats.itern(a) = out.itern;
                 self.A = a;
                 
-                
-                % Termination condition: fixed request for a certain number of components.
-                if self.A < requested_A
-                    base_condition = true;                    
-                else
-                    base_condition = false;
-                end
-                
-                % Termination condition: randomization test
-                if self.opt.randomize_test.use
-                    randomize_keep_adding = not(self.randomization_should_terminate());
-                    stats = self.opt.randomize_test.risk_statistics{a};
-                    self.model.stats.risk.stats{a} = stats;
-                    self.model.stats.risk.rate(a) = stats.num_G_exceeded/stats.nperm * 100;
-                    self.model.stats.risk.objective(a) = self.opt.randomize_test.test_statistic(a);
-                end                
-                
+                add_next_component = self.add_next_component(requested_A, a, row_ssq_deflated);
                 a = a + 1;                
             end % looping on ``a`` latent variables
         end % ``calc_model``
