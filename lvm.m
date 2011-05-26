@@ -1,4 +1,5 @@
 % Copyright (c) 2010-2011 ConnectMV, Inc. All rights reserved.
+% Licensed under the BSD license.
 % -------------------------------------------------------------------------
 %
 % Code for defining, building and manipulating latent variable models.
