@@ -75,7 +75,7 @@ classdef mbpca < mblvm
             a = max(self.A+1,1);
              
             % Baseline for all R2 calculations and variance check
-            ssq_before = ssq(self.data, 1);
+            ssq_before = self.ssq(self.data, 1);
             if a == 1                
                 self.split_result(ssq_before, 'stats', 'start_SS_col');                    
             end
@@ -131,11 +131,11 @@ classdef mbpca < mblvm
                    
                     % Store the SS prior to deflation 
                     X_portion_hat = out.t_a * p_b';
-                    self.stats{b}.col_ssq_prior(:, a) = ssq(X_portion_hat,1);
+                    self.stats{b}.col_ssq_prior(:, a) = self.ssq(X_portion_hat,1);
                     
                     % VIP calculations
                     % -----------------                    
-                    ssq_after = ssq(X_portion - X_portion_hat, 1);
+                    ssq_after = self.ssq(X_portion - X_portion_hat, 1);
                     VIP_temp = zeros(self.K(b), 1);
                     for a_iter = 1:a
                         denom = sum(self.stats{b}.start_SS_col - ssq_after);
@@ -166,8 +166,8 @@ classdef mbpca < mblvm
                 for b = 1:self.B
                     idx = self.b_iter(b);
                     X_portion = self.data(:, idx);
-                    col_ssq = ssq(X_portion, 1)';
-                    row_ssq = ssq(X_portion, 2);
+                    col_ssq = self.ssq(X_portion, 1)';
+                    row_ssq = self.ssq(X_portion, 2);
                     ssq_cumul = ssq_cumul + sum(col_ssq);
                     ssq_before = ssq_before + sum(self.stats{b}.start_SS_col);
                     
@@ -196,7 +196,7 @@ classdef mbpca < mblvm
                 
                 % Model summary SPE (not the superblock's SPE!), merely the
                 % overall SPE from the merged model
-                row_ssq_deflated = ssq(self.data, 2);
+                row_ssq_deflated = self.ssq(self.data, 2);
                 self.super.SPE(:,a) = row_ssq_deflated;
                 
                 % Model summary T2 (not the superblock's T2!), merely the
@@ -241,7 +241,7 @@ classdef mbpca < mblvm
                 initial_ssq_total = zeros(state.Nnew, 1);
                 initial_ssq = cell(1, self.B);
                 for b = 1:self.B                    
-                    initial_ssq{b} = ssq(new{b}.data, 2);
+                    initial_ssq{b} = self.ssq(new{b}.data, 2);
                     initial_ssq_total = initial_ssq_total + initial_ssq{b};
                     if a==1                        
                         state.stats.initial_ssq{b} = initial_ssq{b};
@@ -268,7 +268,7 @@ classdef mbpca < mblvm
                 % Deflate each block: using the SUPERSCORE and the block loading
                 for b = 1:self.B
                     deflate = state.T_super(:,a) * self.P{b}(:,a)';
-                    state.stats.R2{b}(:,1) = ssq(deflate, 2) ./ state.stats.initial_ssq{b};
+                    state.stats.R2{b}(:,1) = self.ssq(deflate, 2) ./ state.stats.initial_ssq{b};
                     new{b}.data = new{b}.data - deflate;
                 end            
             end % looping on ``a`` latent variables
@@ -277,7 +277,7 @@ classdef mbpca < mblvm
             % Summary statistics for each block and the super level
             overall_variance = zeros(state.Nnew, 1);
             for b = 1:self.B
-                block_variance = ssq(new{b}.data, 2);
+                block_variance = self.ssq(new{b}.data, 2);
                 overall_variance = overall_variance + block_variance;
                 state.stats.SPE{b} = block_variance;
             end

@@ -439,7 +439,7 @@ classdef mblvm < handle
         function self = randomization_test(self, current_A) 
        
             nperm = self.opt.randomize_test.permutations;
-            self.opt.randomize_test.test_statistic = zeroexp([1, current_A], ...
+            self.opt.randomize_test.test_statistic = self.zeroexp([1, current_A], ...
                                      self.opt.randomize_test.test_statistic);
             
             
@@ -511,7 +511,7 @@ classdef mblvm < handle
                 % TODO(KGD): put this into the above function
                 prev_ssq = stats.std_G^2 * (stats.nperm-1) + ...
                                                    stats.nperm*stats.mean_G^2;
-                curr_ssq = ssq(permuted_stats);
+                curr_ssq = self.ssq(permuted_stats);
                 stats.mean_G = (stats.mean_G*stats.nperm + ...
                    block_base.nanmean(permuted_stats)*nperm)/(stats.nperm+nperm);
                 
@@ -623,7 +623,7 @@ classdef mblvm < handle
                             self.super.T2_j(n,j) = out.stats.super.T2;
                             self.super.SPE_j(n,j) = out.stats.super.SPE;  % out.stats.SPE(1, end); % use only the last component
                             self.stats{b}.T_j(n, :, j) = out.T{b};
-                            SPE_j_temp(n,j) = ssq(out.newb{b}.data(1, idx_beg:idx_end));
+                            SPE_j_temp(n,j) = self.ssq(out.newb{b}.data(1, idx_beg:idx_end));
                         end % ``j=1, 2, ... J``
                     else
                         raw_n{b} = blk.data(n, :);
@@ -711,7 +711,7 @@ classdef mblvm < handle
                         end   
                         % N x J matrix assigned
                         self.stats{b}.SPE_j = SPE_j_temp;
-                        %self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
+                        %self.stats{b}.SPE_j = self.zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
                         
                     end % ``if: a batch block ?
                 end % ``b = 1, 2, ... self.B``
@@ -884,20 +884,20 @@ classdef mblvm < handle
                 create_storage(self);
             end
             
-            self.model.stats.timing = zeroexp([A, 1], self.model.stats.timing);
-            self.model.stats.itern = zeroexp([A, 1], self.model.stats.itern);
-            self.model.stats.risk.rate = zeroexp([A, 1], self.model.stats.risk.rate);
-            self.model.stats.risk.objective = zeroexp([A, 1], self.model.stats.risk.objective);
+            self.model.stats.timing = self.zeroexp([A, 1], self.model.stats.timing);
+            self.model.stats.itern = self.zeroexp([A, 1], self.model.stats.itern);
+            self.model.stats.risk.rate = self.zeroexp([A, 1], self.model.stats.risk.rate);
+            self.model.stats.risk.objective = self.zeroexp([A, 1], self.model.stats.risk.objective);
             
             
             % Storage for each block
             for b = 1:self.B
                 dblock = self.blocks{b};
-                self.P{b} = zeroexp([dblock.K, A], self.P{b});  % block loadings; 
-                self.T{b} = zeroexp([dblock.N, A], self.T{b});  % block scores
-                self.W{b} = zeroexp([dblock.K, A], self.W{b});  % PLS block weights
-               %self.R{b} = zeroexp([dblock.K, A], self.R{b});  % PLS block weights
-                self.S{b} = zeroexp([A, A], self.S{b});         % score scaling factors
+                self.P{b} = self.zeroexp([dblock.K, A], self.P{b});  % block loadings; 
+                self.T{b} = self.zeroexp([dblock.N, A], self.T{b});  % block scores
+                self.W{b} = self.zeroexp([dblock.K, A], self.W{b});  % PLS block weights
+               %self.R{b} = self.zeroexp([dblock.K, A], self.R{b});  % PLS block weights
+                self.S{b} = self.zeroexp([A, A], self.S{b});         % score scaling factors
                 
                 % Block preprocessing options: resets them
                 if numel(self.PP{b}) == 0
@@ -944,57 +944,57 @@ classdef mblvm < handle
                 
                 % SPE per block
                 % N x A
-                self.stats{b}.SPE = zeroexp([dblock.N, A], self.stats{b}.SPE);
+                self.stats{b}.SPE = self.zeroexp([dblock.N, A], self.stats{b}.SPE);
                 
                 
                 % Instantaneous SPE limit using all A components (batch models)
                 % N x J
-                %self.stats{b}.SPE_j = zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
+                %self.stats{b}.SPE_j = self.zeroexp([dblock.N, dblock.J], self.stats{b}.SPE_j, true);
 
                 
                 % Baseline value for all R2 calculations: before any components are
                 % extracted, but after the data have been preprocessed.
                 % 1 x K(b)
-                self.stats{b}.start_SS_col = zeroexp([1, dblock.K], self.stats{b}.start_SS_col);
+                self.stats{b}.start_SS_col = self.zeroexp([1, dblock.K], self.stats{b}.start_SS_col);
                 
                 % R^2 for every variable in the block, per component (not cumulative)
                 % K(b) x A
-                self.stats{b}.R2Xk_a = zeroexp([dblock.K, A], self.stats{b}.R2Xk_a);
+                self.stats{b}.R2Xk_a = self.zeroexp([dblock.K, A], self.stats{b}.R2Xk_a);
                 
                 % R^2 for every variable in the Y-block, per component (not cumulative)
                 % M x A
-                self.super.stats.R2Yk_a = zeroexp([self.M, A], self.super.stats.R2Yk_a);
+                self.super.stats.R2Yk_a = self.zeroexp([self.M, A], self.super.stats.R2Yk_a);
                 
                 % Sum of squares for each column in the block, prior to the component
                 % being extracted.
                 % K(b) x A
-                self.stats{b}.col_ssq_prior = zeroexp([dblock.K, A], self.stats{b}.col_ssq_prior);                
+                self.stats{b}.col_ssq_prior = self.zeroexp([dblock.K, A], self.stats{b}.col_ssq_prior);                
                                 
                 % R^2 for the block, per component
                 % 1 x A
-                self.stats{b}.R2Xb_a = zeroexp([1, A], self.stats{b}.R2Xb_a);
+                self.stats{b}.R2Xb_a = self.zeroexp([1, A], self.stats{b}.R2Xb_a);
                 
                 % Sum of squares explained for this component
                 % 1 x A
-                self.stats{b}.SSQ_exp = zeroexp([1, A], self.stats{b}.SSQ_exp);
+                self.stats{b}.SSQ_exp = self.zeroexp([1, A], self.stats{b}.SSQ_exp);
 
                 % VIP value using all 1:A components (only last column is useful though)
                 % K(b) x A
-                self.stats{b}.VIP_a = zeroexp([dblock.K, A], self.stats{b}.VIP_a);
+                self.stats{b}.VIP_a = self.zeroexp([dblock.K, A], self.stats{b}.VIP_a);
                 
                 % Overall T2 value for each observation in the block using
                 % all components 1:A
                 % N x A
-                self.stats{b}.T2 = zeroexp([dblock.N, A], self.stats{b}.T2);
+                self.stats{b}.T2 = self.zeroexp([dblock.N, A], self.stats{b}.T2);
                 
                 % Instantaneous T2 limit using all A components (batch models)
-                %self.stats{b}.T2_j = zeroexp([dblock.N, dblock.J], self.stats{b}.T2_j);
+                %self.stats{b}.T2_j = self.zeroexp([dblock.N, dblock.J], self.stats{b}.T2_j);
 
                 % Modelling power = 1 - (RSD_k)/(RSD_0k)
                 % RSD_k = residual standard deviation of variable k after A PC's
                 % RSD_0k = same, but before any latent variables are extracted
                 % RSD_0k = 1.0 if the data have been autoscaled.
-                %self.stats{b}.model_power = zeroexp([1, dblock.K], self.stats{b}.model_power);
+                %self.stats{b}.model_power = self.zeroexp([1, dblock.K], self.stats{b}.model_power);
 
                 % Actual limits for the block: to be calculated later on
                 % ---------------------------
@@ -1003,23 +1003,23 @@ classdef mblvm < handle
                 % NOTE: these limits really only make sense for uncorrelated
                 % scores (I don't think it's too helpful to monitor based on limits 
                 % from correlated variables)
-                self.lim{b}.t = zeroexp([1, A], self.lim{b}.t);
-                %self.lim{b}.t_j = zeroexp([dblock.J, A], self.lim{b}.t_j, true); 
+                self.lim{b}.t = self.zeroexp([1, A], self.lim{b}.t);
+                %self.lim{b}.t_j = self.zeroexp([dblock.J, A], self.lim{b}.t_j, true); 
 
                 % Hotelling's T2 limits using A components (column)
                 % (this is actually the instantaneous T2 limit,
                 % but we don't call it that, because at time=J the T2 limit is the
                 % same as the overall T2 limit - not so for SPE!).
                 % 1 x A
-                self.lim{b}.T2 = zeroexp([1, A], self.lim{b}.T2);            
+                self.lim{b}.T2 = self.zeroexp([1, A], self.lim{b}.T2);            
 
                 % Overall SPE limit for the block using 1:A components (use the 
                 % last column for the limit with all A components)
                 % 1 x A
-                self.lim{b}.SPE = zeroexp([1, A], self.lim{b}.SPE);
+                self.lim{b}.SPE = self.zeroexp([1, A], self.lim{b}.SPE);
 
                 % SPE instantaneous limits using all A components
-                %self.lim{b}.SPE_j = zeroexp([dblock.J, 1], self.lim{b}.SPE_j);
+                %self.lim{b}.SPE_j = self.zeroexp([dblock.J, 1], self.lim{b}.SPE_j);
 
             end
             
@@ -1028,30 +1028,30 @@ classdef mblvm < handle
             
             % Summary scores from each block: these match self.T{b}, so we
             % don't really need to store them in the superblock structure.
-            self.super.T_summary = zeroexp([self.N, self.B, A], self.super.T_summary);
-            self.super.T = zeroexp([self.N, A], self.super.T);
-            self.super.P = zeroexp([self.B, A], self.super.P);
-            self.super.W = zeroexp([self.B, A], self.super.W);
-            self.super.C = zeroexp([self.M, A], self.super.C);  % PLS Y-space loadings
-            self.super.U = zeroexp([self.N, A], self.super.U);  % PLS Y-space scores
+            self.super.T_summary = self.zeroexp([self.N, self.B, A], self.super.T_summary);
+            self.super.T = self.zeroexp([self.N, A], self.super.T);
+            self.super.P = self.zeroexp([self.B, A], self.super.P);
+            self.super.W = self.zeroexp([self.B, A], self.super.W);
+            self.super.C = self.zeroexp([self.M, A], self.super.C);  % PLS Y-space loadings
+            self.super.U = self.zeroexp([self.N, A], self.super.U);  % PLS Y-space scores
                
             
             % T2, using all components 1:A, in the superblock
-            self.super.T2 = zeroexp([self.N, A], self.super.T2);
+            self.super.T2 = self.zeroexp([self.N, A], self.super.T2);
             
             % Limits for superscore entities
-            self.super.lim.t = zeroexp([1, A], self.super.lim.t);
-            self.super.lim.T2 = zeroexp([1, A], self.super.lim.T2);            
-            self.super.lim.SPE = zeroexp([1, A], self.super.lim.SPE);
+            self.super.lim.t = self.zeroexp([1, A], self.super.lim.t);
+            self.super.lim.T2 = self.zeroexp([1, A], self.super.lim.T2);            
+            self.super.lim.SPE = self.zeroexp([1, A], self.super.lim.SPE);
             
             % Statistics in the superblock
-            self.super.stats.R2X = zeroexp([1, A], self.super.stats.R2X);
-            self.super.stats.R2Y = zeroexp([1, A], self.super.stats.R2Y);
+            self.super.stats.R2X = self.zeroexp([1, A], self.super.stats.R2X);
+            self.super.stats.R2Y = self.zeroexp([1, A], self.super.stats.R2Y);
             self.super.stats.ssq_Y_before = [];
             
-            self.super.stats.SSQ_exp = zeroexp([1, A], self.super.stats.SSQ_exp);
+            self.super.stats.SSQ_exp = self.zeroexp([1, A], self.super.stats.SSQ_exp);
             % The VIP's for each block, and the VIP calculation factor
-            self.super.stats.VIP = zeroexp([self.B, 1], self.super.stats.VIP);
+            self.super.stats.VIP = self.zeroexp([self.B, 1], self.super.stats.VIP);
             %self.super.stats.VIP_f = cell({});
             
             % Give the subclass the chance to expand storage, if required
@@ -2148,6 +2148,120 @@ classdef mblvm < handle
                 end
             end
         end  % ``regress_func``
+        
+        function out = ssq(X, axis)
+
+            % A function than calculates the sum of squares of a matrix (not array!),
+            % skipping over any NaN (missing) data.
+            %
+            % If ``axis`` is not specified, it will sum over the entire array and
+            % return a scalar value.  If ``axis`` is specified, then the output is
+            % usually a vector, with the sum of squares taken along that axis.
+            %
+            % If a complete dimension has missing values, then ssq will return 0.0 for
+            % that sum of squares.
+            %
+            % Relies on nansum.m
+            
+            function y = nansum(x, dim)
+                % FORMAT: Y = NANSUM(X,DIM)
+                % 
+                %    Sum of values ignoring NaNs
+                %
+                %    This function enhances the functionality of NANSUM as distributed in
+                %    the MATLAB Statistics Toolbox and is meant as a replacement (hence the
+                %    identical name).  
+                %
+                %    NANSUM(X,DIM) calculates the mean along any dimension of the N-D array
+                %    X ignoring NaNs.  If DIM is omitted NANSUM averages along the first
+                %    non-singleton dimension of X.
+                %
+                %    Similar replacements exist for NANMEAN, NANSTD, NANMEDIAN, NANMIN, and
+                %    NANMAX which are all part of the NaN-suite.
+                %
+                %    See also SUM
+
+                % -------------------------------------------------------------------------
+                %    author:      Jan Gläscher
+                %    affiliation: Neuroimage Nord, University of Hamburg, Germany
+                %    email:       glaescher@uke.uni-hamburg.de
+                %    
+                %    $Revision: 1.2 $ $Date: 2005/06/13 12:14:38 $
+                if isempty(x)
+                    y = [];
+                    return
+                end
+
+                if nargin < 2
+                    dim = min(find(size(x)~=1));
+                    if isempty(dim)
+                        dim = 1;
+                    end
+                end
+
+                % Replace NaNs with zeros.
+                nans = isnan(x);
+                x(isnan(x)) = 0; 
+
+                % Protect against all NaNs in one dimension
+                count = size(x,dim) - sum(nans,dim);
+                i = find(count==0);
+
+                y = sum(x,dim);
+                y(i) = NaN;
+            end
+
+            if nargin == 1
+                out = nansum(X(:).*X(:));
+            else
+                out = nansum(X.*X, axis);
+            end
+            out(isnan(out)) = 0.0;
+            
+        end % ``ssq``
+        
+        function out = zeroexp(shape, varargin)
+
+            % Will return an array of zeros of the given ``shape``.  Or if given an
+            % existing array ``prev`` will expand it to the new ``shape``, maintaining
+            % the existing elements, but adding zeros to the new elements.  Only
+            % one of the elements in ``shape`` may be different from size(prev)
+
+            out = zeros(shape);
+            if nargin == 3
+                % If "true" then expand it with NaN's rather than zeros
+                if varargin{2}
+                    out = out .* NaN;
+                end
+            end
+            if nargin == 2 && not(isempty(varargin{1}))
+                prev = varargin{1};
+                prev_shape = size(prev);
+            else
+                return;
+            end
+
+
+            % Which dimension is to be expanded?
+            which_dim = find(shape-prev_shape);
+            if numel(which_dim) > 1
+                error('The new shape must have all dimensions, except one, as the same size.');
+            end
+            % If the dimensions are the same as required, just pass the input as
+            % the output
+            if isempty(which_dim)
+                out = prev;
+            else
+                idx = cell(1,numel(shape));
+                for k = 1:numel(shape)
+                    idx{k} = ':';
+                end
+                idx{which_dim} = 1:prev_shape(which_dim);        
+                subsarr = struct('type', '()', 'subs', {idx});
+                subsasgn(out, subsarr, prev);
+
+            end   
+        end % ``zerosexp``
         
     end % end: methods (sealed and static)
     

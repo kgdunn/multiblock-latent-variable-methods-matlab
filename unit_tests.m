@@ -170,11 +170,11 @@ function Wold_article_PCA_test()
     assertEAE(R2Xb_a, [0.831, 0.169], 2)
 
     % SS values, on page 43
-    SS_X = ssq(PCA_model_2.data, 1);
+    SS_X = mblvm.ssq(PCA_model_2.data, 1);
     assertEAE(SS_X, [0.0, 0.0, 0.0, 0.0], 3)
 
     % The remaining sum of squares, on page 43
-    SS_X = ssq(PCA_model_1.data, 1);
+    SS_X = mblvm.ssq(PCA_model_1.data, 1);
     assertEAE(SS_X, [0.0551, 1.189, 0.0551, 0.0551], 3)
     
     
@@ -729,10 +729,10 @@ function MBPCA_tests()
         X_merged(:, start_col:last_col) = X_mb{b} / sqrt(K_b(b));
         start_col = start_col + K_b(b);
 
-        stats_PCA.R2X_baseline{b} = ssq(X_mb{b} / sqrt(K_b(b)));
+        stats_PCA.R2X_baseline{b} = mblvm.ssq(X_mb{b} / sqrt(K_b(b)));
     end
     K = size(X_merged, 2);
-    assert(abs(sum(cell2mat(stats_PCA.R2X_baseline))-ssq(X_merged)) <sqrt(eps))
+    assert(abs(sum(cell2mat(stats_PCA.R2X_baseline))-mblvm.ssq(X_merged)) <sqrt(eps))
 
 
 
@@ -765,19 +765,17 @@ function MBPCA_tests()
             P_b_recovered{b}(:,a) = p_b_temp;
 
 
-            stats_PCA.R2X{b}(a) = ssq(t_a * p_a(start_col:last_col)') / stats_PCA.R2X_baseline{b}; 
+            stats_PCA.R2X{b}(a) = mblvm.ssq(t_a * p_a(start_col:last_col)') / stats_PCA.R2X_baseline{b}; 
 
             start_col = start_col + K_b(b);    
         end
         P_s_recovered(:,a) = T_sum_recovered(:, :, a)' * t_a / (t_a' * t_a);
 
 
-        stats_PCA.R2X_overall(a) = ssq(t_a*p_a') / sum(cell2mat(stats_PCA.R2X_baseline));
+        stats_PCA.R2X_overall(a) = mblvm.ssq(t_a*p_a') / sum(cell2mat(stats_PCA.R2X_baseline));
 
         % Finally, deflate
         X_merged = X_merged - t_a*p_a';
-
-
     end
 
     % ---------------------------------------------------------------------------
@@ -803,7 +801,7 @@ function MBPCA_tests()
         T_b{b} = zeros(N, A);
         P_b{b} = zeros(K_b(b), A);
         stats_MB.R2X{b} = zeros(1, A);
-        stats_MB.R2X_baseline{b} = ssq(X_mb{b});
+        stats_MB.R2X_baseline{b} = mblvm.ssq(X_mb{b});
     end
 
     for a = 1:A
@@ -855,7 +853,7 @@ function MBPCA_tests()
             % I'm bothered by the fact that we don't normalize p{b} here.
             X_mb{b} = X_mb{b} - t_a_s * p_deflate';
 
-            block_ssq = ssq(t_a_s * p_deflate');
+            block_ssq = mblvm.ssq(t_a_s * p_deflate');
             overall_ssq = overall_ssq + block_ssq;
             stats_MB.R2X{b}(a) = block_ssq / stats_MB.R2X_baseline{b};        
         end
@@ -1009,7 +1007,7 @@ function MBPLS_tests()
     stats_PLS.R2X = cell(1, B);
     stats_PLS.R2X_baseline = cell(1,B);
     stats_PLS.R2X_overall = zeros(1,A);
-    stats_PLS.R2Y_baseline = ssq(Y_data);
+    stats_PLS.R2Y_baseline = mblvm.ssq(Y_data);
     stats_PLS.R2Y_overall = zeros(1,A);
     stats_PLS.SPE = cell(1,B);
     stats_PLS.SPE_overall = zeros(N, A);
@@ -1023,11 +1021,11 @@ function MBPLS_tests()
         X_merged(:, start_col:last_col) = X_mb{b} / sqrt(K_b(b));
         start_col = start_col + K_b(b);
 
-        stats_PLS.R2X_baseline{b} = ssq(X_mb{b} / sqrt(K_b(b)));
+        stats_PLS.R2X_baseline{b} = mblvm.ssq(X_mb{b} / sqrt(K_b(b)));
         stats_PLS.SPE{b} = zeros(N, A);
         stats_PLS.T2{b} = zeros(N, A);
     end
-    assert(abs(sum(cell2mat(stats_PLS.R2X_baseline))-ssq(X_merged)) <sqrt(eps))
+    assert(abs(sum(cell2mat(stats_PLS.R2X_baseline))-mblvm.ssq(X_merged)) <sqrt(eps))
     K = size(X_merged, 2);
     M = size(Y_data, 2);
 
@@ -1087,7 +1085,7 @@ function MBPLS_tests()
             % would have been calculated to deflate each block
             P_b_recovered{b}(:,a) = X_portion' * t_a / (t_a' * t_a);
 
-            stats_PLS.R2X{b}(a) = ssq(t_a * p_a(start_col:last_col)') / stats_PLS.R2X_baseline{b}; 
+            stats_PLS.R2X{b}(a) = mblvm.ssq(t_a * p_a(start_col:last_col)') / stats_PLS.R2X_baseline{b}; 
             start_col = start_col + K_b(b);
         end
         W_s_recovered(:, a) = T_sum_recovered(:, :, a)' * u_a / (u_a' * u_a);
@@ -1102,13 +1100,13 @@ function MBPLS_tests()
         for b = 1:B
             last_col = start_col + K_b(b) - 1;
 
-            stats_PLS.SPE{b}(:,a) = ssq(X_merged(:,start_col:last_col), 2);
+            stats_PLS.SPE{b}(:,a) = mblvm.ssq(X_merged(:,start_col:last_col), 2);
             start_col = start_col + K_b(b);
         end
 
-        stats_PLS.R2X_overall(a) = ssq(t_a * p_a') / sum(cell2mat(stats_PLS.R2X_baseline));
-        stats_PLS.R2Y_overall(a) = ssq(t_a * c_a') / stats_PLS.R2Y_baseline;
-        stats_PLS.SPE_overall(:,a) = ssq(X_merged, 2);
+        stats_PLS.R2X_overall(a) = mblvm.ssq(t_a * p_a') / sum(cell2mat(stats_PLS.R2X_baseline));
+        stats_PLS.R2Y_overall(a) = mblvm.ssq(t_a * c_a') / stats_PLS.R2Y_baseline;
+        stats_PLS.SPE_overall(:,a) = mblvm.ssq(X_merged, 2);
 
     end
     Y_hat_pls = T*C';
@@ -1127,7 +1125,7 @@ function MBPLS_tests()
     stats_MB.R2X = cell(1, B);
     stats_MB.R2X_baseline = cell(1,B);
     stats_MB.R2X_overall = zeros(1,A);
-    stats_MB.R2Y_baseline = ssq(Y_data);
+    stats_MB.R2Y_baseline = mblvm.ssq(Y_data);
     stats_MB.R2Y_overall = zeros(1,A);
     stats_MB.SPE = cell(1,B);
 
@@ -1146,7 +1144,7 @@ function MBPLS_tests()
         T_b{b} = zeros(N, A);
         P_b{b} = zeros(K_b(b), A);
         stats_MB.R2X{b} = zeros(1, A);
-        stats_MB.R2X_baseline{b} = ssq(X_mb{b});
+        stats_MB.R2X_baseline{b} = mblvm.ssq(X_mb{b});
         stats_MB.SPE{b} = zeros(N, A);
     end
 
@@ -1200,14 +1198,14 @@ function MBPLS_tests()
             p{b} = X_mb{b}' * t_a_s / (t_a_s' * t_a_s);
             X_mb{b} = X_mb{b} - t_a_s * p{b}';
 
-            stats_MB.SPE{b}(:,a) = ssq(X_mb{b},2);
-            block_ssq = ssq(t_a_s * p{b}');
+            stats_MB.SPE{b}(:,a) = mblvm.ssq(X_mb{b},2);
+            block_ssq = mblvm.ssq(t_a_s * p{b}');
             overall_X_ssq = overall_X_ssq + block_ssq;
             stats_MB.R2X{b}(a) = block_ssq / stats_MB.R2X_baseline{b};
         end
         Y_data = Y_data - t_a_s * c_a_s';
         stats_MB.R2X_overall(a) = overall_X_ssq / sum(cell2mat(stats_MB.R2X_baseline));
-        stats_MB.R2Y_overall(a) = ssq(t_a_s * c_a_s') / stats_MB.R2Y_baseline;
+        stats_MB.R2Y_overall(a) = mblvm.ssq(t_a_s * c_a_s') / stats_MB.R2Y_baseline;
 
         % Store results for comparison
         W_s(:,a) = w_a_s;

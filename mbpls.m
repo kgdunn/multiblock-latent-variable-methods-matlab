@@ -143,8 +143,8 @@ classdef mbpls < mblvm
                     
             
             % Baseline for all R2 calculations and variance check
-            ssq_X_before = ssq(self.data, 1);
-            ssq_Y_before = ssq(self.Y.data, 1);
+            ssq_X_before = self.ssq(self.data, 1);
+            ssq_Y_before = self.ssq(self.Y.data, 1);
             if a == 1                
                 self.split_result(ssq_X_before, 'stats', 'start_SS_col');
                 self.super.stats.ssq_Y_before = ssq_Y_before;
@@ -207,11 +207,11 @@ classdef mbpls < mblvm
                    
                     % Store the SS prior to deflation 
                     X_portion_hat = out.t_a * p_b';
-                    self.stats{b}.col_ssq_prior(:, a) = ssq(X_portion_hat,1);
+                    self.stats{b}.col_ssq_prior(:, a) = self.ssq(X_portion_hat,1);
                     
                     % VIP calculations
                     % -----------------                    
-                    ssq_after = ssq(X_portion - X_portion_hat, 1);
+                    ssq_after = self.ssq(X_portion - X_portion_hat, 1);
                     VIP_temp = zeros(self.K(b), 1);
                     for a_iter = 1:a
                         denom = sum(self.stats{b}.start_SS_col - ssq_after);
@@ -249,7 +249,7 @@ classdef mbpls < mblvm
                 Y_hat_update = out.t_a * out.c_a';
                 self.Y_hat.data = self.Y_hat.data + Y_hat_update;
                 self.Y.data = self.Y.data - Y_hat_update;
-                ssq_Y_after = ssq(self.Y.data, 1)';
+                ssq_Y_after = self.ssq(self.Y.data, 1)';
                 self.super.stats.R2Yk_a(:,a) = 1 - ssq_Y_after ./ self.super.stats.ssq_Y_before';
                 self.super.stats.R2Y(a) = 1 - sum(ssq_Y_after)/ sum(self.super.stats.ssq_Y_before);
                 if a>1
@@ -266,10 +266,10 @@ classdef mbpls < mblvm
                     X_portion = self.data(:, idx);
                     
                     % Calculate SPE
-                    self.stats{b}.SPE(:,a) = ssq(X_portion, 2);
+                    self.stats{b}.SPE(:,a) = self.ssq(X_portion, 2);
                     
                     % Calculate R2 per variable
-                    col_ssq_remain = ssq(X_portion, 1)';
+                    col_ssq_remain = self.ssq(X_portion, 1)';
                     ssq_cumul = ssq_cumul + sum(col_ssq_remain);
                     ssq_X_before = ssq_X_before + sum(self.stats{b}.start_SS_col);
                     
@@ -293,7 +293,7 @@ classdef mbpls < mblvm
                 
                 % Model summary SPE (not the superblock's SPE!), merely the
                 % overall SPE from the merged model
-                self.super.SPE(:,a) = ssq(self.data, 2);
+                self.super.SPE(:,a) = self.ssq(self.data, 2);
                 
                 % Model summary T2 (not the superblock's T2!), merely the
                 % overall T2 from the merged model
@@ -412,7 +412,7 @@ classdef mbpls < mblvm
                 initial_ssq_total = zeros(state.Nnew, 1);
                 initial_ssq = cell(1, self.B);
                 for b = 1:self.B                    
-                    initial_ssq{b} = ssq(new{b}.data, 2);
+                    initial_ssq{b} = self.ssq(new{b}.data, 2);
                     initial_ssq_total = initial_ssq_total + initial_ssq{b};
                     if a==1                        
                         state.stats.initial_ssq{b} = initial_ssq{b};
@@ -438,7 +438,7 @@ classdef mbpls < mblvm
                 % Deflate each block: using the SUPERSCORE and the block loading
                 for b = 1:self.B
                     deflate = state.T_super(:,a) * self.P{b}(:,a)';
-                    state.stats.R2{b}(:,1) = ssq(deflate, 2) ./ state.stats.initial_ssq{b};
+                    state.stats.R2{b}(:,1) = self.ssq(deflate, 2) ./ state.stats.initial_ssq{b};
                     new{b}.data = new{b}.data - deflate;
                 end
             end % looping on ``a`` latent variables
@@ -447,7 +447,7 @@ classdef mbpls < mblvm
             % Summary statistics for each block and the super level
             overall_variance = zeros(state.Nnew, 1);
             for b = 1:self.B
-                block_variance = ssq(new{b}.data, 2);
+                block_variance = self.ssq(new{b}.data, 2);
                 overall_variance = overall_variance + block_variance;
                 state.stats.SPE{b} = block_variance;
             end
