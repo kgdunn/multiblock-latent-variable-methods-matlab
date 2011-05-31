@@ -1,3 +1,7 @@
+% Copyright (c) 2010-2011 ConnectMV, Inc. All rights reserved.
+% Licensed under the BSD license.
+% -------------------------------------------------------------------------
+
 function unit_tests(varargin)
     close all;
     
