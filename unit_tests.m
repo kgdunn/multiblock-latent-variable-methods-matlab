@@ -48,7 +48,7 @@ function unit_tests(varargin)
     % - Syntax tests
     % 1a) PCA = lvm({'X', X}, A);  quick build with A components
     % 1b) Same, except X is a block, not a matrix
-    % 2)  options = lvm_opt(); 
+    % 2)  options = mblvm.options(); 
     %     PCA_model = lvm({'X', X}, options);
     %   a)options.build_now = false; <-- used for cross-validation internally
     %   b)options.build_now = true;
@@ -135,14 +135,14 @@ function Wold_article_PCA_test()
     fprintf('PCA tests from literature: ');
     X_raw = [3, 4, 2, 2; 4, 3, 4, 3; 5.0, 5, 6, 4];
     X = block(X_raw);
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = 1;    
     PCA_model_1 = lvm({'X', X}, options);
     assertTrue(strcmp(PCA_model_1.blocks{1}.name, 'X'))
 
     X = block(X_raw);
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = 2;
     PCA_model_2 = lvm({'X', X}, options);
@@ -280,7 +280,7 @@ function PCA_no_missing_data()
     % Build the PCA model with LVM.m
     % ------------------------------
     A = exp_m.A;
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = A;
     PCA = lvm({'X', X}, options);
@@ -338,7 +338,7 @@ function PLS_no_missing_data()
     % Build the PCA model with LVM.m
     % ------------------------------
     A = exp_m.A;
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = A;
     PLS = lvm({'X', X, 'Y', Y}, options);
@@ -385,7 +385,7 @@ function PLS_no_missing_data()
     lowarp = load('tests/lowarp.mat');
     X = lowarp.recipe;
     Y = lowarp.Y;
-    options = lvm_opt(); 
+    options = mblvm.options(); 
     options.randomize_test.use = true;
     lastwarn('')
     warning('off', 'mbpls:calc_model:no_X_variance')
@@ -410,7 +410,7 @@ function PCA_with_missing_data()
     
     % Build the model
     A = 2;
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = A;
     PCA = lvm({'Column', X}, options);
@@ -457,7 +457,7 @@ function PCA_batch_data()
 %                             @block, data.X, 'X', 'batch' )
 %                         
     batch_X = block(data.X, 'X', {'batch_tag_names', tagNames}, {'nBatches', 53});
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = 2;
     batch_PCA = lvm({'X', batch_X},options);
@@ -548,7 +548,7 @@ function PCA_randomization_tests()
         catch ME
             X = test.X;
         end
-        options = lvm_opt(); 
+        options = mblvm.options(); 
         options.randomize_test.use = true;
         options.show_progress = false;     
         options.randomize_test.show_progress = true;
@@ -655,7 +655,7 @@ function PLS_randomization_tests()
             X = test.X;
             Y = test.Y;
         end
-        options = lvm_opt(); 
+        options = mblvm.options(); 
         options.randomize_test.use = true;
         options.show_progress = false;     
         options.randomize_test.show_progress = false;
@@ -929,7 +929,7 @@ function MBPCA_tests()
     X_2 = block(X1_raw(:, block_2_vars), 'X2');
     
     
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = 2;
     mbmodel = lvm({'X1', X_1, 'X2', X_2}, options);
@@ -1288,7 +1288,7 @@ function MBPLS_tests()
     X2 = block(X_raw(:, block_2_vars), 'X2');
 
    
-    options = lvm_opt();     
+    options = mblvm.options();     
     options.show_progress = false; 
     options.min_lv = A;
     mbmodel = lvm({'X1', X1, 'X2', X2, 'Y', Y}, options);
