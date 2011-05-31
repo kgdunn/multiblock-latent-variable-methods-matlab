@@ -1962,17 +1962,17 @@ classdef mblvm < handle
                     progdata(ndx).proglabel = text(0.01, 0.5, '', ...
                         'HorizontalAlignment', 'Left', ...
                         'FontUnits', 'Normalized', ...
-                        'FontSize', 0.7 );
+                        'FontSize', 0.85);
                     if ischar(input{ndx})
                         set(progdata(ndx).proglabel, 'String', input{ndx})
                         input{ndx} = 0;
                     end
 
                     % Set callbacks to change color on mouse click
-                    set(progdata(ndx).progaxes, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
-                    set(progdata(ndx).progpatch, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
-                    set(progdata(ndx).progtext, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
-                    set(progdata(ndx).proglabel, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
+                    %set(progdata(ndx).progaxes, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
+                    %set(progdata(ndx).progpatch, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
+                    %set(progdata(ndx).progtext, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
+                    %set(progdata(ndx).proglabel, 'ButtonDownFcn', {@changecolor, progdata(ndx).progpatch})
 
                     % Pick a random color for this patch
                     changecolor([], [], progdata(ndx).progpatch)
