@@ -2516,7 +2516,12 @@ classdef mblvm < handle
                 idx = series.x_num;
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
-            end       
+            end
+            
+            if idx == 0
+                spe_data = [];
+                return
+            end
             
             if block == 0
                 spe_data = hP.model.super.SPE(:, idx);
@@ -2542,6 +2547,10 @@ classdef mblvm < handle
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
             end                
+            
+            if idx == 0
+                return
+            end
             
             if block == 0
                 limit = hP.model.super.lim.SPE(idx);

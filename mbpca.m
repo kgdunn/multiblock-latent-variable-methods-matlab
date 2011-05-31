@@ -89,10 +89,8 @@ classdef mbpca < mblvm
                 % Converge onto a single component
                 if self.opt.show_progress
                     self.progressbar(sprintf('Calculating component %d', a));
-                    out = self.single_block_PCA(self.data);                     
-                else
-                    out = self.single_block_PCA(self.data);
-                end                
+                end
+                out = self.single_block_PCA(self.data);
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
@@ -459,8 +457,7 @@ classdef mbpca < mblvm
                 
                 if self.opt.show_progress && out.itern > 2
                     perc = log(norm(t_a_guess - out.t_a))*progress_slope + progress_intercept;
-                    self.progressbar(perc);
-                    
+                    self.progressbar(perc);                    
                     % Ideally self.progressbar should return a ``stop_early``
                     % signal if the user has cancelled adding the component.
                     %if stop_early
@@ -489,6 +486,9 @@ classdef mbpca < mblvm
                 out.t_a = self.regress_func(X, out.p_a, self.has_missing);
                 
                 out.itern = out.itern + 1;
+            end
+            if self.opt.show_progress
+                self.progressbar(1.0);                
             end
         end % ``single_block_PCA``
         

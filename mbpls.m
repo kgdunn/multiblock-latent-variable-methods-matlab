@@ -160,10 +160,8 @@ classdef mbpls < mblvm
                 % Converge onto a single component
                 if self.opt.show_progress
                     self.progressbar(sprintf('Calculating component %d', a))
-                    out = self.single_block_PLS(self.data, self.Y.data); 
-                else
-                    out = self.single_block_PLS(self.data, self.Y.data);
                 end
+                out = self.single_block_PLS(self.data, self.Y.data);
                 
                 % Flip the signs of the column vectors in P so that the largest
                 % magnitude element is positive.
