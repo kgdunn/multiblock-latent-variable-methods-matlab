@@ -159,9 +159,8 @@ classdef mbpls < mblvm
 
                 % Converge onto a single component
                 if self.opt.show_progress
-                    h = awaitbar(0, sprintf('Calculating component %d', a));
-                    out = self.single_block_PLS(self.data, self.Y.data, h); 
-                    close(h);
+                    self.progressbar(sprintf('Calculating component %d', a))
+                    out = self.single_block_PLS(self.data, self.Y.data); 
                 else
                     out = self.single_block_PLS(self.data, self.Y.data);
                 end
@@ -609,12 +608,9 @@ classdef mbpls < mblvm
             
         end % ``get_predictions``
         
-        function out = single_block_PLS(self, X, Y, varargin)
+        function out = single_block_PLS(self, X, Y)
             % Extracts a PLS component on a single block of data, ``X`` and
             % ``Y``.
-            %
-            %  The ``varargin`` input can optionally provide a handle to the
-            % progress bar.
             %
             % [1] Höskuldsson, PLS regression methods, Journal of Chemometrics,
             %     2(3), 211-228, 1998, http://dx.doi.org/10.1002/cem.1180020306
@@ -644,12 +640,16 @@ classdef mbpls < mblvm
                     progress_intercept = 0 - start_perc*progress_slope;
                 end
                 
-                if nargin > 3 && self.opt.show_progress && out.itern > 2 
+                if self.opt.show_progress && out.itern > 2 
                     perc = log(norm(u_a_guess - out.u_a))*progress_slope + progress_intercept;
-                    stop_early = awaitbar(perc, varargin{1});
-                    if stop_early
-                        break;
-                    end
+                    self.progressbar(perc);
+                    
+                    % Ideally the progress bar should return a "stop early"
+                    % signal, allowing us to break out of the code.
+                    
+                    %if stop_early
+                    %    break;
+                    %end
                 end
                 
                 % 0: starting point for convergence checking on next loop
@@ -692,6 +692,10 @@ classdef mbpls < mblvm
             % Note the similarity with step 4! and that similarity helps
             % understand the deflation process.
             out.p_a = regress_func(X, out.t_a, self.has_missing); 
+            
+            if self.opt.show_progress 
+                self.progressbar(1.0)
+            end
             
         end % ``single_block_PLS``
         

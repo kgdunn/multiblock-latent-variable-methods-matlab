@@ -88,9 +88,8 @@ classdef mbpca < mblvm
                                 
                 % Converge onto a single component
                 if self.opt.show_progress
-                    h = awaitbar(0, sprintf('Calculating component %d', a));
-                    out = self.single_block_PCA(self.data, h); 
-                    close(h);
+                    self.progressbar(sprintf('Calculating component %d', a));
+                    out = self.single_block_PCA(self.data);                     
                 else
                     out = self.single_block_PCA(self.data);
                 end                
@@ -430,12 +429,9 @@ classdef mbpca < mblvm
             
         end % ``randomization_test_finish``
         
-        function out = single_block_PCA(self, X, varargin)
+        function out = single_block_PCA(self, X)
             % Extracts a PCA component on a single block of data, ``data``.
             % The model object, ``self``, should also be provided, for options.
-            % The ``a`` entry is merely used to show which component is being
-            % extracted in the progress bar.
-            %
             %
             % 1.   Wold, Esbensen and Geladi, 1987, Principal Component Analysis,
             %      Chemometrics and Intelligent Laboratory Systems, v 2, p37-52.
@@ -461,12 +457,15 @@ classdef mbpca < mblvm
                     progress_intercept = 0 - start_perc*progress_slope;
                 end
                 
-                if nargin > 3 && self.opt.show_progress && out.itern > 2
+                if self.opt.show_progress && out.itern > 2
                     perc = log(norm(t_a_guess - out.t_a))*progress_slope + progress_intercept;
-                    stop_early = awaitbar(perc, varargin{1});
-                    if stop_early
-                        break;
-                    end
+                    self.progressbar(perc);
+                    
+                    % Ideally self.progressbar should return a ``stop_early``
+                    % signal if the user has cancelled adding the component.
+                    %if stop_early
+                    %    break;
+                    %end
                 end
                 
                 % 0: starting point for convergence checking on next loop

@@ -551,7 +551,7 @@ function PCA_randomization_tests()
         options = lvm_opt(); 
         options.randomize_test.use = true;
         options.show_progress = false;     
-        options.randomize_test.show_progress = false;
+        options.randomize_test.show_progress = true;
         options.randomize_test.permutations = 100;
         warning('off', 'mbpca:calc_model:no_X_variance')
         PCA_model = lvm({'X', X}, options);
