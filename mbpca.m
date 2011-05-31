@@ -116,12 +116,12 @@ classdef mbpca < mblvm
                     
                     % Regress sub-columns of self.data onto the superscore
                     % to get the block loadings.
-                    p_b = regress_func(X_portion, out.t_a, self.has_missing);
+                    p_b = self.regress_func(X_portion, out.t_a, self.has_missing);
                     
                     p_b = p_b / norm(p_b);
                     
                     % Block scores: regress rows of X onto the block loadings
-                    t_b = regress_func(X_portion, p_b, self.has_missing);
+                    t_b = self.regress_func(X_portion, p_b, self.has_missing);
                     
                     t_superblock(:,b) = t_b;
                     
@@ -148,7 +148,7 @@ classdef mbpca < mblvm
                     [self.stats{b}.T2(:,a), S] = self.mahalanobis_distance(self.T{b}(:,1:a));
                     self.stats{b}.S = S;
                 end
-                p_super = regress_func(t_superblock, out.t_a, false);
+                p_super = self.regress_func(t_superblock, out.t_a, false);
                      
                 self.super.T_summary(:,:,a) = t_superblock;
                 self.super.T(:,a) = out.t_a;
@@ -255,7 +255,7 @@ classdef mbpca < mblvm
 
                 for b = 1:self.B
                     % Block score
-                    state.T{b}(:,a) = regress_func(new{b}.data, self.P{b}(:,a), new{b}.has_missing);
+                    state.T{b}(:,a) = self.regress_func(new{b}.data, self.P{b}(:,a), new{b}.has_missing);
                     state.T{b}(:,a) = state.T{b}(:,a) .* self.block_scaling(b);
                     % Transfer it to the superscore matrix
                     state.T_sb(:,b,a) = state.T{b}(:,a);
@@ -476,7 +476,7 @@ classdef mbpca < mblvm
                 %p_a = X.T * t_a / (t_a.T * t_a)
                 %p_a = (X.T)(t_a) / ((t_a.T)(t_a))
                 %p_a = dot(X.T, t_a) / ssq(t_a)
-                out.p_a = regress_func(X, out.t_a, self.has_missing);
+                out.p_a = self.regress_func(X, out.t_a, self.has_missing);
                 
                 % 2: Normalize p_a to unit length
                 out.p_a = out.p_a / sqrt(out.p_a' * out.p_a);
@@ -486,7 +486,7 @@ classdef mbpca < mblvm
                 %t_a = X * p_a / (p_a.T * p_a)
                 %t_a = (X)(p_a) / ((p_a.T)(p_a))
                 %t_a = dot(X, p_a) / ssq(p_a)
-                out.t_a = regress_func(X, out.p_a, self.has_missing);
+                out.t_a = self.regress_func(X, out.p_a, self.has_missing);
                 
                 out.itern = out.itern + 1;
             end

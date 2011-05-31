@@ -186,19 +186,19 @@ classdef mbpls < mblvm
                     
                     % Regress sub-columns of self.data onto the superscore
                     % to get the block weights.
-                    w_b = regress_func(X_portion, out.u_a, self.has_missing);
+                    w_b = self.regress_func(X_portion, out.u_a, self.has_missing);
                     
                     w_b = w_b / norm(w_b);
                     
                     % Block scores: regress rows of X onto the block loadings
-                    t_b = regress_func(X_portion, w_b, self.has_missing);
+                    t_b = self.regress_func(X_portion, w_b, self.has_missing);
                     t_superblock(:,b) = t_b;
                     %T_b_recovered{b}(:,a) = X_portion * w_b / (w_b'*w_b) / sqrt(K_b(b));
                     
                     
                     % Block loadings: that would have been used to deflate the
                     % X-blocks
-                    p_b = regress_func(X_portion, out.t_a, self.has_missing);
+                    p_b = self.regress_func(X_portion, out.t_a, self.has_missing);
                     
                     % Store the block scores, weights and loadings
                     self.T{b}(:,a) = t_b;
@@ -226,7 +226,7 @@ classdef mbpls < mblvm
                     self.stats{b}.S = S;
                     
                 end
-                w_super = regress_func(t_superblock, out.u_a, false);
+                w_super = self.regress_func(t_superblock, out.u_a, false);
                 w_super = w_super / norm(w_super);
                 
                 % Store the super-level results
@@ -426,7 +426,7 @@ classdef mbpls < mblvm
 
                 for b = 1:self.B
                     % Block score
-                    state.T{b}(:,a) = regress_func(new{b}.data, self.W{b}(:,a), new{b}.has_missing);
+                    state.T{b}(:,a) = self.regress_func(new{b}.data, self.W{b}(:,a), new{b}.has_missing);
                     state.T{b}(:,a) = state.T{b}(:,a) .* self.block_scaling(b);
                     % Transfer it to the superscore matrix
                     state.T_sb(:,b,a) = state.T{b}(:,a);
@@ -658,7 +658,7 @@ classdef mbpls < mblvm
                 % 1: Regress the score, u_a, onto every column in X, compute the
                 %    regression coefficient and store in w_a
                 % w_a = X.T * u_a / (u_a.T * u_a)
-                out.w_a = regress_func(X, out.u_a, self.has_missing);
+                out.w_a = self.regress_func(X, out.u_a, self.has_missing);
                 
                 % 2: Normalize w_a to unit length
                 out.w_a = out.w_a / norm(out.w_a);
@@ -668,19 +668,19 @@ classdef mbpls < mblvm
                 % 3: Now regress each row in X on the w_a vector, and store the
                 %    regression coefficient in t_a
                 % t_a = X * w_a / (w_a.T * w_a)
-                out.t_a = regress_func(X, out.w_a, self.has_missing);
+                out.t_a = self.regress_func(X, out.w_a, self.has_missing);
 
                 % 4: Now regress score, t_a, onto every column in Y, compute the
                 %    regression coefficient and store in c_a
                 % c_a = Y.T * t_a / (t_a.T * t_a)
-                out.c_a = regress_func(Y, out.t_a, self.has_missing);
+                out.c_a = self.regress_func(Y, out.t_a, self.has_missing);
                 
                 % 5: Now regress each row in Y on the c_a vector, and store the
                 %    regression coefficient in u_a
                 % u_a = Y * c_a / (c_a.T * c_a)
                 %
                 % TODO(KGD):  % Still handle case when entire row in Y is missing
-                out.u_a = regress_func(Y, out.c_a, self.has_missing);
+                out.u_a = self.regress_func(Y, out.c_a, self.has_missing);
                 
                 out.itern = out.itern + 1;
             end
@@ -691,7 +691,7 @@ classdef mbpls < mblvm
             % deflate afterwards.
             % Note the similarity with step 4! and that similarity helps
             % understand the deflation process.
-            out.p_a = regress_func(X, out.t_a, self.has_missing); 
+            out.p_a = self.regress_func(X, out.t_a, self.has_missing); 
             
             if self.opt.show_progress 
                 self.progressbar(1.0)

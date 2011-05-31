@@ -525,7 +525,7 @@ function PCA_randomization_tests()
     T(:,1) = T(:,1) ./ std(T(:,1)) .* std_T(1);
     for a = 2:A
         t_a = create_centered_decreasing_spread(N, 1, std_T(a), 1e-4);
-        beta_coeff = regress_func(t_a, T(:,a-1), 0);
+        beta_coeff = mblvm.regress_func(t_a, T(:,a-1), 0);
         resids = t_a - beta_coeff * T(:,a-1);
         resids = resids ./ std(resids) .* std_T(a);
         T(:,a) = resids;
