@@ -178,7 +178,7 @@ htmlhelp_basename = 'MBLVMdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'MBLVM.tex', u'Documentation for multiblock latent-variable modelling software in MATLAB', u'Kevin Dunn', 'manual'),
+  ('index', 'MBLVM.tex', u'Documentation for multiblock latent-variable modelling software in MATLAB', u'Kevin Dunn', 'howto'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

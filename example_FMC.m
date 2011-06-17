@@ -97,7 +97,6 @@ if true
 
     pls_combinedZ = lvm({'Z-combined', Zcombined, 'Y', Y}, 2);
     plot(pls_combinedZ)
-    plot(pls_combinedZ, {'mark', '20'});    
 end
 
 

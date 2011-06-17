@@ -1,3 +1,6 @@
+Fake section
+=============
+
 .. toctree::
    :maxdepth: 2
 
