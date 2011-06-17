@@ -804,6 +804,10 @@ classdef mblvm < handle
                 fprintf(fid, '\n\n[%s]\n\n', section_name);
             end
             function write_value(fid, name, value)
+                if ischar(value)
+                    fprintf(fid, '%s = %s\n', name, value);
+                    return
+                end
                 if round(value) == value
                     fprintf(fid, '%s = %0.0f\n', name, value);
                 else
@@ -849,8 +853,46 @@ classdef mblvm < handle
             % Write the mean-centering and scaling vectors for "Y"
             write_vector(fid, 'Mean_Y', self.Y.labels{2}, self.YPP.mean_center)
             write_vector(fid, 'Scale_Y', self.Y.labels{2}, self.YPP.scaling)
-
+            
             sucesss = fclose(fid);
+            
+            
+            % Now export each block to a new file
+            for b = 1:self.B
+                fid = fopen([filename_base, '_block_', num2str(b), '_name_', self.blocks{b}.name, '.ini'], 'w');
+                write_section(fid, 'BlockInformation')
+                write_value(fid, 'Block name', self.blocks{b}.name)
+                write_value(fid, 'Block number', b)
+                write_value(fid, 'Block scaling factor K_b', sqrt(self.K(b)))
+                
+                write_section(fid, 'A')
+                write_value(fid, 'A', self.A)
+                
+                column_labels = self.blocks{b}.labels;
+                
+                % Force new labelling onto batch blocks, or onto blocks that 
+                % have no column labels
+                if isempty(column_labels) || isa(self.blocks{b}, 'block_batch')
+                    column_labels = cell(self.K(b), 1);
+                    for col = 1:numel(column_labels)
+                        column_labels{col} = ['Tag ', num2str(col)];
+                    end
+                else
+                    column_labels = column_labels{2};
+                end
+                
+                % Preprocessing data
+                write_vector(fid, 'Mean', column_labels, self.PP{b}.mean_center)
+                write_vector(fid, 'Scale', column_labels, self.PP{b}.scaling)
+                
+                % Loadings P and weights W
+                write_matrix_by_column(fid, 'P', column_labels, self.P{b})
+                write_matrix_by_column(fid, 'W', column_labels, self.W{b})
+                
+                fclose(fid);
+            end          
+
+            
             
         end % ``export``
         
