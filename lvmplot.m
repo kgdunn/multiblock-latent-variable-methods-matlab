@@ -772,12 +772,7 @@ classdef lvmplot < handle
             set(hAx, 'XTickLabel', {})
             x_data = get(hBar, 'XData');
             y_data = get(hBar, 'YData');
-            if numel(x_data) ~= numel(labels)
-                % TODO(KGD): this occurs with batch blocks
-                % Figure out a way to elegantly deal with batck blocks
-                return
-                %error('lvmplot:annotate_barplot', 'Incorrect number of labels supplied')
-            end
+            
             set(hAx, 'XLim', [x_data(1)-1, x_data(end)+1])
             axis_extent = axis;
             max_range = axis_extent(4) - axis_extent(3); %max(max(y_data),  - extent(3));
@@ -792,6 +787,13 @@ classdef lvmplot < handle
                 y_data = ones(size(x_data)) .* point;
             end
             set(hAx, 'XTick', [])
+            
+            if numel(x_data) ~= numel(labels)
+                % TODO(KGD): this occurs with batch blocks
+                % Figure out a way to elegantly deal with batck blocks
+                return
+                %error('lvmplot:annotate_barplot', 'Incorrect number of labels supplied')
+            end
             
             for n = 1:numel(x_data)
                 hText = text(x_data(n), y_data(n)+delta, labels{n}, 'Rotation', 90);

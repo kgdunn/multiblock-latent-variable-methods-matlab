@@ -735,19 +735,31 @@ classdef mbpls < mblvm
                 idx = series.x_num;
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
-            end   
-            labels = hP.model.Y.labels{2};
-            label_str = ['Observed: ', labels{idx}];
+            end
+            
+            labels = hP.model.Y.labels;
+            if isempty(labels)
+                if strcmpi(series.current, 'x')
+                    tag_name = ['tag ', num2str(series.x_num)];
+                elseif strcmpi(series.current, 'y')
+                    tag_name = ['tag ', num2str(series.y_num)];
+                end
+            else
+                tag_name = labels{idx};
+            end
+                
+            label_str = ['Observed: ', tag_name];            
             if strcmpi(series.current, 'x')
                 xlabel(ax, label_str)
             elseif strcmpi(series.current, 'y')
                 ylabel(ax, label_str)
-            end
-            
+            end            
             x_ax = series.x_type{1};
             y_ax = series.y_type{1};
             if strcmpi(x_ax, 'Observations') && strcmpi(y_ax, 'Predictions')
-                annotate_obs_predicted(hP.gca, labels{idx})
+                
+                title(ax, ['Obs vs predicted: ', tag_name])
+                annotate_obs_predicted(hP.gca)
             end
             
             if series.x_num < 0 && series.y_num > 0
@@ -798,8 +810,18 @@ classdef mbpls < mblvm
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
             end   
-            labels = hP.model.Y.labels{2};            
-            label_str = ['Predicted: ', labels{idx}];
+            labels = hP.model.Y.labels;
+            if isempty(labels)
+                if strcmpi(series.current, 'x')
+                    tag_name = ['tag ', num2str(series.x_num)];
+                elseif strcmpi(series.current, 'y')
+                    tag_name = ['tag ', num2str(series.y_num)];
+                end
+            else
+                tag_name = labels{idx};
+            end
+                
+            label_str = ['Predicted: ', tag_name];
             if strcmpi(series.current, 'x')
                 xlabel(ax, label_str)
             elseif strcmpi(series.current, 'y')
@@ -808,8 +830,9 @@ classdef mbpls < mblvm
                         
             x_ax = series.x_type{1};
             y_ax = series.y_type{1};
-            if strcmpi(x_ax, 'Observations') && strcmpi(y_ax, 'Predictions')
-                annotate_obs_predicted(hP.gca, labels{idx})
+            if strcmpi(x_ax, 'Observations') && strcmpi(y_ax, 'Predictions')                
+                title(ax, ['Obs vs predicted: ', tag_name])
+                annotate_obs_predicted(hP.gca)
             end
             if series.x_num < 0 && series.y_num > 0
                 title('Predictions of: ', labels{idx})
@@ -975,8 +998,13 @@ classdef mbpls < mblvm
                 grid on
                 ylabel(ax, ['R2 for Y-variables with A=', num2str(series.y_num)])
                 
-                labels = hP.model.Y.labels{2};
-                hP.annotate_barplot(hBar, labels, 'stacked')
+                labels = hP.model.Y.labels;
+                if isempty(labels)
+                    tagnames = [];
+                else
+                    tagnames = labels{2};
+                end                
+                hP.annotate_barplot(hBar, tagnames, 'stacked')
             end
         end
         
@@ -985,9 +1013,8 @@ classdef mbpls < mblvm
     
 end % end classdef
 
-function annotate_obs_predicted(ax, tag_name)
+function annotate_obs_predicted(ax)    
     
-    title(ax, ['Obs vs predicted: ', tag_name])
     if findobj(ax, 'Tag', 'RMSEP_obs_pred')
         return
     end
