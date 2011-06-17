@@ -788,6 +788,72 @@ classdef mblvm < handle
             state.newb = newb;
         end % ``apply``
         
+        function sucesss = export(self, filename_base)
+            % Exports a multiblock model to text file in the current directory
+            %
+            % e.g.: model = lvm(...)
+            %       model.export('mymodel')
+            %
+            % will create ``mymodel_superlevel.ini``
+            %             ``mymodel_block_Z.ini``
+            %             ``mymodel_block_X.ini``
+            % etc. Will create B+1 text files, where B = number of blocks.
+            
+            function write_section(fid, section_name)
+                % Start a new section
+                fprintf(fid, '\n\n[%s]\n\n', section_name);
+            end
+            function write_value(fid, name, value)
+                if round(value) == value
+                    fprintf(fid, '%s = %0.0f\n', name, value);
+                else
+                    fprintf(fid, '%s = %0.15f\n', name, value);
+                end
+            end            
+            function write_vector(fid, section_name, row_labels, values)
+                write_section(fid, section_name)
+                for n = 1:numel(values)
+                    write_value(fid, row_labels{n}, values(n))
+                end
+            end
+            function write_matrix_by_column(fid, matrix_name, row_labels, matrix)
+                % Create sections [name1], [name2], ... up to the number of
+                % columns in ``matrix``. The row labels 
+                for k = 1:size(matrix, 2)
+                    section_name = [matrix_name, '__', num2str(k)];
+                    write_vector(fid, section_name, row_labels, matrix(:,k))
+                end
+            end
+
+            fid = fopen([filename_base, '.ini'], 'w');
+            write_section(fid, 'A')
+            write_value(fid, 'A', self.A)
+            
+            write_section(fid, 'B')
+            write_value(fid, 'B', self.B)
+            
+            write_section(fid, 'M')
+            write_value(fid, 'M', self.M)
+            
+            component_labels = cell(self.A, 1);
+            for a = 1:self.A
+                component_labels{a} = ['Component_', num2str(a)];                
+            end
+            
+            % Write the superscore weights
+            write_matrix_by_column(fid, 'Super_W', component_labels, self.super.W)
+                        
+            % Write the C-matrix
+            write_matrix_by_column(fid, 'C', self.Y.labels{2}, self.super.C)
+            
+            % Write the mean-centering and scaling vectors for "Y"
+            write_vector(fid, 'Mean_Y', self.Y.labels{2}, self.YPP.mean_center)
+            write_vector(fid, 'Scale_Y', self.Y.labels{2}, self.YPP.scaling)
+
+            sucesss = fclose(fid);
+            
+        end % ``export``
+        
         function self = create_storage(self)
             % Creates only the subfields required for each block.
             % NOTE: this function does not depend on ``A``.  That storage is
