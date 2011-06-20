@@ -889,6 +889,12 @@ classdef mblvm < handle
                 write_matrix_by_column(fid, 'P', column_labels, self.P{b})
                 write_matrix_by_column(fid, 'W', column_labels, self.W{b})
                 
+                % Write the confidence interval information
+                write_vector(fid, 'Score_limits_plus_and_minus_95', component_labels, self.lim{b}.t)
+                write_vector(fid, 'T2_limits_95', component_labels, self.lim{b}.T2)
+                write_vector(fid, 'SPE_limits_95', component_labels, self.lim{b}.SPE)
+                % [ellipse constant]
+                
                 fclose(fid);
             end          
 
