@@ -745,12 +745,16 @@ classdef mblvm < handle
                 Nnew = 0;
                 newb = cell(self.B, 1);
                 for b = 1:numel(new)
-                    newb{b} = block(new{b});                    
+                    if isa(new{b}, 'block_base')
+                        newb{b} = new{b}.copy();
+                    else
+                        newb{b} = block(new{b});
+                    end
                     Nnew = max(Nnew, newb{b}.N);
                 end
             end
 
-            if apply_opt.preprocess
+            if apply_opt.preprocess 
                 for b = 1:self.B
                     newb{b} = self.blocks{b}.preprocess(newb{b}, self.PP{b});
                 end
@@ -824,7 +828,7 @@ classdef mblvm < handle
                 % Create sections [name1], [name2], ... up to the number of
                 % columns in ``matrix``. The row labels 
                 for k = 1:size(matrix, 2)
-                    section_name = [matrix_name, '__', num2str(k)];
+                    section_name = [matrix_name, '', num2str(k)];
                     write_vector(fid, section_name, row_labels, matrix(:,k))
                 end
             end
@@ -850,12 +854,14 @@ classdef mblvm < handle
             % Write the C-matrix
             write_matrix_by_column(fid, 'C', self.Y.labels{2}, self.super.C)
             
+            % Write the S-matrix
+            write_matrix_by_column(fid, 'S', component_labels, self.super.S)
+            
             % Write the mean-centering and scaling vectors for "Y"
             write_vector(fid, 'Mean_Y', self.Y.labels{2}, self.YPP.mean_center)
             write_vector(fid, 'Scale_Y', self.Y.labels{2}, self.YPP.scaling)
             
-            sucesss = fclose(fid);
-            
+            sucesss = fclose(fid);            
             
             % Now export each block to a new file
             for b = 1:self.B
@@ -886,8 +892,11 @@ classdef mblvm < handle
                 write_vector(fid, 'Scale', column_labels, self.PP{b}.scaling)
                 
                 % Loadings P and weights W
-                write_matrix_by_column(fid, 'P', column_labels, self.P{b})
-                write_matrix_by_column(fid, 'W', column_labels, self.W{b})
+                write_matrix_by_column(fid, 'p', column_labels, self.P{b})
+                write_matrix_by_column(fid, 'w', column_labels, self.W{b})
+                
+                % Score scaling matrix to calculate T^2
+                write_matrix_by_column(fid, 'S', column_labels, self.stats{b}.S)
                 
                 % Write the confidence interval information
                 write_vector(fid, 'Score_limits_plus_and_minus_95', component_labels, self.lim{b}.t)
@@ -896,10 +905,7 @@ classdef mblvm < handle
                 % [ellipse constant]
                 
                 fclose(fid);
-            end          
-
-            
-            
+            end            
         end % ``export``
         
         function self = create_storage(self)

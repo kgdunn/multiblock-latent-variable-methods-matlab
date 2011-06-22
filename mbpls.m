@@ -404,6 +404,8 @@ classdef mbpls < mblvm
             % Applies a PLS model to the given ``block`` of (new) data.
             % 
             % TODO(KGD): allow user to specify ``A``
+            % TODO(KGD): check that this matches the actual model for the
+            % block scores still
             
             which_components = 1 : min(self.A);
             for a = which_components
