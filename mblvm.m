@@ -144,6 +144,7 @@ classdef mblvm < handle
         
         function N = get.N(self)
             N = size(self.blocks{1}.data, 1);
+            % Ensures that all blocks have the same number of observations
             for b = 1:self.B
                 assert(N == self.blocks{b}.N);
             end
@@ -1618,7 +1619,13 @@ classdef mblvm < handle
                 estimated_S = varargin{1};
             else
                 covariance = (T'*T)/n;
-                estimated_S = inv(covariance);
+                if covariance==0
+                    % Catches the case when the scores for the block are
+                    % entirely zero.
+                    estimated_S = NaN;
+                else
+                    estimated_S = inv(covariance);
+                end
             end
             
             % Equivalent of T2 = diag(T * estimated_S * T'); but more 

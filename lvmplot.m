@@ -607,7 +607,11 @@ classdef lvmplot < handle
             %    'include_zero' (e.g. for score line plots)
             
             data = sort(data(:));
-            range = max(data(end)-data(1), 0.4*max(data(:)));  % max(..) handles case when data is a scalar
+            if data(end) == 0
+                range = 0.1;
+            else
+                range = max(data(end)-data(1), 0.4*data(end));  % data(end) handles case when data is a scalar
+            end
             actual_range = extent(2) - extent(1);
             if actual_range > 1.4*range
                 delta = 0.15*range;
