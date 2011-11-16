@@ -790,7 +790,9 @@ classdef lvmplot < handle
                 point = (axis_extent(4) - axis_extent(3))*0.05 + axis_extent(3);
                 y_data = ones(size(x_data)) .* point;
             end
-            set(hAx, 'XTick', [])
+            % KGD: 16 Nov 2011: this removes the grids from batch
+            % trajectory loadings and VIP plots, making them hard to read
+            %set(hAx, 'XTick', [])
             
             if numel(x_data) ~= numel(labels)
                 % TODO(KGD): this occurs with batch blocks

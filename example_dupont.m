@@ -10,7 +10,7 @@ batch_data = dupont.tech;
 nBatches = 55;
 tagNames = {'TempR-1','TempR-2','TempR-3','Press-1', ...
             'Flow-1', 'TempH-1','TempC-1','Press-2', ...
-            'Press-3','Flow-2'};
+            'Press-3','Flow-2'}';
         
 % We must create a batch block first: tell it how
 % many batches there are in the aligned data
