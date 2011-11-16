@@ -361,7 +361,7 @@ function [hA, hHeaders, hFooters] = plot_raw(self, layout, which_tags, mark)
             end
         end
         
-        set(hA(k),'FontSize',14)
+        set(hA(k),'FontSize',14, 'Box', 'on')
         axis tight
         grid('on')
         a=axis;
