@@ -433,6 +433,7 @@ classdef block_base < handle
                     block_data = block_data .* repmat(scaling, other.N, 1);
                 else
                     % Catches the case when empty blocks are preprocessed
+                    block_data = other.get_data();
                     scaling = NaN;
                 end
                 

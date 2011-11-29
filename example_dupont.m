@@ -29,7 +29,7 @@ A = 3;
 batch_PCA = lvm({'X', batch_X}, A);
 
 % Let's see the score plots and Hotelling's T2 first
-plot(batch_PCA)
+%plot(batch_PCA)
 %plot(batch_PCA, 'scores')
 
 % Understand where and when the variance is explained

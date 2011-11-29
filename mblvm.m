@@ -2286,6 +2286,11 @@ classdef mblvm < handle
 
             [Ny, K] = size(Y);
             Nx = numel(x);
+            
+            if Ny == 0
+                b = NaN;
+                return
+            end
 
             if Ny == Nx                  % Case A: b' = (x'Y)/(x'x): (1xN)(NxK) = (1xK)
                 if not(has_missing)

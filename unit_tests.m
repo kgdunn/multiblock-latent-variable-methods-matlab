@@ -395,7 +395,7 @@ function PLS_no_missing_data()
     warning('off', 'mbpls:calc_model:no_X_variance')
     PLS_model = lvm({'X', X, 'Y', Y}, 5);
     assertTrue(PLS_model.A == 3);    
-    [~, msg_id] = lastwarn;
+    [dummy, msg_id] = lastwarn;
     assertTrue(strcmp('mbpls:calc_model:no_X_variance', msg_id))
     warning('on', 'mbpls:calc_model:no_X_variance')
 return

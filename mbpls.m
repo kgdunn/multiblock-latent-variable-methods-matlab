@@ -189,7 +189,7 @@ classdef mbpls < mblvm
                     
                     w_b = w_b / norm(w_b);
                     
-                    % Block scores: regress rows of X onto the block loadings
+                    % Block scores: regress rows of X onto the block weights
                     t_b = self.regress_func(X_portion, w_b, self.has_missing);
                     t_superblock(:,b) = t_b;
                     %T_b_recovered{b}(:,a) = X_portion * w_b / (w_b'*w_b) / sqrt(K_b(b));
@@ -412,12 +412,14 @@ classdef mbpls < mblvm
                 
                 initial_ssq_total = zeros(state.Nnew, 1);
                 initial_ssq = cell(1, self.B);
-                for b = 1:self.B                    
-                    initial_ssq{b} = self.ssq(new{b}.data, 2);
-                    initial_ssq_total = initial_ssq_total + initial_ssq{b};
-                    if a==1                        
-                        state.stats.initial_ssq{b} = initial_ssq{b};
-                        state.stats.initial_ssq_total(:,1) = initial_ssq_total;
+                for b = 1:self.B           
+                    if not(isempty(new{b}))
+                        initial_ssq{b} = self.ssq(new{b}.data, 2);
+                        initial_ssq_total = initial_ssq_total + initial_ssq{b};
+                        if a==1                        
+                            state.stats.initial_ssq{b} = initial_ssq{b};
+                            state.stats.initial_ssq_total(:,1) = initial_ssq_total;
+                        end
                     end
                 end
 
@@ -433,7 +435,8 @@ classdef mbpls < mblvm
                     state.T_sb(:,b,a) = state.T{b}(:,a);
                 end
                 
-                % Calculate the superscore, T_super
+                % Calculate the superscore, T_super. 
+                % TODO(KGD): what if T_sb is entirely missing for a block?
                 state.T_super(:,a) = state.T_sb(:,:,a) * self.super.W(:,a);
                 
                 % Deflate each block: using the SUPERSCORE and the block loading
@@ -444,6 +447,7 @@ classdef mbpls < mblvm
                 end
             end % looping on ``a`` latent variables
             state.Y_pred = state.T_super * self.super.C(:,1:a)';
+            state.Y_pred = state.Y_pred .* self.YPP.scaling + self.YPP.mean_center;
             
             % Summary statistics for each block and the super level
             overall_variance = zeros(state.Nnew, 1);
