@@ -435,7 +435,7 @@ classdef mbpls < mblvm
                     state.T_sb(:,b,a) = state.T{b}(:,a);
                 end
                 
-                % Calculate the superscore, T_super. 
+                % Calculate the superscore, T_super. cd ..
                 % TODO(KGD): what if T_sb is entirely missing for a block?
                 state.T_super(:,a) = state.T_sb(:,:,a) * self.super.W(:,a);
                 
