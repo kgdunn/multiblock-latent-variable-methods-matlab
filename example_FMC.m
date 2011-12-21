@@ -40,7 +40,7 @@ X = block(FMC.X, 'X: batch data',...                     % name of the block
                  {'batch_tag_names', FMC.Xnames}, ...    % trajectory names
                  {'batch_names', FMC.batch_names});      % batch names
 X = X.exclude(1, missing_chemistry);
-%plot(X, {'layout', [2, 3]})
+plot(X, {'layout', [2, 3]}, {'mark', {'28', '43'}})
 
 % Final quality attributes (CQAs)
 % --------------------------------
