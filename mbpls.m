@@ -434,6 +434,7 @@ classdef mbpls < mblvm
                 end
                 
                 % Calculate the superscore, T_super
+                % TODO(KGD): handle missing values in T_sb (a block may not necessarily be present yet)
                 state.T_super(:,a) = state.T_sb(:,:,a) * self.super.W(:,a);
                 
                 % Deflate each block: using the SUPERSCORE and the block loading
@@ -739,7 +740,7 @@ classdef mbpls < mblvm
                 idx = series.y_num;
             end
             
-            labels = hP.model.Y.labels;
+            labels = hP.model.Y.labels{2};
             if isempty(labels)
                 if strcmpi(series.current, 'x')
                     tag_name = ['tag ', num2str(series.x_num)];
@@ -780,7 +781,7 @@ classdef mbpls < mblvm
             end   
             % Get the column labels for the Y-block
             label_str = [];
-            labels = hP.model.Y.labels;
+            labels = hP.model.Y.labels{2};
             if not(isempty(labels))
                 label_str = ['Predicted: ', labels{idx}];
             end
@@ -812,7 +813,7 @@ classdef mbpls < mblvm
             elseif strcmpi(series.current, 'y')
                 idx = series.y_num;
             end   
-            labels = hP.model.Y.labels;
+            labels = hP.model.Y.labels{2};
             if isempty(labels)
                 if strcmpi(series.current, 'x')
                     tag_name = ['tag ', num2str(series.x_num)];
@@ -1017,7 +1018,7 @@ end % end classdef
 
 function annotate_obs_predicted(ax)    
     
-    if findobj(ax, 'Tag', 'RMSEP_obs_pred')
+    if findobj(ax, 'Tag', 'RMSEE_obs_pred')
         return
     end
     extent = axis;
@@ -1034,9 +1035,9 @@ function annotate_obs_predicted(ax)
     x_data(isnan(x_data)) = [];
     y_data = get(hData, 'YData');
     y_data(isnan(y_data)) = [];    
-    RMSEP = sqrt(mean((x_data - y_data).^2));
-    hText = text(min_ex + 0.05*delta, max_ex - 0.05*delta, sprintf('RMSEP = %0.4g', RMSEP));
-    set(hText, 'Tag', 'RMSEP_obs_pred');
+    RMSEE = sqrt(mean((x_data - y_data).^2));
+    hText = text(min_ex + 0.05*delta, max_ex - 0.05*delta, sprintf('RMSEE = %0.4g', RMSEE));
+    set(hText, 'Tag', 'RMSEE_obs_pred');
 
     xlim([min_ex-0.1*delta, max_ex+0.1*delta])
     ylim([min_ex-0.1*delta, max_ex+0.1*delta])
