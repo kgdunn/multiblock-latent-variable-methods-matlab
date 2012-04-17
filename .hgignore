@@ -1,2 +1,6 @@
 kaggle/
 documentation/_build/
+distributions/
+temporary/
+readings/
+export/
