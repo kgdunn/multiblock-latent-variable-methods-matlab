@@ -751,7 +751,7 @@ classdef mbpls < mblvm
                     tag_name = ['tag ', num2str(series.y_num)];
                 end
             else
-                tag_name = labels{2}{idx};
+                tag_name = labels{idx};
             end
                 
             label_str = ['Observed: ', tag_name];            
@@ -786,7 +786,7 @@ classdef mbpls < mblvm
             label_str = [];
             labels = hP.model.Y.labels{2};
             if not(isempty(labels))
-                label_str = ['Predicted: ', labels{2}{idx}];
+                label_str = ['Predicted: ', labels{idx}];
             end
             
             if strcmpi(series.current, 'x')
@@ -824,7 +824,7 @@ classdef mbpls < mblvm
                     tag_name = ['tag ', num2str(series.y_num)];
                 end
             else
-                tag_name = labels{2}{idx};
+                tag_name = labels{idx};
             end
                 
             label_str = ['Predicted: ', tag_name];
