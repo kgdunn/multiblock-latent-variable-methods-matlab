@@ -1,7 +1,7 @@
 
 % Shortened FMC data set
 % ----------------------
-FMC = load('datasets/FMC.mat');
+FMC = load(['datasets', filesep, 'FMC.mat']);
 
 % Only use the first 10 rows in all blocks
 use_rows = 1:10;

@@ -32,7 +32,7 @@ function self = lvm(blocks, varargin)
 %            lvm({'Z1', Z1, 'Z2', Z2, 'X', batch_X, 'Y', y_block}) 
   
     if mod(numel(blocks), 2) ~= 0
-        error('lvm:lvm', 'First input must be provided as a cell array of pairs, e.g. {''X'', x_data, ''Y'', y_data}')    
+        error('lvm:lvm', 'First input must be provided as a cell array of pairs, e.g. {''X'', x_data, ''Y'', y_data}')
     end
     if iscell(blocks)
         % FUTURE(KGD): use a dictionary, or MATLAB/Java hashtable for the blocks
@@ -42,7 +42,7 @@ function self = lvm(blocks, varargin)
             if mod(b, 2) ~= 0
                 block_name = blocks{b};
                 if not(ischar(block_name))
-                    error('lvm:lvm', 'Block name must be a character string.') 
+                    error('lvm:lvm', 'Block name must be a character string.')
                 end
                 if strcmpi(block_name, 'y') && (numel(blocks) > 2)
                     model_type = 'PLS';
@@ -63,7 +63,7 @@ function self = lvm(blocks, varargin)
     elseif strcmpi(model_type, 'pls')
         self = mbpls(out, varargin{:});
     end
- 
+
     % Now set the data blocks:
     %self.blocks = out;
     
@@ -71,10 +71,8 @@ function self = lvm(blocks, varargin)
         self.model_type = ['MB-', model_type];
     else
         self.model_type = model_type;
-    end    
+    end
 
     if self.opt.build_now
        build(self);
-    end            
-
-        
+    end

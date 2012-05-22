@@ -3064,7 +3064,8 @@ classdef mblvm < handle
                 end
                 
                 if ~isempty(batchblock)
-                    colour_order = {'r', [255, 102, 0]/255, [0.2, 0.8, 0.2], 'k', 'b', 'm'};
+                    %colour_order = {'r', [255, 102, 0]/255, [0.2, 0.8, 0.2], };
+                    colour_order = {'r', 'k', [200, 102, 0]/255, 'm' };
                     R2_data(isnan(R2_data)) = 0.0;
                     hPlot = zeros(size(R2_data, 2), 1);
                     for a = 1:size(R2_data, 2)

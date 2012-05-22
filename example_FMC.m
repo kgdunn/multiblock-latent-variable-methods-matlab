@@ -15,7 +15,7 @@
 
 clear all
 close all
-FMC = load('datasets/FMC.mat');
+FMC = load(['datasets', filesep, 'FMC.mat']);
 
 % Initial conditions block: chemistry
 % -------------------------
@@ -40,7 +40,8 @@ X = block(FMC.X, 'X: batch data',...                     % name of the block
                  {'batch_tag_names', FMC.Xnames}, ...    % trajectory names
                  {'batch_names', FMC.batch_names});      % batch names
 X = X.exclude(1, missing_chemistry);
-plot(X, {'layout', [2, 3]}, {'mark', {'28', '43'}})
+%plot(X, {'layout', [2, 3]}, {'mark', {'28', '43'}})
+plot(X, {'layout', [2, 3]})
 
 % Final quality attributes (CQAs)
 % --------------------------------
@@ -54,7 +55,7 @@ Y = Y.exclude(1, missing_chemistry);
 % We will use 2 components
 % ----------------------------------
 if true    
-    cqa_pca = lvm({'CQAs', Y}, 2);
+    cqa_pca = lvm({'CQAs', Y}, 3);
     plot(cqa_pca)
 
     % There seem to be 2 clusters in the CQA space.  Take a look at contributions.

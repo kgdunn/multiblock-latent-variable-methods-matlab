@@ -3,7 +3,7 @@
 % -------------------------------------------------------------------------
 
 % Load the raw data
-data = load('datasets/SBR.mat');
+data = load(['datasets', filesep, 'SBR.mat']);
 Y_data = data.Y;
    
 % Specify the data dimensions
@@ -30,58 +30,19 @@ plot(batchX)
 A = 2;
 batch_PCA = lvm({'X', batchX}, A);
 
-% Let's see the score plots and Hotelling's T2 first
-plot(batch_PCA)
+% Let's take a look at the model first: scores and SPE
+%plot(batch_PCA)
+
+% Highlight batch 34 and 37 (scores) and batch 8 (SPE)
+%plot(batchX, {'layout', [2, 4]}, {'mark', {'34'}})
+%plot(batchX, {'layout', [2, 4]}, {'mark', {'37'}})
+%plot(batchX, {'layout', [2, 4]}, {'mark', {'8'}})
 
 
-% ---------
-% DIAGNOSIS: there's a problem with batch 34 and 37.  
-% ---------
-
-% Batch 37: showed up in t_1
-% --------
-% Let's take a look when: right from the start of the batch
-plot(batch_PCA, 'scores', {'batch', 37})
-
-contrib_37 = contrib(batch_PCA, 37);
-plot(contrib_37, 'scores', 1)  % which tags, and what 
-% time periods, are related to problem?
-% Plot the raw data to verify contributions
-plot(batchX, 'highlight', 2, 3, 37)
-
-% Does it also show up in SPEs (No)
-plot(batch_PCA, 'spe', {'batch', 37})
-
-
-% Batch 34: showed up in t_2
-% --------
-plot(batch_PCA, 'scores', {'batch', 34})
-
-contrib_34 = contrib(batch_PCA, 34);
-% which tags are related to batch 34, and at what times?
-plot(contrib_34, 'scores', 2)  
-% Verify in the raw data
-plot(batchX, 'highlight', 2, 3, 34)   
-
-% Does it also show up in SPEs?
-% Yes: at time t=105, around when problem occurred
-plot(batch_PCA, 'spe', {'batch', 34})
-
-% What are the SPE contributions?
-plot(contrib_34, 'spe')
-
-% Other plots
-plot(batch_PCA, 'summary') % default
-plot(batch_PCA, 'obs')
-plot(batchX, 'onebatch', 34)
-
-% -------------------
-% EXCLUDE and REBUILD
-% -------------------
 
 % Exclude the identified bad batches and make them 
 % testing data
-[batchXgood, test_X] = batchX.exclude(1, [34, 37]);
+[X_good, test_X] = batchX.exclude(1, [34, 37]);
 
 
 % Monitoring: code not available yet
@@ -97,19 +58,18 @@ plot(batchX, 'onebatch', 34)
 % -------------------
 
 % Let's do a PCA on the Y-space of the batch quality 
-pcaY = lvm({'X', Y_data}, 2);
+Y = block(Y_data);
+Y.add_labels(1, cellstr(num2str([1:nBatches]')));
+Y.add_labels(2, cellstr(data.Ynames));
+plot(Y)
+pcaY = lvm({'Quality', Y}, 2);
 
 % Score: 34, 37 (are expected), but also see 36.  
 % 48 and 52 are on the edge
-plot(pcaY, 'scores')
-% Batch 37 slightly over the limit
-plot(pcaY, 'spe')
 
 % Build a batch PLS model on the 50 good batches
-Y_data_good = Y_data;
-Y_data_good([34, 37],:) = [];  % exclude the 2 bad batches
-pls = lvm({'X', batchXgood, 'Y', Y_data_good});
-
-
+[Y_good, Y_test] = Y.exclude(1, [34, 37]);
+pls = lvm({'X', X_good, 'Y', Y_good}, 2);
+plot(pls)
 
 

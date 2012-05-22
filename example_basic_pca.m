@@ -4,7 +4,7 @@
 
 % Load the data
 % -------------
-quality = load('datasets/LDPE-quality.mat');
+quality = load(['datasets', filesep, 'LDPE-quality.mat']);
 tag_names = {'Conversion', 'Mn', 'Mw', 'LCB', 'SCB'};
 
 % Create the "X" block: 

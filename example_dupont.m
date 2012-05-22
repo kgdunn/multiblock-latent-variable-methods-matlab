@@ -3,7 +3,7 @@
 % -------------------------------------------------------------
 
 % Load the raw data
-dupont = load('datasets/DuPont.mat');
+dupont = load(['datasets', filesep, 'DuPont.mat']);
 batch_data = dupont.tech;
 
 % Specify the data dimensions

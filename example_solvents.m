@@ -1,5 +1,5 @@
 % Import the file
-solvents = importdata('datasets/solvents.csv', ',', 1);
+solvents = importdata(['datasets', filesep, 'solvents.csv'], ',', 1);
 
 X = block(solvents.data);
 X.add_labels(2, solvents.textdata(1,2:end));
