@@ -447,7 +447,7 @@ classdef mbpls < mblvm
                 end
             end % looping on ``a`` latent variables
             state.Y_pred = state.T_super * self.super.C(:,1:a)';
-            state.Y_pred = state.Y_pred .* self.YPP.scaling + self.YPP.mean_center;
+            state.Y_pred = state.Y_pred ./ self.YPP.scaling + self.YPP.mean_center;
             
             % Summary statistics for each block and the super level
             overall_variance = zeros(state.Nnew, 1);
