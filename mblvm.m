@@ -800,13 +800,15 @@ classdef mblvm < handle
             %       model.export('mymodel')
             %
             % will create ``mymodel_superlevel.ini``
-            %             ``mymodel_block_Z.ini``
-            %             ``mymodel_block_X.ini``
+            %             ``mymodel_block_Z_preproc.ini``
+            %             ``mymodel_block_Z_parameters.ini``
+            %             ``mymodel_block_X_preproc.ini``
+            %             ``mymodel_block_X_parameters.ini``
             % etc. Will create B+1 text files, where B = number of blocks.
             
             function write_section(fid, section_name)
                 % Start a new section
-                fprintf(fid, '\n\n[%s]\n\n', section_name);
+                fprintf(fid, '\n[%s]\n', section_name);
             end
             function write_value(fid, name, value)
                 if ischar(value)
@@ -821,8 +823,14 @@ classdef mblvm < handle
             end            
             function write_vector(fid, section_name, row_labels, values)
                 write_section(fid, section_name)
-                for n = 1:numel(values)
-                    write_value(fid, row_labels{n}, values(n))
+                if isempty(row_labels)
+                    for n = 1:numel(values)
+                        fprintf(fid, '%0.15f\n', values(n));
+                    end
+                else
+                    for n = 1:numel(values)
+                        write_value(fid, row_labels{n}, values(n))
+                    end
                 end
             end
             function write_matrix_by_column(fid, matrix_name, row_labels, matrix)
@@ -833,6 +841,56 @@ classdef mblvm < handle
                     write_vector(fid, section_name, row_labels, matrix(:,k))
                 end
             end
+            % Export each block to a new file
+            for b = 1:self.B
+                % Write preprocessing data; e.g. to "mymodel_block_Z_preproc.ini"
+                fid = fopen([filename_base, '_block_', self.blocks{b}.name, '_preproc.ini'], 'w');
+                column_labels = self.blocks{b}.labels{2};
+                write_vector(fid, 'location', [], self.PP{b}.mean_center)
+                write_vector(fid, 'scale', [], self.PP{b}.scaling)
+                fclose(fid);
+                
+%                 fid = fopen([filename_base, '_block_', self.blocks{b}.name, '_parameters.ini'], 'w');
+%                 write_section(fid, 'BlockInformation')
+%                 write_value(fid, 'Block name', self.blocks{b}.name)
+%                 write_value(fid, 'Block number', b)
+%                 write_value(fid, 'Block scaling factor K_b', sqrt(self.K(b)))
+%                 
+%                 write_section(fid, 'A')
+%                 write_value(fid, 'A', self.A)
+%                 
+%                 
+%                 
+%                 % Force new labelling onto batch blocks, or onto blocks that 
+%                 % have no column labels
+%                 if isempty(column_labels) || isa(self.blocks{b}, 'block_batch')
+%                     column_labels = cell(self.K(b), 1);
+%                     for col = 1:numel(column_labels)
+%                         column_labels{col} = ['Tag ', num2str(col)];
+%                     end
+%                 else
+%                     column_labels = column_labels{2};
+%                 end
+%                 
+%                 
+%                 
+%                 % Loadings P and weights W
+%                 write_matrix_by_column(fid, 'p', column_labels, self.P{b})
+%                 write_matrix_by_column(fid, 'w', column_labels, self.W{b})
+%                 
+%                 % Score scaling matrix to calculate T^2
+%                 write_matrix_by_column(fid, 'S', column_labels, self.stats{b}.S)
+%                 
+%                 % Write the confidence interval information
+%                 write_vector(fid, 'Score_limits_plus_and_minus_95', component_labels, self.lim{b}.t)
+%                 write_vector(fid, 'T2_limits_95', component_labels, self.lim{b}.T2)
+%                 write_vector(fid, 'SPE_limits_95', component_labels, self.lim{b}.SPE)
+%                 % [ellipse constant]
+%                 
+%                 fclose(fid);
+            end       
+            
+            
 
             fid = fopen([filename_base, '.ini'], 'w');
             write_section(fid, 'A')
@@ -864,49 +922,7 @@ classdef mblvm < handle
             
             sucesss = fclose(fid);            
             
-            % Now export each block to a new file
-            for b = 1:self.B
-                fid = fopen([filename_base, '_block_', num2str(b), '_name_', self.blocks{b}.name, '.ini'], 'w');
-                write_section(fid, 'BlockInformation')
-                write_value(fid, 'Block name', self.blocks{b}.name)
-                write_value(fid, 'Block number', b)
-                write_value(fid, 'Block scaling factor K_b', sqrt(self.K(b)))
-                
-                write_section(fid, 'A')
-                write_value(fid, 'A', self.A)
-                
-                column_labels = self.blocks{b}.labels;
-                
-                % Force new labelling onto batch blocks, or onto blocks that 
-                % have no column labels
-                if isempty(column_labels) || isa(self.blocks{b}, 'block_batch')
-                    column_labels = cell(self.K(b), 1);
-                    for col = 1:numel(column_labels)
-                        column_labels{col} = ['Tag ', num2str(col)];
-                    end
-                else
-                    column_labels = column_labels{2};
-                end
-                
-                % Preprocessing data
-                write_vector(fid, 'Mean', column_labels, self.PP{b}.mean_center)
-                write_vector(fid, 'Scale', column_labels, self.PP{b}.scaling)
-                
-                % Loadings P and weights W
-                write_matrix_by_column(fid, 'p', column_labels, self.P{b})
-                write_matrix_by_column(fid, 'w', column_labels, self.W{b})
-                
-                % Score scaling matrix to calculate T^2
-                write_matrix_by_column(fid, 'S', column_labels, self.stats{b}.S)
-                
-                % Write the confidence interval information
-                write_vector(fid, 'Score_limits_plus_and_minus_95', component_labels, self.lim{b}.t)
-                write_vector(fid, 'T2_limits_95', component_labels, self.lim{b}.T2)
-                write_vector(fid, 'SPE_limits_95', component_labels, self.lim{b}.SPE)
-                % [ellipse constant]
-                
-                fclose(fid);
-            end            
+                 
         end % ``export``
         
         function self = create_storage(self)

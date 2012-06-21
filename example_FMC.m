@@ -59,7 +59,7 @@ X = block(FMC.X, 'X: batch data',...                     % name of the block
                  {'batch_names', FMC.batch_names});      % batch names
 X = X.exclude(1, missing_chemistry);
 %plot(X, {'layout', [2, 3]}, {'mark', {'28', '43'}})
-plot(X, {'layout', [2, 3]})
+%plot(X, {'layout', [2, 3]})
 
 % Final quality attributes (CQAs)
 % --------------------------------
@@ -67,6 +67,15 @@ plot(X, {'layout', [2, 3]})
 Y = block(FMC.Y, {'col_labels', FMC.Ynames}, {'row_labels', FMC.batch_names}); 
 Y = Y.exclude(1, missing_chemistry);
 %plot(Y, {'layout', [2, 4]})
+
+% Batch MB PLS model
+% -------------------
+if true
+    batch_mbpls = lvm({'Z-chemistry', Zchem, 'Z-timing', Zop, ...
+                       'Trajectories', X, 'Y', Y}, 2);
+    batch_mbpls.export('FMC')
+end
+
 
 
 % Let's start with a PCA on the Y-block, to understand the quality variables
