@@ -3423,7 +3423,7 @@ function basic_plot__predictions(hP)
     % TODO(KGD): add the ability to plot data from multiple blocks
     % i.e. click plot, then change dropdown: will only change plot in that
     % subplot
-    M = min(hP.model.M, 6);
+    M = min(hP.model.M, 8);
     [hP.nRow hP.nCol] = hP.subplot_layout(M);
     hP.new_axis(1:M);
     for m = 1:M

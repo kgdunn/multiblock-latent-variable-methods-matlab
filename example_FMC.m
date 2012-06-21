@@ -22,7 +22,7 @@ FMC = load(['datasets', filesep, 'FMC.mat']);
 Zchem = block(FMC.Zchem);
 Zchem.add_labels(1, FMC.batch_names);
 Zchem.add_labels(2, FMC.Zchem_names);
-missing_chemistry = [12, 13, 14, 15, 28, 29, 30, 31, 32, 33, 34, 35, 53];
+missing_chemistry = [];%12, 13, 14, 15, 28, 29, 30, 31, 32, 33, 34, 35, 53];
 Zchem = Zchem.exclude(1, missing_chemistry);
 %plot(Zchem)
 
@@ -36,6 +36,24 @@ Zop = Zop.exclude(1, missing_chemistry);
 
 % Batch data block (pre-aligned)
 % ------------------------------
+% phase_id = [];
+% batch_id = [];
+% for n = 1:59
+%     for p = 1:325
+%         if p <= 175
+%             phase_id(end+1) = 1;
+%         elseif  p <= 250
+%             phase_id(end+1) = 2;
+%         elseif p <= 325
+%             phase_id(end+1) = 3;
+%         end
+%         batch_id(end+1) = FMC.batch_names(n);
+%     end
+% end
+% phase_id = phase_id(:);
+% batch_id = batch_id(:);
+% csvwrite('trajectories_X.csv', [batch_id, phase_id, FMC.X])
+
 X = block(FMC.X, 'X: batch data',...                     % name of the block
                  {'batch_tag_names', FMC.Xnames}, ...    % trajectory names
                  {'batch_names', FMC.batch_names});      % batch names
