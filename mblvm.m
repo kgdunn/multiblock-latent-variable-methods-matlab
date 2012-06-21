@@ -907,14 +907,15 @@ classdef mblvm < handle
             write_matrix_by_column(fid, 'Super_W', component_labels, self.super.W)
                         
             % Write the C-matrix
-            write_matrix_by_column(fid, 'C', self.Y.labels{2}, self.super.C)
+            if strcmp(self.model_type, 'PLS')
+                write_matrix_by_column(fid, 'C', self.Y.labels{2}, self.super.C)
+                % Write the mean-centering and scaling vectors for "Y"
+                write_vector(fid, 'Mean_Y', self.Y.labels{2}, self.YPP.mean_center)
+                write_vector(fid, 'Scale_Y', self.Y.labels{2}, self.YPP.scaling)
+            end
             
             % Write the S-matrix
             write_matrix_by_column(fid, 'S', component_labels, self.super.S)
-            
-            % Write the mean-centering and scaling vectors for "Y"
-            write_vector(fid, 'Mean_Y', self.Y.labels{2}, self.YPP.mean_center)
-            write_vector(fid, 'Scale_Y', self.Y.labels{2}, self.YPP.scaling)
             
             sucesss = fclose(fid);            
             
