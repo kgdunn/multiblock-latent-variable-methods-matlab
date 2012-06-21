@@ -821,17 +821,13 @@ classdef mblvm < handle
                     fprintf(fid, '%s = %0.15f\n', name, value);
                 end
             end            
-            function write_vector(fid, section_name, row_labels, values)
-                write_section(fid, section_name)
-                if isempty(row_labels)
-                    for n = 1:numel(values)
-                        fprintf(fid, '%0.15f\n', values(n));
-                    end
-                else
-                    for n = 1:numel(values)
-                        write_value(fid, row_labels{n}, values(n))
-                    end
+            function write_vector(fid, section_name, values)
+                fprintf(fid, [section_name, ' = """[\n']);
+                fprintf(fid, '%0.15f', values(1));
+                for n = 2:numel(values)
+                    fprintf(fid, ',\n%0.15f', values(n));
                 end
+                fprintf(fid, ']"""\n\n');
             end
             function write_matrix_by_column(fid, matrix_name, row_labels, matrix)
                 % Create sections [name1], [name2], ... up to the number of
@@ -846,8 +842,8 @@ classdef mblvm < handle
                 % Write preprocessing data; e.g. to "mymodel_block_Z_preproc.ini"
                 fid = fopen([filename_base, '_block_', self.blocks{b}.name, '_preproc.ini'], 'w');
                 column_labels = self.blocks{b}.labels{2};
-                write_vector(fid, 'location', [], self.PP{b}.mean_center)
-                write_vector(fid, 'scale', [], self.PP{b}.scaling)
+                write_vector(fid, 'location', self.PP{b}.mean_center)
+                write_vector(fid, 'scale', self.PP{b}.scaling)
                 fclose(fid);
                 
 %                 fid = fopen([filename_base, '_block_', self.blocks{b}.name, '_parameters.ini'], 'w');
