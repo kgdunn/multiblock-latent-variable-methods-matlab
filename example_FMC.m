@@ -13,7 +13,7 @@
 % [3] http://digitalcommons.mcmaster.ca/opendissertations/1596/
 %      "Batch Process Improvement Using Latent Variable Methods"
 
-clear all
+%clear all
 close all
 FMC = load(['datasets', filesep, 'FMC.mat']);
 
@@ -75,7 +75,7 @@ if true
                        'Trajectories', X, 'Y', Y}, 2);
     batch_mbpls.export('FMC')
 end
-
+break
 
 
 % Let's start with a PCA on the Y-block, to understand the quality variables

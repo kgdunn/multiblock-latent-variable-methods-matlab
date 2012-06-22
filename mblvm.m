@@ -799,17 +799,11 @@ classdef mblvm < handle
             % e.g.: model = lvm(...)
             %       model.export('mymodel')
             %
-            % will create ``mymodel_superlevel.ini``
+            % will create ``mymodel_parameters.txt``       <-- all blocks' parameters
             %             ``mymodel_block_Z_preproc.ini``
-            %             ``mymodel_block_Z_parameters.ini``
             %             ``mymodel_block_X_preproc.ini``
-            %             ``mymodel_block_X_parameters.ini``
             % etc. Will create B+1 text files, where B = number of blocks.
             
-            function write_section(fid, section_name)
-                % Start a new section
-                fprintf(fid, '\n[%s]\n', section_name);
-            end
             function write_value(fid, name, value)
                 if ischar(value)
                     fprintf(fid, '%s = %s\n', name, value);
@@ -829,97 +823,72 @@ classdef mblvm < handle
                 end
                 fprintf(fid, ']"""\n\n');
             end
-            function write_matrix_by_column(fid, matrix_name, row_labels, matrix)
-                % Create sections [name1], [name2], ... up to the number of
-                % columns in ``matrix``. The row labels 
-                for k = 1:size(matrix, 2)
-                    section_name = [matrix_name, '', num2str(k)];
-                    write_vector(fid, section_name, row_labels, matrix(:,k))
+            function write_row_in_matrix(fid, values)
+                fprintf(fid, '    [%0.15f', values(1));
+                for n = 2:numel(values)
+                    fprintf(fid, ',%0.15f', values(n));
                 end
+                fprintf(fid, '],\n');
             end
-            % Export each block to a new file
+            function write_matrix(fid, matrix_name, matrix)
+                %P = """[
+                %        [0,0,0],
+                %        [0.0008224249,0.1421761,0.679463],
+                %        [-0.3490362,0.02316021,-0.1138952],
+                %        [-0.01816896,-0.3461325,-0.1736953],
+                %    ]"""
+                fprintf(fid, [matrix_name, ' = """[\n']);                
+                for n = 1:size(matrix, 1)
+                    write_row_in_matrix(fid, matrix(n,:))
+                end
+                fprintf(fid, ']"""\n\n');
+            end
+            
+            
+            % First, export each block's preprocessing to a new file
             for b = 1:self.B
                 % Write preprocessing data; e.g. to "mymodel_block_Z_preproc.ini"
                 fid = fopen([filename_base, '_block_', self.blocks{b}.name, '_preproc.ini'], 'w');
-                column_labels = self.blocks{b}.labels{2};
                 write_vector(fid, 'location', self.PP{b}.mean_center)
                 write_vector(fid, 'scale', self.PP{b}.scaling)
                 fclose(fid);
-                
-%                 fid = fopen([filename_base, '_block_', self.blocks{b}.name, '_parameters.ini'], 'w');
-%                 write_section(fid, 'BlockInformation')
-%                 write_value(fid, 'Block name', self.blocks{b}.name)
-%                 write_value(fid, 'Block number', b)
-%                 write_value(fid, 'Block scaling factor K_b', sqrt(self.K(b)))
-%                 
-%                 write_section(fid, 'A')
-%                 write_value(fid, 'A', self.A)
-%                 
-%                 
-%                 
-%                 % Force new labelling onto batch blocks, or onto blocks that 
-%                 % have no column labels
-%                 if isempty(column_labels) || isa(self.blocks{b}, 'block_batch')
-%                     column_labels = cell(self.K(b), 1);
-%                     for col = 1:numel(column_labels)
-%                         column_labels{col} = ['Tag ', num2str(col)];
-%                     end
-%                 else
-%                     column_labels = column_labels{2};
-%                 end
-%                 
-%                 
-%                 
-%                 % Loadings P and weights W
-%                 write_matrix_by_column(fid, 'p', column_labels, self.P{b})
-%                 write_matrix_by_column(fid, 'w', column_labels, self.W{b})
-%                 
-%                 % Score scaling matrix to calculate T^2
-%                 write_matrix_by_column(fid, 'S', column_labels, self.stats{b}.S)
-%                 
-%                 % Write the confidence interval information
-%                 write_vector(fid, 'Score_limits_plus_and_minus_95', component_labels, self.lim{b}.t)
-%                 write_vector(fid, 'T2_limits_95', component_labels, self.lim{b}.T2)
-%                 write_vector(fid, 'SPE_limits_95', component_labels, self.lim{b}.SPE)
-%                 % [ellipse constant]
-%                 
-%                 fclose(fid);
-            end       
+            end
             
-            
-
-            fid = fopen([filename_base, '.ini'], 'w');
-            write_section(fid, 'A')
+            fid = fopen([filename_base, '_parameters.txt'], 'w');
             write_value(fid, 'A', self.A)
-            
-            write_section(fid, 'B')
             write_value(fid, 'B', self.B)
-            
-            write_section(fid, 'M')
             write_value(fid, 'M', self.M)
-            
-            component_labels = cell(self.A, 1);
-            for a = 1:self.A
-                component_labels{a} = ['Component_', num2str(a)];                
+            write_value(fid, 'MDM', self.opt.md_method)
+            fprintf(fid, 'block_order = ');
+            for b = 1:self.B
+                fprintf(fid, self.blocks{b}.name);
+                if b < self.B, fprintf(fid, ','); end
             end
+            fprintf(fid, '\n\n');
             
-            % Write the superscore weights
-            write_matrix_by_column(fid, 'Super_W', component_labels, self.super.W)
-                        
-            % Write the C-matrix
-            if strcmp(self.model_type, 'PLS')
-                write_matrix_by_column(fid, 'C', self.Y.labels{2}, self.super.C)
+            % Print out the super level parameters:
+            write_matrix(fid, 'P_super', self.super.P)
+            write_matrix(fid, 'W_super', self.super.W)
+            write_matrix(fid, 'S_super', self.super.S)
+            if self.M > 0
+                write_matrix(fid, 'C_super', self.super.C)
                 % Write the mean-centering and scaling vectors for "Y"
-                write_vector(fid, 'Mean_Y', self.Y.labels{2}, self.YPP.mean_center)
-                write_vector(fid, 'Scale_Y', self.Y.labels{2}, self.YPP.scaling)
+                write_vector(fid, 'Mean_Y', self.YPP.mean_center)
+                write_vector(fid, 'Scale_Y', self.YPP.scaling)
             end
             
-            % Write the S-matrix
-            write_matrix_by_column(fid, 'S', component_labels, self.super.S)
-            
+            % Paraameters for each block
+            for b = 1:self.B
+                fprintf(fid, '[%s]\n', self.blocks{b}.name);
+                write_value(fid, 'K', self.K(b))
+                write_value(fid, 'S_block', self.block_scaling(b))
+                write_matrix(fid, 'P', self.P{b})
+                write_matrix(fid, 'S', self.stats{b}.S)
+                if self.M > 0
+                    write_matrix(fid, 'W', self.W{b})                
+                end
+            end
             sucesss = fclose(fid);            
-            
-                 
         end % ``export``
         
         function self = create_storage(self)
