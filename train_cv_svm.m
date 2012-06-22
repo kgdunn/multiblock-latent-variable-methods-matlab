@@ -6,7 +6,7 @@ function model = train_cv_svm(data, label_vector)
 
 
     % Specify the path to the SVM code (path is for the ``windows`` directory)
-    addpath('C:\Program Files\MATLAB\R2008a\work\libsvm-3.1\windows')
+    addpath('svm\libsvm-3.1\windows')
 
     % Try a linear SVM model first ("-t 0" implies a linear model)
     model_linear = svmtrain(label_vector, data, '-t 0');
