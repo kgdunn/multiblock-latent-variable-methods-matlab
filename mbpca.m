@@ -99,8 +99,7 @@ classdef mbpca < mblvm
                 %  http://dx.doi.org/10.1016/0169-7439(87)80084-9)
                 % 
                 % Also see: http://www.models.life.ku.dk/signflipsvd
-                % See 10.1.1.120.8476.pdf in the readings directory
-                
+                % See 10.1.1.120.8476.pdf in the readings directory                
                 [max_el, max_el_idx] = max(abs(out.p_a)); %#ok<ASGLU>
                 if sign(out.p_a(max_el_idx)) < 1
                     out.p_a = -1.0 * out.p_a;
@@ -147,6 +146,7 @@ classdef mbpca < mblvm
                     [self.stats{b}.T2(:,a), S] = self.mahalanobis_distance(self.T{b}(:,1:a));
                     self.stats{b}.S = S;
                 end
+                % This regression does not lead to unit loadings: should we normalize it? Better terminology: w_super
                 p_super = self.regress_func(t_superblock, out.t_a, false);
                      
                 self.super.T_summary(:,:,a) = t_superblock;
@@ -159,12 +159,17 @@ classdef mbpca < mblvm
                 end
                 
                 % Now deflate the data matrix using the superscore
-                self.data = self.data - out.t_a * out.p_a';
+                %self.data = self.data - out.t_a * out.p_a';
                 ssq_cumul = 0;
                 ssq_before = 0;
                 for b = 1:self.B
                     idx = self.b_iter(b);
                     X_portion = self.data(:, idx);
+                    
+                    KGD: fix this: deflate by the block loadings
+                    
+                    self.data = self.data - out.t_a * self.P{b}(:,a)';
+                    
                     col_ssq = self.ssq(X_portion, 1)';
                     row_ssq = self.ssq(X_portion, 2);
                     ssq_cumul = ssq_cumul + sum(col_ssq);
