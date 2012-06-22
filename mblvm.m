@@ -817,9 +817,9 @@ classdef mblvm < handle
             end            
             function write_vector(fid, section_name, values)
                 fprintf(fid, [section_name, ' = """[\n']);
-                fprintf(fid, '%0.15f', values(1));
+                fprintf(fid, '    %0.15f', values(1));
                 for n = 2:numel(values)
-                    fprintf(fid, ',\n%0.15f', values(n));
+                    fprintf(fid, ',\n    %0.15f', values(n));
                 end
                 fprintf(fid, ']"""\n\n');
             end
@@ -844,7 +844,6 @@ classdef mblvm < handle
                 fprintf(fid, ']"""\n\n');
             end
             
-            
             % First, export each block's preprocessing to a new file
             for b = 1:self.B
                 % Write preprocessing data; e.g. to "mymodel_block_Z_preproc.ini"
@@ -868,9 +867,9 @@ classdef mblvm < handle
             
             % Print out the super level parameters:
             write_matrix(fid, 'P_super', self.super.P)
-            write_matrix(fid, 'W_super', self.super.W)
             write_matrix(fid, 'S_super', self.super.S)
             if self.M > 0
+                write_matrix(fid, 'W_super', self.super.W)
                 write_matrix(fid, 'C_super', self.super.C)
                 % Write the mean-centering and scaling vectors for "Y"
                 write_vector(fid, 'Mean_Y', self.YPP.mean_center)
